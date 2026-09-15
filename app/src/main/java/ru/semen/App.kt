@@ -1,4 +1,4 @@
-package ru.semen.fishingspot
+package ru.semen
 
 import android.app.Application
 import com.yandex.mapkit.MapKitFactory

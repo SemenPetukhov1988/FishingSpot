@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/mainTabsFragment">
+
+    <!-- ✅ СТАРТОВЫЙ ЭКРАН: Табы -->
+    <fragment
+        android:id="@+id/mainTabsFragment"
+        android:name="ru.semen.fishingspot.fragment.MainTabsFragment"
+        android:label="Главная" />
+
+    <!-- Экран добавления точки (вызывается поверх табов) -->
+    <fragment
+        android:id="@+id/addPointFragment"
+        android:name="ru.semen.fishingspot.fragment.AddPointFragment"
+        android:label="Новая точка" />
+
+    <!-- Переход от табов к добавлению точки -->
+    <action
+        android:id="@+id/action_mainTabs_to_addPoint"
+        app:destination="@id/addPointFragment" />
+</navigation>
