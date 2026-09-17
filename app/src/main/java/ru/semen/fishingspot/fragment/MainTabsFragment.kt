@@ -8,20 +8,18 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
+import com.yandex.mapkit.MapKitFactory
 import ru.netology.fishingspot.ui.stats.StatsFragment
 import ru.netology.fishingspot.ui.user.FishermenFragment
-
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentMainTabsBinding
 import ru.semen.fishingspot.ui.map.GlobalMapFragment
-
 
 class MainTabsFragment : Fragment() {
 
     private var _binding: FragmentMainTabsBinding? = null
     private val binding get() = _binding!!
 
-    // Текущий активный фрагмент (чтобы не пересоздавать его каждый раз)
     private var currentFragment: Fragment? = null
 
     override fun onCreateView(
@@ -36,22 +34,19 @@ class MainTabsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 1. Отступы под статус-бар
         ViewCompat.setOnApplyWindowInsetsListener(binding.topBar) { v, windowInsets ->
             val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.updatePadding(top = insets.top)
             WindowInsetsCompat.CONSUMED
         }
 
-        // 2. Загружаем первый экран (Мои места) при старте
         if (savedInstanceState == null) {
             switchFragment(MyMapFragment(), R.id.nav_my_places)
         } else {
-            // Восстанавливаем состояние после поворота экрана
-            binding.bottomNavigation.selectedItemId = savedInstanceState.getInt("SELECTED_ITEM", R.id.nav_my_places)
+            binding.bottomNavigation.selectedItemId =
+                savedInstanceState.getInt("SELECTED_ITEM", R.id.nav_my_places)
         }
 
-        // 3. Обработчики кнопок в шапке
         binding.menuButton.setOnClickListener {
             // TODO: Открыть боковое меню
         }
@@ -60,7 +55,6 @@ class MainTabsFragment : Fragment() {
             binding.bottomNavigation.selectedItemId = R.id.nav_fishermen
         }
 
-        // 4. Навигация через нижнее меню
         binding.bottomNavigation.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_my_places -> switchFragment(MyMapFragment(), item.itemId)
@@ -72,11 +66,19 @@ class MainTabsFragment : Fragment() {
         }
     }
 
-    /**
-     * Метод замены фрагмента без анимации свайпа
-     */
+    // ✅ MapKit рантайм запускается ОДИН РАЗ для всех дочерних фрагментов
+    override fun onStart() {
+        super.onStart()
+        MapKitFactory.getInstance().onStart()
+    }
+
+    // ✅ И останавливается один раз — при уходе с экрана вкладок
+    override fun onStop() {
+        super.onStop()
+        MapKitFactory.getInstance().onStop()
+    }
+
     private fun switchFragment(fragment: Fragment, itemId: Int): Boolean {
-        // Если это тот же самый фрагмент - ничего не делаем
         if (fragment::class.java == currentFragment?.javaClass) {
             return true
         }
@@ -87,7 +89,6 @@ class MainTabsFragment : Fragment() {
 
         currentFragment = fragment
 
-        // Сохраняем выбранный пункт для восстановления после поворота
         requireActivity().runOnUiThread {
             binding.bottomNavigation.selectedItemId = itemId
         }

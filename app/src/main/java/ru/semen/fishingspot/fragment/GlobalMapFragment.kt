@@ -24,31 +24,25 @@ class GlobalMapFragment : Fragment() {
 
     private var mapView: MapView? = null
     private var locationManager: LocationManager? = null
-    private val LOCATION_PERMISSION_CODE = 1002 // Уникальный код для этого фрагмента
+    private val LOCATION_PERMISSION_CODE = 1002
     private var viewAlive = false
 
-    // Слушатель для однократного определения позиции
     private val locationListener: LocationListener = object : LocationListener {
         override fun onLocationUpdated(location: Location) {
             if (!viewAlive || mapView == null) return
 
             val point = location.position
-            Log.d("GLOBAL_MAP", "Позиция определена: ${point.latitude}, ${point.longitude}")
+            Log.d("GLOBAL_MAP", "Позиция: ${point.latitude}, ${point.longitude}")
 
-            // ✅ Для общей карты берем зум поменьше (11.0), чтобы видеть район целиком
             mapView?.map?.move(
                 CameraPosition(point, 11.0f, 0.0f, 0.0f),
                 Animation(Animation.Type.SMOOTH, 1.5f),
                 null
             )
-
             stopLocationUpdates()
         }
 
-        override fun onLocationStatusUpdated(status: com.yandex.mapkit.location.LocationStatus) {
-            // Логируем статус только в дебаге
-            Log.d("GLOBAL_MAP", "Статус геолокации: $status")
-        }
+        override fun onLocationStatusUpdated(status: com.yandex.mapkit.location.LocationStatus) {}
     }
 
     override fun onCreateView(
@@ -63,24 +57,21 @@ class GlobalMapFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         viewAlive = true
         mapView = view.findViewById(R.id.mapView)
-
         checkLocationPermission()
     }
 
     private fun checkLocationPermission() {
-        when {
-            ContextCompat.checkSelfPermission(
+        if (ContextCompat.checkSelfPermission(
                 requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED -> {
-                requestLocationOnce()
-            }
-            else -> {
-                ActivityCompat.requestPermissions(
-                    requireActivity(),
-                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                    LOCATION_PERMISSION_CODE
-                )
-            }
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            requestLocationOnce()
+        } else {
+            ActivityCompat.requestPermissions(
+                requireActivity(),
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                LOCATION_PERMISSION_CODE
+            )
         }
     }
 
@@ -109,16 +100,16 @@ class GlobalMapFragment : Fragment() {
         }
     }
 
+    // ✅ Убрали MapKitFactory.onStart() — делает MainTabsFragment
     override fun onStart() {
         super.onStart()
-        MapKitFactory.getInstance().onStart()
         mapView?.onStart()
     }
 
+    // ✅ Убрали MapKitFactory.onStop() — делает MainTabsFragment
     override fun onStop() {
         stopLocationUpdates()
         mapView?.onStop()
-        MapKitFactory.getInstance().onStop()
         super.onStop()
     }
 

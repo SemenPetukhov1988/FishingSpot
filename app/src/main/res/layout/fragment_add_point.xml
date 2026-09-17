@@ -1,44 +1,149 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:background="#FFFFFF">
 
+    <!-- Верхняя панель со стрелкой назад -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp"
-        android:gravity="center_horizontal">
+        android:layout_height="?attr/actionBarSize"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/back"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Назад" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Новая точка"
-            android:textSize="24sp"
+            android:textSize="20sp"
             android:textStyle="bold"
-            android:layout_marginBottom="32dp" />
+            android:layout_marginStart="16dp"/>
+    </LinearLayout>
 
-        <!-- Заглушка под фото -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:background="#F5F5F5" />
+    <!-- Основной контент -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="?attr/actionBarSize"
+        android:fillViewport="true">
 
-        <EditText
-            android:id="@+id/etLocationName"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:hint="Название места"
-            android:inputType="textCapSentences" />
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:gravity="center_horizontal">
 
-        <Button
-            android:id="@+id/btnSavePoint"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="32dp"
-            android:text="Сохранить точку" />
+            <!-- Область для фото (заглушка с иконкой камеры) -->
+            <FrameLayout
+                android:id="@+id/flPhotoContainer"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:background="#F0F0F0"
+                android:foreground="?attr/selectableItemBackground">
 
-    </LinearLayout>
-</ScrollView>
+                <ImageView
+                    android:id="@+id/ivSpotPhoto"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/llCameraPlaceholder"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:orientation="vertical"
+                    android:gravity="center">
+
+                    <ImageView
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:src="@android:drawable/ic_menu_camera"
+                        app:tint="#757575" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Добавить фото улова"
+                        android:textColor="#757575"
+                        android:layout_marginTop="8dp"/>
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- Название точки -->
+            <EditText
+                android:id="@+id/etLocationName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:hint="Название места (например: Залив Щучий)"
+                android:inputType="textCapSentences"
+                android:backgroundTint="#E0E0E0"
+                android:padding="12dp"/>
+
+            <!-- Вес улова -->
+            <EditText
+                android:id="@+id/etCatchWeight"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:hint="Вес улова (кг)"
+                android:inputType="numberDecimal"
+                android:backgroundTint="#E0E0E0"
+                android:padding="12dp"/>
+
+            <!-- Переключатель Публичная / Приватная -->
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/swIsPublic"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Сделать точку публичной"
+                android:checked="false"/>
+
+            <!-- Краткое описание -->
+            <EditText
+                android:id="@+id/etDescription"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:layout_marginTop="16dp"
+                android:hint="Краткое описание (снасти, погода...)"
+                android:gravity="top|start"
+                android:inputType="textMultiLine"
+                android:backgroundTint="#E0E0E0"
+                android:padding="12dp"/>
+
+            <!-- Отступ для круглой кнопки -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="80dp"/>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Круглая кнопка с галочкой (Floating Action Button) -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabSavePoint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="24dp"
+        android:src="@android:drawable/ic_input_add"
+        app:tint="@android:color/white"
+        app:backgroundTint="#4CAF50" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

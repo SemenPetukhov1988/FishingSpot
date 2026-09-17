@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- 1. Карта -->
+    <com.yandex.mapkit.mapview.MapView
+        android:id="@+id/refineMapView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- 2. Статичный маркер по центру -->
+    <ImageView
+        android:id="@+id/ivCenterMarker"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="center"
+        android:src="@drawable/add_location_24dp_000000_fill0_wght400_grad0_opsz24__2_"
+        android:contentDescription="Центр карты" />
+
+    <!-- 3. Подсказка под маркером -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="36dp"
+        android:background="#CCFFFFFF"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp"
+        android:text="Переместите карту, чтобы уточнить точку"
+        android:textSize="14sp" />
+
+    <!-- 4. Кнопка Готово внизу -->
+    <Button
+        android:id="@+id/btnDone"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom"
+        android:layout_margin="16dp"
+        android:text="✅ Готово" />
+
+</FrameLayout>

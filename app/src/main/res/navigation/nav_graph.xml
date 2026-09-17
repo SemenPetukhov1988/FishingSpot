@@ -4,20 +4,47 @@
     android:id="@+id/nav_graph"
     app:startDestination="@id/mainTabsFragment">
 
-    <!-- ✅ СТАРТОВЫЙ ЭКРАН: Табы -->
     <fragment
         android:id="@+id/mainTabsFragment"
         android:name="ru.semen.fishingspot.fragment.MainTabsFragment"
-        android:label="Главная" />
+        android:label="Главная">
 
-    <!-- Экран добавления точки (вызывается поверх табов) -->
+        <action
+            android:id="@+id/action_mainTabs_to_addPoint"
+            app:destination="@id/addPointFragment" />
+
+        <!-- ✅ ЭКШЕН ДЛЯ ОТКРЫТИЯ ДЕТАЛЕЙ ТОЧКИ -->
+        <action
+            android:id="@+id/action_map_to_details"
+            app:destination="@id/spotDetailsFragment" />
+    </fragment>
+
     <fragment
         android:id="@+id/addPointFragment"
         android:name="ru.semen.fishingspot.fragment.AddPointFragment"
-        android:label="Новая точка" />
+        android:label="Новая точка">
 
-    <!-- Переход от табов к добавлению точки -->
-    <action
-        android:id="@+id/action_mainTabs_to_addPoint"
-        app:destination="@id/addPointFragment" />
+        <action
+            android:id="@+id/action_addPoint_to_refineLocation"
+            app:destination="@id/refineLocationFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/refineLocationFragment"
+        android:name="ru.semen.fishingspot.fragment.RefineLocationFragment"
+        android:label="Уточнение точки">
+
+        <action
+            android:id="@+id/action_refine_to_tabs"
+            app:destination="@id/mainTabsFragment"
+            app:popUpTo="@id/mainTabsFragment"
+            app:popUpToInclusive="false" />
+    </fragment>
+
+    <!-- ✅ НОВЫЙ ФРАГМЕНТ ДЕТАЛЕЙ -->
+    <fragment
+        android:id="@+id/spotDetailsFragment"
+        android:name="ru.semen.fishingspot.fragment.SpotDetailsFragment"
+        android:label="Детали точки" />
+
 </navigation>
