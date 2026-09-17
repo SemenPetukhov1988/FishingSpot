@@ -30,7 +30,29 @@
         android:text="Переместите карту, чтобы уточнить точку"
         android:textSize="14sp" />
 
-    <!-- 4. Кнопка Готово внизу -->
+    <!-- ✅ 4. Индикатор загрузки (скрыт по умолчанию) -->
+    <ProgressBar
+        android:id="@+id/progressLocation"
+        style="?android:attr/progressBarStyleLarge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvLoadingText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="60dp"
+        android:text="Проверка водоема..."
+        android:textColor="#000000"
+        android:textSize="16sp"
+        android:visibility="gone"
+        android:background="#CCFFFFFF"
+        android:padding="8dp"/>
+
+    <!-- 5. Кнопка Готово внизу -->
     <Button
         android:id="@+id/btnDone"
         android:layout_width="match_parent"

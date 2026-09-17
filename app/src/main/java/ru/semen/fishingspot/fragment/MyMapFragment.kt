@@ -41,23 +41,22 @@ class MyMapFragment : Fragment() {
     private val tapListeners = mutableListOf<MapObjectTapListener>()
     private var viewAlive = false
 
-    // ✅ Дефолтная позиция — Архангельск
-    private val DEFAULT_POINT = Point(64.5396, 40.5169)
-    private val DEFAULT_ZOOM = 12.0f
+    private var lastUserLocation: Point? = null
+    private var isLocationAlreadyShown = false
 
-    // ✅ Современный запрос прав — переживёт пересоздание фрагмента
+    private val DEFAULT_POINT = Point(55.7520, 37.6175) // Москва
+    private val CITY_ZOOM = 11.0f
+    private val MAX_ZOOM_LIMIT = 18.5f
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            Log.d(TAG, "👍 Разрешение получено через registerForActivityResult")
-            requestLocationOnce()
+            Log.d(TAG, "👍 Разрешение получено")
+            startLocationTracking()
         } else {
             Log.w(TAG, "🚫 Разрешение отклонено")
-            if (_binding != null) {
-                binding.tvLoadingText.text = "Разрешите геолокацию для работы карты"
-                binding.progressLocation.visibility = View.GONE
-            }
+            hideLoading()
         }
     }
 
@@ -66,19 +65,21 @@ class MyMapFragment : Fragment() {
             if (!viewAlive || _binding == null) return
 
             val point = location.position
+            lastUserLocation = point
+
             Log.d(TAG, "✅ GPS получен: ${point.latitude}, ${point.longitude}")
 
-            binding.progressLocation.visibility = View.GONE
-            binding.tvLoadingText.visibility = View.GONE
+            if (!isLocationAlreadyShown) {
+                binding.mapView.map.move(
+                    CameraPosition(point, CITY_ZOOM, 0.0f, 0.0f),
+                    Animation(Animation.Type.SMOOTH, 1.0f),
+                    null
+                )
+                isLocationAlreadyShown = true
+            }
 
             binding.mapView.map.mapObjects.addPlacemark(point)
-
-            binding.mapView.map.move(
-                CameraPosition(point, 12.0f, 0.0f, 0.0f),
-                Animation(Animation.Type.SMOOTH, 1.5f),
-                null
-            )
-
+            hideLoading()
             stopLocationUpdates()
         }
 
@@ -99,13 +100,27 @@ class MyMapFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         Log.d(TAG, "onViewCreated")
         viewAlive = true
+        isLocationAlreadyShown = false
 
-        // ✅ Сразу показываем Архангельск — карта оживает мгновенно
-        binding.mapView.map.move(
-            CameraPosition(DEFAULT_POINT, DEFAULT_ZOOM, 0.0f, 0.0f),
-            Animation(Animation.Type.LINEAR, 0.0f),
-            null
-        )
+        // ✅ ОГРАНИЧЕНИЕ ЗУМА ЧЕРЕЗ CAMERA LISTENER
+        binding.mapView.map.addCameraListener(object : com.yandex.mapkit.map.CameraListener {
+            override fun onCameraPositionChanged(
+                map: com.yandex.mapkit.map.Map,
+                cameraPosition: CameraPosition,
+                reason: com.yandex.mapkit.map.CameraUpdateReason,
+                finished: Boolean
+            ) {
+                if (cameraPosition.zoom > MAX_ZOOM_LIMIT) {
+                    map.move(
+                        CameraPosition(cameraPosition.target, MAX_ZOOM_LIMIT, cameraPosition.azimuth, cameraPosition.tilt),
+                        Animation(Animation.Type.SMOOTH, 0.0f),
+                        null
+                    )
+                }
+            }
+        })
+
+        checkLocationPermission()
 
         binding.btnAddPoint.setOnClickListener {
             val cameraPosition = binding.mapView.map.cameraPosition
@@ -128,44 +143,71 @@ class MyMapFragment : Fragment() {
         super.onStart()
         Log.d(TAG, "onStart")
         binding.mapView.onStart()
-        checkLocationPermission()
-        if (lastKnownSpots.isNotEmpty()) {
-            drawMarkers(lastKnownSpots)
+
+        if (lastUserLocation != null && !isLocationAlreadyShown) {
+            Log.d(TAG, "Мгновенный переход на сохраненную позицию")
+            binding.mapView.map.move(
+                CameraPosition(lastUserLocation!!, CITY_ZOOM, 0.0f, 0.0f),
+                Animation(Animation.Type.SMOOTH, 0.5f),
+                null
+            )
+            binding.mapView.map.mapObjects.addPlacemark(lastUserLocation!!)
+            isLocationAlreadyShown = true
+            hideLoading()
+        } else if (lastUserLocation == null) {
+            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+                startLocationTracking()
+            }
         }
     }
 
-    private fun checkLocationPermission() {
-        val permission = Manifest.permission.ACCESS_FINE_LOCATION
-
-        if (ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, "Разрешение уже есть")
-            requestLocationOnce()
-        } else {
-            Log.d(TAG, "Запрашиваем разрешение через registerForActivityResult")
-            requestPermissionLauncher.launch(permission)
-        }
-    }
-
-    private fun requestLocationOnce() {
+    private fun startLocationTracking() {
         if (_binding == null) return
-
-        binding.progressLocation.visibility = View.VISIBLE
-        binding.tvLoadingText.visibility = View.VISIBLE
+        showLoading()
 
         if (locationManager == null) {
             locationManager = MapKitFactory.getInstance().createLocationManager()
         }
+
+        val instantAnimation = Animation(Animation.Type.SMOOTH, 0.0f)
+        binding.mapView.map.move(
+            CameraPosition(DEFAULT_POINT, CITY_ZOOM, 0.0f, 0.0f),
+            instantAnimation,
+            null
+        )
+
         locationManager?.requestSingleUpdate(locationListener)
+    }
+
+    private fun checkLocationPermission() {
+        val permission = Manifest.permission.ACCESS_FINE_LOCATION
+        if (ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED) {
+            Log.d(TAG, "🔐 Разрешение уже есть")
+            startLocationTracking()
+        } else {
+            Log.d(TAG, "⚠️ Запрашиваем разрешение...")
+            requestPermissionLauncher.launch(permission)
+        }
     }
 
     private fun stopLocationUpdates() {
         locationManager?.unsubscribe(locationListener)
     }
 
+    private fun showLoading() {
+        binding.progressLocation.visibility = View.VISIBLE
+        binding.tvLoadingText.visibility = View.VISIBLE
+        binding.tvLoadingText.text = "Определяем местоположение..."
+    }
+
+    private fun hideLoading() {
+        binding.progressLocation.visibility = View.GONE
+        binding.tvLoadingText.visibility = View.GONE
+    }
+
     private fun drawMarkers(spots: List<FishingSpot>) {
         if (_binding == null) return
-
-        Log.d(TAG, "Отрисовка ${spots.size} маркеров...")
 
         tapListeners.clear()
         binding.mapView.map.mapObjects.clear()
@@ -174,21 +216,14 @@ class MyMapFragment : Fragment() {
             val point = Point(spot.latitude, spot.longitude)
             val placemark = binding.mapView.map.mapObjects.addPlacemark(point)
 
-            placemark.setIcon(
-                com.yandex.runtime.image.ImageProvider.fromResource(
-                    requireContext(), R.drawable.lokation
-                )
-            )
+            placemark.setIcon(com.yandex.runtime.image.ImageProvider.fromResource(
+                requireContext(), R.drawable.lokation))
 
             placemark.userData = spot
 
             val listener = object : MapObjectTapListener {
-                override fun onMapObjectTap(
-                    mapObject: MapObject,
-                    point: Point
-                ): Boolean {
+                override fun onMapObjectTap(mapObject: MapObject, point: Point): Boolean {
                     Log.d(TAG, "КЛИК! ID: ${spot.id}")
-
                     val clickedSpot = mapObject.userData as? FishingSpot ?: return false
 
                     val detailsBundle = Bundle().apply {
@@ -210,7 +245,6 @@ class MyMapFragment : Fragment() {
     }
 
     override fun onStop() {
-        stopLocationUpdates()
         binding.mapView.onStop()
         super.onStop()
     }
