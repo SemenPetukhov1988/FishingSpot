@@ -7,25 +7,23 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.data.AppDatabase
 import ru.semen.fishingspot.data.FishingSpot
+import ru.semen.fishingspot.data.WaterChecker
 import ru.semen.fishingspot.repository.FishingSpotRepository
-
 
 class SpotViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: FishingSpotRepository
+    private val database: AppDatabase
+    private val waterChecker = WaterChecker() // ✅ Инициализируем checker
     val allSpots: LiveData<List<FishingSpot>>
 
     init {
-        // Инициализируем репозиторий через базу данных приложения
-        val dao = AppDatabase.getDatabase(application).fishingSpotDao()
+        database = AppDatabase.getDatabase(application)
+        val dao = database.fishingSpotDao()
         repository = FishingSpotRepository(dao)
         allSpots = repository.allSpots
     }
 
-    /**
-     * Сохраняет полноценную точку с уточненными координатами в базу данных.
-     * Выполняется в корутине (в фоне), чтобы не блокировать UI.
-     */
     fun addFullSpot(
         lat: Double,
         lon: Double,
@@ -47,5 +45,16 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
             )
             repository.insert(spot)
         }
+    }
+
+    /**
+     * ✅ Двухэтапная проверка: сначала грубый поиск в базе, потом точная геометрия
+     */
+    suspend fun findNearbyWater(lat: Double, lon: Double): Boolean {
+        // Шаг 1: Берем кандидатов из расширенного квадрата (~500м)
+        val candidates = database.waterBodyDao().getNearbyWaterBodies(lat, lon)
+
+        // Шаг 2: Проверяем точное расстояние до контура
+        return waterChecker.isNearWater(lat, lon, candidates)
     }
 }

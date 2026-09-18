@@ -5,10 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [FishingSpot::class], version = 1, exportSchema = false)
+@Database(entities = [FishingSpot::class, WaterBody::class], version = 3) // Версия 3!
 abstract class AppDatabase : RoomDatabase() {
-
     abstract fun fishingSpotDao(): FishingSpotDao
+    abstract fun waterBodyDao(): WaterBodyDao
 
     companion object {
         @Volatile
@@ -20,7 +20,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "fishing_database"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration() // ✅ Сбрасывает базу при изменении структуры
+                    .build()
                 INSTANCE = instance
                 instance
             }
