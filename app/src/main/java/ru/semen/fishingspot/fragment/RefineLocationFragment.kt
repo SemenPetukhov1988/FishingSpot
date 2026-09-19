@@ -21,11 +21,12 @@ import com.yandex.mapkit.location.Location
 import com.yandex.mapkit.location.LocationListener
 import com.yandex.mapkit.location.LocationManager
 import com.yandex.mapkit.map.CameraPosition
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentRefineLocationBinding
 import ru.semen.fishingspot.viewmodel.SpotViewModel
-import kotlin.math.* // Для расчетов расстояния
+import kotlin.math.*
 
 class RefineLocationFragment : Fragment() {
 
@@ -49,21 +50,15 @@ class RefineLocationFragment : Fragment() {
     private val DEFAULT_POINT = Point(55.7520, 37.6175)
     private val CITY_ZOOM = 15.0f
     private val TARGET_ZOOM = 17.5f
-
-    // ✅ РАДИУС ДОВЕРИЯ GPS (250 метров)
     private val MAX_DISTANCE_METERS = 250.0
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View {
-        Log.d(TAG, "--- [1] onCreateView ---")
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentRefineLocationBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        Log.d(TAG, "--- [2] onViewCreated ---")
 
         spotName = arguments?.getString("NAME") ?: "Без названия"
         spotDesc = arguments?.getString("DESC") ?: ""
@@ -73,96 +68,55 @@ class RefineLocationFragment : Fragment() {
 
         MapKitFactory.getInstance().onStart()
         binding.refineMapView.onStart()
-
         checkLocationPermission()
 
         binding.btnDone.setOnClickListener {
             val currentZoom = binding.refineMapView.map.cameraPosition.zoom
-
             if (!isZoomAdjusted && currentZoom < 16.0f) {
-                Log.d(TAG, "[ZOOM] Зум $currentZoom слишком мал. Приближаем до $TARGET_ZOOM")
-
-                val centerPoint = binding.refineMapView.map.cameraPosition.target
                 binding.refineMapView.map.move(
-                    CameraPosition(centerPoint, TARGET_ZOOM, 0.0f, 0.0f),
-                    Animation(Animation.Type.SMOOTH, 0.6f),
-                    null
+                    CameraPosition(binding.refineMapView.map.cameraPosition.target, TARGET_ZOOM, 0.0f, 0.0f),
+                    Animation(Animation.Type.SMOOTH, 0.6f), null
                 )
-
                 isZoomAdjusted = true
-                Toast.makeText(context, "📍 Уточните место: переместите точку точно на берег", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "📍 Уточните место на карте", Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
 
-            val finalPoint = binding.refineMapView.map.cameraPosition.target
-            Log.d(TAG, "--- [CLICK] Готово. Коорд: ${finalPoint.latitude}, ${finalPoint.longitude} ---")
-
-            // ✅ ЗАПУСК ЛОКАЛЬНОЙ ПРОВЕРКИ
-            checkWaterLocalAndSave(finalPoint)
+            checkWaterLocalAndSave(binding.refineMapView.map.cameraPosition.target)
         }
     }
 
     override fun onStart() {
         super.onStart()
-        Log.d(TAG, "--- [3] onStart ---")
         binding.refineMapView.onStart()
-
         if (lastUserLocation != null && !isLocationAlreadyShown) {
-            Log.d(TAG, "[GPS] Мгновенный переход на сохраненную позицию")
-            binding.refineMapView.map.move(
-                CameraPosition(lastUserLocation!!, CITY_ZOOM, 0.0f, 0.0f),
-                Animation(Animation.Type.SMOOTH, 0.0f),
-                null
-            )
+            binding.refineMapView.map.move(CameraPosition(lastUserLocation!!, CITY_ZOOM, 0.0f, 0.0f), Animation(Animation.Type.SMOOTH, 0.0f), null)
             isLocationAlreadyShown = true
             hideLoading()
-        } else if (lastUserLocation == null) {
-            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
-                startLocationTracking()
-            }
+        } else if (lastUserLocation == null && ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            startLocationTracking()
         }
     }
 
     private fun startLocationTracking() {
-        Log.d(TAG, "[GPS] Запуск requestSingleUpdate...")
         showLoading()
-
-        if (locationManager == null) {
-            locationManager = MapKitFactory.getInstance().createLocationManager()
-        }
-
-        binding.refineMapView.map.move(
-            CameraPosition(DEFAULT_POINT, CITY_ZOOM, 0.0f, 0.0f),
-            Animation(Animation.Type.SMOOTH, 0.0f),
-            null
-        )
-
+        if (locationManager == null) locationManager = MapKitFactory.getInstance().createLocationManager()
+        binding.refineMapView.map.move(CameraPosition(DEFAULT_POINT, CITY_ZOOM, 0.0f, 0.0f), Animation(Animation.Type.SMOOTH, 0.0f), null)
         locationManager?.requestSingleUpdate(locationListener)
     }
 
-    private val locationListener: LocationListener = object : LocationListener {
+    private val locationListener = object : LocationListener {
         override fun onLocationUpdated(location: Location) {
             if (_binding == null) return
-            val point = location.position
-            lastUserLocation = point
-            Log.d(TAG, "[GPS] ✅ ПОЛУЧЕНЫ КООРДИНАТЫ: ${point.latitude}, ${point.longitude}")
-
+            lastUserLocation = location.position
             if (!isLocationAlreadyShown) {
-                binding.refineMapView.map.move(
-                    CameraPosition(point, CITY_ZOOM, 0.0f, 0.0f),
-                    Animation(Animation.Type.SMOOTH, 1.0f),
-                    null
-                )
+                binding.refineMapView.map.move(CameraPosition(location.position, CITY_ZOOM, 0.0f, 0.0f), Animation(Animation.Type.SMOOTH, 1.0f), null)
                 isLocationAlreadyShown = true
             }
             hideLoading()
             stopLocationUpdates()
         }
-
-        override fun onLocationStatusUpdated(status: com.yandex.mapkit.location.LocationStatus) {
-            Log.d(TAG, "[GPS] Статус: $status")
-        }
+        override fun onLocationStatusUpdated(status: com.yandex.mapkit.location.LocationStatus) {}
     }
 
     private fun checkLocationPermission() {
@@ -174,144 +128,147 @@ class RefineLocationFragment : Fragment() {
     }
 
     private fun stopLocationUpdates() { locationManager?.unsubscribe(locationListener) }
+    private fun showLoading() { binding.progressLocation.visibility = View.VISIBLE; binding.tvLoadingText.visibility = View.VISIBLE }
+    private fun hideLoading() { binding.progressLocation.visibility = View.GONE; binding.tvLoadingText.visibility = View.GONE }
 
-    private fun showLoading() {
-        binding.progressLocation.visibility = View.VISIBLE
-        binding.tvLoadingText.visibility = View.VISIBLE
-        binding.tvLoadingText.text = "Ищем ваше местоположение..."
-    }
-
-    private fun hideLoading() {
-        binding.progressLocation.visibility = View.GONE
-        binding.tvLoadingText.visibility = View.GONE
-    }
-
+    // --------------------------------------------------------------------------
+    // ✅ ГЛАВНАЯ ЛОГИКА ПРОВЕРКИ И СОХРАНЕНИЯ
+    // --------------------------------------------------------------------------
     /**
-     * ✅ ПРОВЕРКА ВОДЫ + АНТИ-ЧИТ (ЗАКОММЕНТИРОВАНО ДЛЯ ТЕСТОВ)
+     * ✅ ГЛАВНАЯ ЛОГИКА ПРОВЕРКИ И СОХРАНЕНИЯ
      */
     private fun checkWaterLocalAndSave(point: Point) {
-        Log.d(TAG, "[LOCAL] Проверка оффлайн-базы...")
-
-        binding.btnDone.isEnabled = false
-        binding.btnDone.text = "Проверка..."
-
         lifecycleScope.launch {
-            val isWater = spotViewModel.findNearbyWater(point.latitude, point.longitude)
+            binding.btnDone.isEnabled = false
+            binding.btnDone.text = "Проверка..."
 
-            val distance = if (lastUserLocation != null) {
-                calculateDistance(lastUserLocation!!, point)
-            } else {
-                Double.MAX_VALUE
+            // СЦЕНАРИЙ 1: ЛИЧНАЯ ТОЧКА (флаг снят) -> Только Room
+            if (!isPublic) {
+                saveToRoomOnly(point, isPublic = false, isVerified = false)
+                return@launch
             }
 
-            Log.d(TAG, "[CHECK] Расстояние до пользователя: ${distance.toInt()} м.")
+            // СЦЕНАРИИ ДЛЯ ПУБЛИЧНОЙ ТОЧКИ
+            val isWaterInDb = spotViewModel.findNearbyWater(point.latitude, point.longitude)
+            val distance = if (lastUserLocation != null)
+                calculateDistance(lastUserLocation!!, point) else Double.MAX_VALUE
+
+            when {
+                // ✅ 2A. Вода есть + Рыбак рядом -> Проверенная (Room + Firebase)
+                isWaterInDb && distance < MAX_DISTANCE_METERS -> {
+                    Log.d(TAG, "[VERIFIED] Вода в БД + GPS совпал")
+                    saveToRoomAndFirebase(point, isPublic = true, isVerified = true)
+                }
+
+                // ⚠️ 2B. Воды нет в БД, НО Рыбак рядом -> Сомнительная
+                !isWaterInDb && distance < MAX_DISTANCE_METERS -> {
+                    Log.w(TAG, "[SUSPICIOUS] GPS совпал, но воды нет в БД")
+                    // Показываем диалог вместо мгновенного сохранения
+                    showSuspiciousDialog(point)
+                }
+
+                // ❌ 2C. Рыбак далеко -> Предлагаем сохранить как личную
+                else -> {
+                    Log.e(TAG, "[REJECTED] Рыбак далеко (${distance.toInt()} м)")
+                    showFarAwayDialog(point)
+                }
+            }
 
             binding.btnDone.isEnabled = true
             binding.btnDone.text = "Готово"
-
-            if (isWater && distance < MAX_DISTANCE_METERS) {
-                // ✅ ВСЕ ЧЕСТНО: Вода есть и рыболов рядом
-                Log.d(TAG, "[SUCCESS] Точка сохранена как ПУБЛИЧНАЯ")
-                saveSpot(point, isPublic)
-
-            } else if (isWater) {
-                // ⚠️ ВОДА ЕСТЬ, НО РЫБОЛОВ ДАЛЕКО
-                Log.w(TAG, "[WARNING] Рыболов далеко! (${distance.toInt()} м)")
-                showFarAwayDialog(point)
-
-            } else {
-                // ❌ ВОДЫ НЕТ ВООБЩЕ
-                showNoWaterDialog(point)
-            }
         }
     }
 
     /**
-     * Диалог для тех, кто пытается схитрить
+     * Диалог подтверждения для сомнительной точки
      */
-    private fun showFarAwayDialog(point: Point) {
-        val dialog = AlertDialog.Builder(requireContext())
-            .setTitle("Вы слишком далеко!")
-            .setMessage("Расстояние до вас более 250 метров. Сохранить как ЛИЧНУЮ?")
-            .setPositiveButton("Сохранить как личную") { d, _ ->
-                d.dismiss() // ✅ 1. Сразу закрываем диалог
-                if (isAdded) saveSpot(point, false) // 2. Потом сохраняем
+    private fun showSuspiciousDialog(point: Point) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("⚠️ Водоем не найден в базе")
+            .setMessage(
+                "Рядом с вами нет зарегистрированного водоема. " +
+                        "Возможно, это новое или маленькое место.\n\n" +
+                        "Точка будет добавлена на общую карту со статусом «Сомнительная» (желтый маркер). " +
+                        "Другие рыболовы смогут подтвердить наличие воды здесь."
+            )
+            .setPositiveButton("Сохранить как сомнительную") { dialog, _ ->
+                dialog.dismiss()
+                if (isAdded) {
+                    saveToRoomAndFirebase(point, isPublic = true, isVerified = false)
+                }
             }
-            .setNegativeButton("Отмена") { d, _ ->
-                d.dismiss() // ✅ Закрываем при отмене
+            .setNegativeButton("Отмена") { dialog, _ ->
+                dialog.dismiss()
             }
+            .setCancelable(false) // Запрещаем закрытие по клику вне окна
             .create()
-
-        dialog.show()
+            .show()
     }
 
-    private fun showNoWaterDialog(point: Point) {
-        val dialog = AlertDialog.Builder(requireContext())
-            .setTitle("Точка не у воды")
-            .setMessage("В базе нет водоемов рядом. Сохранить как ЛИЧНУЮ?")
-            .setPositiveButton("Сохранить как личную") { d, _ ->
-                d.dismiss() // ✅ 1. Сразу закрываем диалог
-                if (isAdded) saveSpot(point, false) // 2. Потом сохраняем
-            }
-            .setNegativeButton("Уточнить место") { d, _ ->
-                d.dismiss() // ✅ Закрываем при отказе
-            }
-            .create()
-
-        dialog.show()
-    }
-
-    private fun saveSpot(point: Point, publicStatus: Boolean) {
-        // ✅ ПРОВЕРКА: Фрагмент всё еще прикреплен к активности?
-        if (!isAdded) {
-            Log.w(TAG, "[SAVE] Пропуск сохранения: фрагмент уже уничтожен.")
-            return
-        }
-
-        Log.d(TAG, "[SAVE] Lat: ${point.latitude}, Lon: ${point.longitude}, Public: $publicStatus")
-
+    /** Сохранение ТОЛЬКО в Room (Личные или отклоненные) */
+    /** Сохранение ТОЛЬКО в Room (Личные или отклоненные) */
+    // ✅ Убрали suspend, так как ViewModel сама управляет корутиной
+    private fun saveToRoomOnly(point: Point, isPublic: Boolean, isVerified: Boolean) {
         spotViewModel.addFullSpot(
-            lat = point.latitude,
-            lon = point.longitude,
-            name = spotName,
-            description = spotDesc,
-            weight = spotWeight,
-            isPublic = publicStatus,
-            photoPath = photoPath
+            lat = point.latitude, lon = point.longitude, name = spotName,
+            description = spotDesc, weight = spotWeight, isPublic = isPublic,
+            isVerified = isVerified, photoPath = photoPath
+        )
+        navigateBack()
+    }
+
+    /** Сохранение в Room + Отправка в Firebase (Публичные) */
+    // ✅ Тоже убираем suspend. Внутренний launch для Firebase оставляем.
+    private fun saveToRoomAndFirebase(point: Point, isPublic: Boolean, isVerified: Boolean) {
+        // 1. Сначала гарантированно сохраняем локально
+        spotViewModel.addFullSpot(
+            lat = point.latitude, lon = point.longitude, name = spotName,
+            description = spotDesc, weight = spotWeight, isPublic = isPublic,
+            isVerified = isVerified, photoPath = photoPath
         )
 
-        try {
-            requireActivity().findNavController(R.id.fragmentContainer)
-                .navigate(R.id.action_refine_to_tabs)
-        } catch (e: Exception) {
-            // Если навигация не сработала, просто закрываем экран
-            requireActivity().onBackPressedDispatcher.onBackPressed()
+        // 2. 🔥 ЗАГЛУШКА ДЛЯ FIREBASE (запускаем отдельную корутину)
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                /*
+                 * TODO: Подключить Firebase Repository
+                 * val publicSpot = localSpot.toPublicSpot(currentUserId)
+                 * firebaseRepository.uploadSpot(publicSpot)
+                 */
+                Log.d(TAG, "[FIREBASE STUB] Отправка точки verified=$isVerified...")
+            } catch (e: Exception) {
+                Log.e(TAG, "[FIREBASE STUB] Ошибка отправки", e)
+            }
         }
+
+        navigateBack()
+    }
+    /** Диалог при нарушении дистанции */
+    private fun showFarAwayDialog(point: Point) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Вы слишком далеко!")
+            .setMessage("Расстояние > 250м. Сохранить как ЛИЧНУЮ точку?")
+            .setPositiveButton("Сохранить как личную") { d, _ ->
+                d.dismiss()
+                if (isAdded) saveToRoomOnly(point, isPublic = false, isVerified = false)
+            }
+            .setNegativeButton("Отмена") { d, _ -> d.dismiss() }
+            .create().show()
     }
 
-    /**
-     * Формула Гаверсинуса для расчета расстояния в метрах
-     */
+    private fun navigateBack() {
+        try { requireActivity().findNavController(R.id.fragmentContainer).navigate(R.id.action_refine_to_tabs) }
+        catch (e: Exception) { requireActivity().onBackPressedDispatcher.onBackPressed() }
+    }
+
     private fun calculateDistance(p1: Point, p2: Point): Double {
-        val earthRadius = 6371000.0
+        val r = 6371000.0
         val dLat = Math.toRadians(p2.latitude - p1.latitude)
         val dLon = Math.toRadians(p2.longitude - p1.longitude)
-
-        val a = sin(dLat / 2) * sin(dLat / 2) +
-                cos(Math.toRadians(p1.latitude)) * cos(Math.toRadians(p2.latitude)) *
-                sin(dLon / 2) * sin(dLon / 2)
-
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return earthRadius * c
+        val a = sin(dLat / 2) * sin(dLat / 2) + cos(Math.toRadians(p1.latitude)) * cos(Math.toRadians(p2.latitude)) * sin(dLon / 2) * sin(dLon / 2)
+        return r * 2 * atan2(sqrt(a), sqrt(1 - a))
     }
 
-    override fun onStop() {
-        binding.refineMapView.onStop()
-        super.onStop()
-    }
-
-    override fun onDestroyView() {
-        _binding = null
-        super.onDestroyView()
-    }
+    override fun onStop() { binding.refineMapView.onStop(); super.onStop() }
+    override fun onDestroyView() { _binding = null; super.onDestroyView() }
 }

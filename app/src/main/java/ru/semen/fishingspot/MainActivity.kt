@@ -15,7 +15,8 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val db = AppDatabase.getDatabase(this@MainActivity)
-            DataImporter.importWaterFromGeoJson(this@MainActivity, db.waterBodyDao())
+            // ✅ Вызываем новый безопасный метод с поддержкой ZIP и fallback на JSON
+            DataImporter.importWaterSafe(this@MainActivity, db.waterBodyDao())
         }
     }
 }

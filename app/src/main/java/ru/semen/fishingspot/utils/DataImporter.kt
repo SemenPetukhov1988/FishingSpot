@@ -10,84 +10,122 @@ import org.json.JSONArray
 import ru.semen.fishingspot.data.WaterBody
 import ru.semen.fishingspot.data.WaterBodyDao
 import java.io.InputStreamReader
+import java.io.Reader
+import java.util.zip.ZipInputStream
 
 object DataImporter {
     private val TAG = "IMPORT"
 
-    suspend fun importWaterFromGeoJson(context: Context, dao: WaterBodyDao) {
+    suspend fun importWaterSafe(context: Context, dao: WaterBodyDao) {
         withContext(Dispatchers.IO) {
             if (dao.getCount() > 0) {
-                Log.d(TAG, "База уже заполнена (${dao.getCount()} записей).")
+                Log.d(TAG, "База уже заполнена (${dao.getCount()} записей). Пропускаем импорт.")
                 return@withContext
             }
 
+            // 1️⃣ Пытаемся прочитать ZIP
             try {
-                Log.d(TAG, "🚀 Начало импорта...")
-                val inputStream = context.assets.open("water_bodies.json")
-                // Увеличиваем буфер чтения для больших файлов
-                val reader = JsonReader(InputStreamReader(inputStream, "UTF-8").buffered(8 * 1024))
-                reader.isLenient = true
+                context.assets.open("water_bodies.zip").use { zipStream ->
+                    Log.d(TAG, "📦 Найден water_bodies.zip. Запускаем быстрый импорт...")
+                    val zis = ZipInputStream(zipStream)
+                    var entry = zis.nextEntry
 
-                val batch = mutableListOf<WaterBody>()
-                var id = 1L
-                var totalParsed = 0
-                var skipped = 0
-
-                reader.beginObject()
-                while (reader.hasNext()) {
-                    if (reader.nextName() == "features") {
-                        reader.beginArray()
-                        while (reader.hasNext()) {
-                            try {
-                                val result = parseSingleFeature(reader)
-                                if (result != null) {
-                                    batch.add(WaterBody(
-                                        id = id++,
-                                        name = result.name,
-                                        type = result.type,
-                                        minLat = result.minLat, maxLat = result.maxLat,
-                                        minLon = result.minLon, maxLon = result.maxLon,
-                                        coordinatesJson = result.coordsJson
-                                    ))
-                                    totalParsed++
-
-                                    // Сохраняем батчами по 1000 штук
-                                    if (batch.size >= 1000) {
-                                        dao.insertAll(batch)
-                                        Log.d(TAG, "Промежуточное сохранение: ${batch.size} шт. (Всего: $totalParsed)")
-                                        batch.clear()
-                                    }
-                                } else {
-                                    skipped++
-                                }
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Ошибка парсинга одного объекта", e)
-                                // Пропускаем битый объект и идем дальше
-                                reader.skipValue()
-                            }
+                    while (entry != null) {
+                        if (entry.name.endsWith(".json")) {
+                            Log.d(TAG, "Распаковываем: ${entry.name}")
+                            // Для ZIP буфер не так критичен, т.к. он уже сжат,
+                            // но InputStreamReader обязателен
+                            processJsonStream(InputStreamReader(zis, "UTF-8"), dao)
+                            break
                         }
-                        reader.endArray()
-                    } else {
-                        reader.skipValue()
+                        entry = zis.nextEntry
                     }
+                    zis.close()
+                    return@withContext
                 }
-                reader.endObject()
-                reader.close()
-
-                // Сохраняем остаток
-                if (batch.isNotEmpty()) {
-                    dao.insertAll(batch)
-                    batch.clear()
-                }
-
-                Log.d(TAG, "✅ Импорт ЗАВЕРШЕН! Загружено: $totalParsed, Пропущено: $skipped")
-
+            } catch (e: java.io.FileNotFoundException) {
+                Log.w(TAG, "⚠️ water_bodies.zip не найден. Переключаюсь на legacy JSON...")
             } catch (e: Exception) {
-                Log.e(TAG, "❌ КРИТИЧЕСКАЯ ОШИБКА ИМПОРТА", e)
+                Log.e(TAG, "❌ Ошибка чтения ZIP, аварийное переключение на JSON", e)
+            }
+
+            // 2️⃣ Fallback: Читаем старый JSON с буфером
+            try {
+                context.assets.open("water_bodies.json").use { jsonStream ->
+                    Log.d(TAG, "📄 Читаю legacy water_bodies.json...")
+                    // ✅ Создаем буферизированный InputStreamReader здесь
+                    val bufferedReader = InputStreamReader(jsonStream, "UTF-8").buffered(8 * 1024)
+                    processJsonStream(bufferedReader, dao)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "💀 КРИТИЧЕСКАЯ ОШИБКА: Нет ни ZIP, ни JSON!", e)
             }
         }
     }
 
+    /**
+     * Универсальный процессор. Принимает Reader (поддерживает и InputStreamReader, и BufferedReader)
+     */
+    private suspend fun processJsonStream(readerSource: Reader, dao: WaterBodyDao) {
+        val reader = JsonReader(readerSource)
+        reader.isLenient = true
+
+        val batch = mutableListOf<WaterBody>()
+        var id = 1L
+        var totalParsed = 0
+        var skipped = 0
+
+        try {
+            reader.beginObject()
+            while (reader.hasNext()) {
+                if (reader.nextName() == "features") {
+                    reader.beginArray()
+                    while (reader.hasNext()) {
+                        try {
+                            val result = parseSingleFeature(reader)
+                            if (result != null) {
+                                batch.add(WaterBody(
+                                    id = id++,
+                                    name = result.name,
+                                    type = result.type,
+                                    minLat = result.minLat, maxLat = result.maxLat,
+                                    minLon = result.minLon, maxLon = result.maxLon,
+                                    coordinatesJson = result.coordsJson
+                                ))
+                                totalParsed++
+
+                                if (batch.size >= 1000) {
+                                    dao.insertAll(batch)
+                                    Log.d(TAG, "Сохранено: ${batch.size} шт. (Всего: $totalParsed)")
+                                    batch.clear()
+                                }
+                            } else {
+                                skipped++
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Ошибка парсинга объекта", e)
+                            reader.skipValue()
+                        }
+                    }
+                    reader.endArray()
+                } else {
+                    reader.skipValue()
+                }
+            }
+            reader.endObject()
+        } finally {
+            reader.close()
+        }
+
+        if (batch.isNotEmpty()) {
+            dao.insertAll(batch)
+            batch.clear()
+        }
+
+        Log.d(TAG, "✅ Импорт ЗАВЕРШЕН! Загружено: $totalParsed, Пропущено: $skipped")
+    }
+
+    // --- Вспомогательные классы и функции (без изменений) ---
     private data class ParsedWater(
         val name: String, val type: String,
         val minLat: Double, val maxLat: Double,
@@ -135,7 +173,6 @@ object DataImporter {
 
         if (!isWater || allCoords.isEmpty()) return null
 
-        // Считаем границы
         var i = 0
         while (i + 1 < allCoords.size) {
             val lat = allCoords[i]; val lon = allCoords[i+1]
@@ -146,7 +183,6 @@ object DataImporter {
             i += 2
         }
 
-        // Формируем JSON контура
         val coordsArray = JSONArray()
         i = 0
         while (i + 1 < allCoords.size) {

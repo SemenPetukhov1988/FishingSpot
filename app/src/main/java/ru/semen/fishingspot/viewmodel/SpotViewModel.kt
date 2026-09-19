@@ -14,7 +14,8 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: FishingSpotRepository
     private val database: AppDatabase
-    private val waterChecker = WaterChecker() // ✅ Инициализируем checker
+    private val waterChecker = WaterChecker()
+
     val allSpots: LiveData<List<FishingSpot>>
 
     init {
@@ -24,6 +25,9 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
         allSpots = repository.allSpots
     }
 
+    /**
+     * ✅ Обновленный метод сохранения с поддержкой флага isVerified
+     */
     fun addFullSpot(
         lat: Double,
         lon: Double,
@@ -31,7 +35,8 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
         description: String,
         weight: Double,
         isPublic: Boolean,
-        photoPath: String?
+        photoPath: String?,
+        isVerified: Boolean = false // <-- Новый параметр
     ) {
         viewModelScope.launch {
             val spot = FishingSpot(
@@ -41,20 +46,21 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
                 description = description,
                 catchWeight = weight,
                 isPublic = isPublic,
-                photoPath = photoPath
+                photoPath = photoPath,
+                isVerified = isVerified // <-- Передаем флаг в Entity
             )
             repository.insert(spot)
         }
     }
 
     /**
-     * ✅ Двухэтапная проверка: сначала грубый поиск в базе, потом точная геометрия
+     * Двухэтапная проверка воды
      */
     suspend fun findNearbyWater(lat: Double, lon: Double): Boolean {
-        // Шаг 1: Берем кандидатов из расширенного квадрата (~500м)
         val candidates = database.waterBodyDao().getNearbyWaterBodies(lat, lon)
-
-        // Шаг 2: Проверяем точное расстояние до контура
         return waterChecker.isNearWater(lat, lon, candidates)
     }
+
+    // Вспомогательный метод для доступа к DAO (если понадобится в фрагменте)
+    fun getDao() = database.fishingSpotDao()
 }
