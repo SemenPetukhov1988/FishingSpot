@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.ksp)
     alias(libs.plugins.dagger.hilt.android)
+    alias(libs.plugins.google.services)
 
 }
 
@@ -65,10 +66,13 @@ dependencies {
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.androidx.room)
-    implementation(libs.constraintlayout)
+    implementation(libs.androidx.constraintlayout)
     ksp(libs.androidx.room.compiler)
     implementation(libs.material)
-    implementation(platform(libs.firebase))
+
+    implementation(libs.firebase.auth)      // Для анонимной авторизации
+    implementation(libs.firebase.firestore) // Для базы данных точек
+    implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
     implementation(libs.play.services)
     implementation(libs.converter.gson)

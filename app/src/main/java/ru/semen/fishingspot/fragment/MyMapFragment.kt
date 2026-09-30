@@ -217,7 +217,7 @@ class MyMapFragment : Fragment() {
             val placemark = binding.mapView.map.mapObjects.addPlacemark(point)
 
             placemark.setIcon(com.yandex.runtime.image.ImageProvider.fromResource(
-                requireContext(), R.drawable.lokation))
+                requireContext(), R.drawable.metka4567))
 
             placemark.userData = spot
 
