@@ -9,6 +9,7 @@ import ru.semen.fishingspot.data.AppDatabase
 import ru.semen.fishingspot.data.FishingSpot
 import ru.semen.fishingspot.data.WaterChecker
 import ru.semen.fishingspot.repository.FishingSpotRepository
+import ru.semen.fishingspot.utils.UserSessionManager // ✅ Добавлен импорт
 
 class SpotViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -18,15 +19,20 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
 
     val allSpots: LiveData<List<FishingSpot>>
 
+    // ✅ Получаем текущий UID пользователя один раз при создании ViewModel
+    private val currentUserId: String =
+        UserSessionManager.getCurrentUserId(application.applicationContext) ?: "unknown"
+
     init {
         database = AppDatabase.getDatabase(application)
         val dao = database.fishingSpotDao()
         repository = FishingSpotRepository(dao)
+        // ✅ Запрос остался прежним! Локальная карта показывает ВСЕ точки, как и раньше
         allSpots = repository.allSpots
     }
 
     /**
-     * ✅ Обновленный метод сохранения с поддержкой флага isVerified
+     * ✅ Обновленный метод сохранения с поддержкой флага isVerified и authorId
      */
     fun addFullSpot(
         lat: Double,
@@ -36,7 +42,7 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
         weight: Double,
         isPublic: Boolean,
         photoPath: String?,
-        isVerified: Boolean = false // <-- Новый параметр
+        isVerified: Boolean = false
     ) {
         viewModelScope.launch {
             val spot = FishingSpot(
@@ -47,7 +53,8 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
                 catchWeight = weight,
                 isPublic = isPublic,
                 photoPath = photoPath,
-                isVerified = isVerified // <-- Передаем флаг в Entity
+                isVerified = isVerified,
+                authorId = currentUserId // ✅ Автоматически привязываем UID создателя
             )
             repository.insert(spot)
         }

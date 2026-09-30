@@ -17,5 +17,9 @@ data class FishingSpot(
 
     // ✅ Новое поле для разделения проверенных и сомнительных точек
     // По умолчанию false (сомнительная), при успешной проверке воды ставим true
-    val isVerified: Boolean = false
+    val isVerified: Boolean = false,
+
+    // ✅ НОВОЕ ПОЛЕ: ID автора из Firebase Auth / UserSessionManager
+    // Дефолтное значение "" гарантирует, что старые записи не сломаются
+    val authorId: String = ""
 )

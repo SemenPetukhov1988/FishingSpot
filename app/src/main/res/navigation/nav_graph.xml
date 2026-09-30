@@ -2,8 +2,25 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/nav_graph"
-    app:startDestination="@id/mainTabsFragment">
+    app:startDestination="@id/loginFragment"> <!-- ✅ Теперь стартуем с входа -->
 
+    <!-- ✅ ФРАГМЕНТ АВТОРИЗАЦИИ (НОВЫЙ) -->
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="ru.semen.fishingspot.ui.auth.LoginFragment"
+        android:label="LoginFragment">
+
+        <!-- Экшен на главную карту/табы -->
+        <action
+            android:id="@+id/action_login_to_mainTabs"
+            app:destination="@id/mainTabsFragment"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+        <!-- popUpToInclusive=true удаляет loginFragment из стека.
+             Кнопка "Назад" на карте закроет приложение, а не вернет к вводу ника -->
+    </fragment>
+
+    <!-- ТВОИ СУЩЕСТВУЮЩИЕ ФРАГМЕНТЫ -->
     <fragment
         android:id="@+id/mainTabsFragment"
         android:name="ru.semen.fishingspot.fragment.MainTabsFragment"
@@ -13,7 +30,6 @@
             android:id="@+id/action_mainTabs_to_addPoint"
             app:destination="@id/addPointFragment" />
 
-        <!-- ✅ ЭКШЕН ДЛЯ ОТКРЫТИЯ ДЕТАЛЕЙ ТОЧКИ -->
         <action
             android:id="@+id/action_map_to_details"
             app:destination="@id/spotDetailsFragment" />
@@ -41,7 +57,6 @@
             app:popUpToInclusive="false" />
     </fragment>
 
-    <!-- ✅ НОВЫЙ ФРАГМЕНТ ДЕТАЛЕЙ -->
     <fragment
         android:id="@+id/spotDetailsFragment"
         android:name="ru.semen.fishingspot.fragment.SpotDetailsFragment"
