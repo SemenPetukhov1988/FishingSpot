@@ -1,9 +1,12 @@
 package ru.semen.fishingspot.fragment
 
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
@@ -14,6 +17,7 @@ import ru.netology.fishingspot.ui.user.FishermenFragment
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentMainTabsBinding
 import ru.semen.fishingspot.ui.map.GlobalMapFragment
+import androidx.core.graphics.toColorInt
 
 class MainTabsFragment : Fragment() {
 
@@ -34,11 +38,12 @@ class MainTabsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        ViewCompat.setOnApplyWindowInsetsListener(binding.topBar) { v, windowInsets ->
-            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.updatePadding(top = insets.top)
-            WindowInsetsCompat.CONSUMED
-        }
+
+
+        // ✅ Отключаем стандартную перекраску и серый круг
+        binding.bottomNavigation.itemIconTintList = null
+        binding.bottomNavigation.itemActiveIndicatorColor = ColorStateList.valueOf(Color.TRANSPARENT)
+
 
         if (savedInstanceState == null) {
             switchFragment(MyMapFragment(), R.id.nav_my_places)
@@ -47,15 +52,29 @@ class MainTabsFragment : Fragment() {
                 savedInstanceState.getInt("SELECTED_ITEM", R.id.nav_my_places)
         }
 
-        binding.menuButton.setOnClickListener {
-            // TODO: Открыть боковое меню
-        }
 
-        binding.profileButton.setOnClickListener {
-            binding.bottomNavigation.selectedItemId = R.id.nav_fishermen
-        }
+
+
 
         binding.bottomNavigation.setOnItemSelectedListener { item ->
+            // ✅ АНИМАЦИЯ "ПОДПРЫГИВАНИЯ" ИКОНКИ
+            val iconView = binding.bottomNavigation.findViewById<View>(item.itemId)
+                ?.findViewById<ImageView>(com.google.android.material.R.id.navigation_bar_item_icon_view)
+
+            iconView?.animate()
+                ?.scaleX(1.25f)
+                ?.scaleY(1.25f)
+                ?.setDuration(150)
+                ?.withEndAction {
+                    iconView.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(200)
+                        .start()
+                }
+                ?.start()
+
+            // Переключаем фрагменты как раньше
             when (item.itemId) {
                 R.id.nav_my_places -> switchFragment(MyMapFragment(), item.itemId)
                 R.id.nav_global_map -> switchFragment(GlobalMapFragment(), item.itemId)

@@ -6,4 +6,11 @@
     </style>
 
     <style name="Theme.FishingSpot" parent="Base.Theme.FishingSpot" />
+
+    <!-- ✅ Стиль текста для нижней навигации -->
+    <style name="BottomNavText" parent="TextAppearance.MaterialComponents.Caption">
+        <item name="android:fontFamily">sans-serif-condensed-medium</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:letterSpacing">0.03</item>
+    </style>
 </resources>

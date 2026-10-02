@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Активное состояние: твоя цветная иконка -->
+    <item android:drawable="@drawable/mymap" android:state_checked="true" />
+
+    <!-- Неактивное состояние: серая иконка -->
+    <item android:drawable="@drawable/mymapblack" />
+</selector>
