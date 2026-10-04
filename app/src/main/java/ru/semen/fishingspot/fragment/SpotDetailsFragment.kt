@@ -1,5 +1,9 @@
 package ru.semen.fishingspot.fragment
 
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -125,9 +129,61 @@ class SpotDetailsFragment : Fragment() {
             }
         }
 
+        // Кнопка ДОБРАТЬСЯ (Реальная навигация)
+
+        // Кнопка ДОБРАТЬСЯ (Самый надёжный способ)
+        // Кнопка ДОБРАТЬСЯ (Официальная логика Яндекс + fallback)
         binding.btnNavigate.setOnClickListener {
-            Toast.makeText(requireContext(), "🗺️ Открываем Яндекс.Навигатор (в разработке)", Toast.LENGTH_SHORT).show()
+            val lat = arguments?.getDouble(ARG_SPOT_LAT)
+            val lon = arguments?.getDouble(ARG_SPOT_LON)
+
+            if (lat == null || lon == null || (lat == 0.0 && lon == 0.0)) {
+                Toast.makeText(requireContext(), "⚠️ Координаты точки не найдены", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // 1. Пробуем Яндекс Карты через стандартный HTTPS-интент, привязанный к пакету
+            if (isPackageInstalled("ru.yandex.yandexmaps", requireContext())) {
+                // Это официальный веб-формат построения маршрутов, который Яндекс Карты перехватывают идеально
+                val uri = Uri.parse("https://yandex.ru{lat},${lon}&rtt=mt")
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    setPackage("ru.yandex.yandexmaps")
+                    // Добавляем флаг, чтобы интент открывался как новая задача, не ломая стек вашего приложения
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                try {
+                    startActivity(intent)
+                    return@setOnClickListener // Успешно открыли Яндекс Карты, выходим
+                } catch (e: Exception) {
+                    // Если произошел внутренний сбой в самом Яндексе — не падаем, идем к Google Картам
+                }
+            }
+
+            // 2. Пробуем Google Карты
+            if (isPackageInstalled("com.google.android.apps.maps", requireContext())) {
+                val uri = Uri.parse("https://google.com{lat},${lon}")
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    setPackage("com.google.android.apps.maps")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                try {
+                    startActivity(intent)
+                    return@setOnClickListener // Успешно открыли Google Карты, выходим
+                } catch (e: Exception) {
+                    // Игнорируем ошибку и идем в системный fallback
+                }
+            }
+
+            // 3. Универсальный fallback: любой доступный навигатор в системе (2ГИС, Maps.me и др.)
+            val uriGeo = Uri.parse("geo:${lat},${lon}?q=${lat},${lon}")
+            val intentGeo = Intent(Intent.ACTION_VIEW, uriGeo)
+            try {
+                startActivity(intentGeo)
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "Не удалось открыть карты", Toast.LENGTH_SHORT).show()
+            }
         }
+
 
         binding.btnSaveToLocal.setOnClickListener {
             Toast.makeText(requireContext(), "💾 Сохранение на локальную карту (в разработке)", Toast.LENGTH_SHORT).show()
@@ -156,5 +212,23 @@ class SpotDetailsFragment : Fragment() {
     override fun onDestroyView() {
         _binding = null
         super.onDestroyView()
+    }
+
+    // ✅ Вспомогательная функция проверки установки пакета
+    private fun isPackageInstalled(packageName: String, context: Context): Boolean {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(
+                    packageName,
+                    PackageManager.PackageInfoFlags.of(PackageManager.GET_ACTIVITIES.toLong())
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES)
+            }
+            true
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        }
     }
 }

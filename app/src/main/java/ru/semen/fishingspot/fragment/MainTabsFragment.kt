@@ -1,7 +1,9 @@
 package ru.semen.fishingspot.fragment
 
+import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -18,7 +20,6 @@ import ru.netology.fishingspot.ui.user.FishermenFragment
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentMainTabsBinding
 import ru.semen.fishingspot.ui.map.GlobalMapFragment
-
 import ru.semen.fishingspot.viewmodel.SpotViewModel
 
 class MainTabsFragment : Fragment() {
@@ -28,6 +29,9 @@ class MainTabsFragment : Fragment() {
     private val spotViewModel: SpotViewModel by activityViewModels()
 
     private var currentFragment: Fragment? = null
+
+    // ✅ НОВОЕ: Храним ID выбранной вкладки в переменной, чтобы не лезть в binding при уничтожении
+    private var currentSelectedItemId = R.id.nav_my_places
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentMainTabsBinding.inflate(inflater, container, false)
@@ -42,18 +46,22 @@ class MainTabsFragment : Fragment() {
         binding.bottomNavigation.itemIconTintList = null
         binding.bottomNavigation.itemActiveIndicatorColor = ColorStateList.valueOf(Color.TRANSPARENT)
 
-        // ✅ СИНХРОНИЗАЦИЯ: При возврате из деталей обновляем выбранную вкладку
+        // Синхронизация вкладки при возврате из SpotDetailsFragment
         spotViewModel.selectedTabId.observe(viewLifecycleOwner) { tabId ->
+            currentSelectedItemId = tabId // ✅ Обновляем и нашу переменную
             binding.bottomNavigation.selectedItemId = tabId
         }
 
         if (savedInstanceState == null) {
             switchFragment(MyMapFragment(), R.id.nav_my_places)
         } else {
-            binding.bottomNavigation.selectedItemId = savedInstanceState.getInt("SELECTED_ITEM", R.id.nav_my_places)
+            currentSelectedItemId = savedInstanceState.getInt("SELECTED_ITEM", R.id.nav_my_places)
+            binding.bottomNavigation.selectedItemId = currentSelectedItemId
         }
 
         binding.bottomNavigation.setOnItemSelectedListener { item ->
+            currentSelectedItemId = item.itemId // ✅ Запоминаем выбор
+
             val iconView = binding.bottomNavigation.findViewById<View>(item.itemId)
                 ?.findViewById<ImageView>(com.google.android.material.R.id.navigation_bar_item_icon_view)
 
@@ -96,9 +104,10 @@ class MainTabsFragment : Fragment() {
         return true
     }
 
+    // ✅ ИСПРАВЛЕННЫЙ МЕТОД: больше не обращаемся к binding, который может быть null
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putInt("SELECTED_ITEM", binding.bottomNavigation.selectedItemId)
+        outState.putInt("SELECTED_ITEM", currentSelectedItemId)
     }
 
     override fun onDestroyView() {

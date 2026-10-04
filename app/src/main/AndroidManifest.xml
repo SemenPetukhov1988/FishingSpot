@@ -31,4 +31,10 @@
 
     </application>
 
+    <!-- ✅ ОБЯЗАТЕЛЬНО ДЛЯ ANDROID 11+: Разрешаем приложению "видеть" карты -->
+    <queries>
+        <package android:name="ru.yandex.yandexmaps" />
+        <package android:name="com.google.android.apps.maps" />
+    </queries>
+
 </manifest>
