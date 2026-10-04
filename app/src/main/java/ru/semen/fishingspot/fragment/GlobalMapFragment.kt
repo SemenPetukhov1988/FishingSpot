@@ -144,6 +144,7 @@ class GlobalMapFragment : Fragment() {
     }
 
     // ✅ ОТРИСОВКА МАРКЕРОВ С РАЗНЫМИ ИКОНКАМИ
+    // ✅ ОТРИСОВКА МАРКЕРОВ С РАЗНЫМИ ИКОНКАМИ
     private fun drawPublicMarkers(spots: List<SpotViewModel.PublicSpot>) {
         if (_binding == null) return
 
@@ -156,9 +157,9 @@ class GlobalMapFragment : Fragment() {
 
             // 🎨 ВЫБОР ИКОНКИ В ЗАВИСИМОСТИ ОТ СТАТУСА
             val iconRes = if (spot.isVerified) {
-                R.drawable.metka78 // ⚠️ ЗАМЕНИ НА СВОЮ ИКОНКУ (например, синий/зеленый маркер)
+                R.drawable.metka78 // Твоя иконка для проверенной точки
             } else {
-                R.drawable.lokation // ⚠️ ЗАМЕНИ НА СВОЮ ИКОНКУ (например, желтый/оранжевый маркер)
+                R.drawable.lokation // Твоя иконка для сомнительной точки
             }
 
             placemark.setIcon(ImageProvider.fromResource(requireContext(), iconRes))
@@ -171,21 +172,28 @@ class GlobalMapFragment : Fragment() {
 
                     Log.d("GLOBAL_MAP", "КЛИК по публичной точке! ID: ${clickedSpot.id}, Verified: ${clickedSpot.isVerified}")
 
+                    // ✅ ВОТ ЗДЕСЬ МЫ СОБИРАЕМ "РЮКЗАК" С ДАННЫМИ ДЛЯ ЭКРАНА ДЕТАЛЕЙ
                     val detailsBundle = Bundle().apply {
                         putString("spot_id", clickedSpot.id)
                         putString("spot_name", clickedSpot.name)
                         putString("spot_desc", clickedSpot.description)
                         putDouble("spot_weight", clickedSpot.catchWeight)
                         putLong("spot_created", clickedSpot.createdAt)
-                        putBoolean("spot_is_verified", clickedSpot.isVerified) // Передаем статус для отображения в деталях
+
+                        // ✅ ДОБАВЛЕНЫ КООРДИНАТЫ (чтобы показать их текстом на экране деталей)
+                        putDouble("spot_lat", clickedSpot.latitude)
+                        putDouble("spot_lon", clickedSpot.longitude)
+
+                        // ✅ ЭТИ ДВЕ СТРОКИ УЖЕ БЫЛИ У ТЕБЯ, ОСТАВЛЯЕМ ИХ
                         putString("spot_author", clickedSpot.authorId)
+                        putBoolean("spot_is_verified", clickedSpot.isVerified)
                     }
 
                     try {
-                        // ✅ БЕЗОПАСНАЯ НАВИГАЦИЯ: переходим напрямую по ID фрагмента, без action
+                        // ✅ БЕЗОПАСНАЯ НАВИГАЦИЯ: переходим напрямую по ID фрагмента
                         findNavController().navigate(R.id.spotDetailsFragment, detailsBundle)
                     } catch (e: Exception) {
-                        Log.e("GLOBAL_MAP", "Ошибка навигации. Возможно, SpotDetailsFragment ожидает Long ID вместо String", e)
+                        Log.e("GLOBAL_MAP", "Ошибка навигации", e)
                     }
                     return true
                 }

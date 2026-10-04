@@ -1,149 +1,363 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout
+<ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFF">
+    android:background="#F8FAFC"
+    android:fillViewport="true">
 
-    <!-- Верхняя панель со стрелкой назад -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
 
-        <ImageButton
-            android:id="@+id/btnBack"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/back"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Назад" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Новая точка"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:layout_marginStart="16dp"/>
-    </LinearLayout>
-
-    <!-- Основной контент -->
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginTop="?attr/actionBarSize"
-        android:fillViewport="true">
-
+        <!-- ✅ ШАПКА -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="24dp"
-            android:gravity="center_horizontal">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="24dp">
 
-            <!-- Область для фото (заглушка с иконкой камеры) -->
-            <FrameLayout
-                android:id="@+id/flPhotoContainer"
+            <ImageButton
+                android:id="@+id/btnBack"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/back"
+                android:contentDescription="Назад"
+                app:tint="#2C3E50" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Новая точка"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#2C3E50"
+                android:gravity="center"
+                android:fontFamily="sans-serif-medium" />
+
+            <View
+                android:layout_width="48dp"
+                android:layout_height="48dp" />
+        </LinearLayout>
+
+        <!-- ✅ БЛОК ФОТО (пока кнопка, потом добавим ImagePicker) -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardPhoto"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="16dp"
+            app:cardBackgroundColor="#FFFFFF"
+            app:strokeWidth="2dp"
+            app:strokeColor="#E2E8F0"
+            app:cardElevation="0dp"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="220dp"
-                android:background="#F0F0F0"
-                android:foreground="?attr/selectableItemBackground">
+                android:layout_height="180dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="16dp">
 
                 <ImageView
-                    android:id="@+id/ivSpotPhoto"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_"
+                    app:tint="#0288D1"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/tvPhotoHint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Нажмите, чтобы сделать фото улова"
+                    android:textSize="14sp"
+                    android:textColor="#64748B"
+                    android:fontFamily="sans-serif-medium" />
+
+                <ImageView
+                    android:id="@+id/ivPhotoPreview"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:scaleType="centerCrop"
                     android:visibility="gone" />
 
-                <LinearLayout
-                    android:id="@+id/llCameraPlaceholder"
-                    android:layout_width="wrap_content"
+                <ImageButton
+                    android:id="@+id/btnRemovePhoto"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="@drawable/add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_"
+                    android:src="@drawable/add_24dp_000000_fill0_wght400_grad0_opsz24__1_"
+                    android:contentDescription="Удалить фото"
+                    android:layout_gravity="top|end"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ✅ НАЗВАНИЕ МЕСТА -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Название места"
+            app:boxCornerRadiusTopStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusBottomEnd="12dp"
+            app:boxStrokeColor="#0288D1"
+            app:hintTextColor="#0288D1"
+            android:layout_marginBottom="16dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etSpotName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:maxLength="40"
+                android:fontFamily="sans-serif-medium" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- ✅ ПЕРЕКЛЮЧАТЕЛЬ ПУБЛИЧНОЙ ТОЧКИ (сверху, не перекрывается клавиатурой) -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardPublic"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="#E3F2FD"
+            app:strokeWidth="1dp"
+            app:strokeColor="#0288D1"
+            app:cardElevation="0dp"
+            android:layout_marginBottom="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/globalmapblack"
+                    app:tint="#0288D1"
+                    android:layout_marginEnd="12dp" />
+
+                <TextView
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:orientation="vertical"
-                    android:gravity="center">
+                    android:layout_weight="1"
+                    android:text="Разместить на общей карте"
+                    android:textSize="14sp"
+                    android:textColor="#2C3E50"
+                    android:fontFamily="sans-serif-medium" />
 
-                    <ImageView
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:src="@android:drawable/ic_menu_camera"
-                        app:tint="#757575" />
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchPublic"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Добавить фото улова"
-                        android:textColor="#757575"
-                        android:layout_marginTop="8dp"/>
-                </LinearLayout>
-            </FrameLayout>
+        <!-- ✅ ПРЕИМУЩЕСТВЕННО В УЛОВЕ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Преимущественно в улове"
+            android:textSize="14sp"
+            android:textColor="#2C3E50"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginBottom="8dp" />
 
-            <!-- Название точки -->
-            <EditText
-                android:id="@+id/etLocationName"
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipGroupFish"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:singleSelection="true"
+            app:selectionRequired="true"
+            android:layout_marginBottom="24dp">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipPike"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Щука" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipPerch"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Окунь" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipZander"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Судак" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipBream"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Лещ" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipRoach"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Плотва" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipGrayling"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Хариус" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipBurbot"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Налим" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipOther"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Другое" />
+        </com.google.android.material.chip.ChipGroup>
+
+        <!-- Поле для "Другое" (скрыто по умолчанию) -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/layoutOtherFish"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Введите вид рыбы"
+            app:boxCornerRadiusTopStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusBottomEnd="12dp"
+            app:boxStrokeColor="#0288D1"
+            android:visibility="gone"
+            android:layout_marginBottom="24dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etOtherFish"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:hint="Название места (например: Залив Щучий)"
-                android:inputType="textCapSentences"
-                android:backgroundTint="#E0E0E0"
-                android:padding="12dp"/>
+                android:inputType="text"
+                android:fontFamily="sans-serif-medium" />
+        </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Вес улова -->
-            <EditText
-                android:id="@+id/etCatchWeight"
-                android:layout_width="match_parent"
+        <!-- ✅ ВЕС УЛОВА -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Вес улова"
+            android:textSize="14sp"
+            android:textColor="#2C3E50"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/toggleGroupWeight"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:singleSelection="true"
+            app:selectionRequired="true"
+            android:layout_marginBottom="24dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWeight1"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:hint="Вес улова (кг)"
-                android:inputType="numberDecimal"
-                android:backgroundTint="#E0E0E0"
-                android:padding="12dp"/>
+                android:layout_weight="1"
+                android:text="До 1 кг" />
 
-            <!-- Переключатель Публичная / Приватная -->
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/swIsPublic"
-                android:layout_width="match_parent"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWeight2"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="Сделать точку публичной"
-                android:checked="false"/>
+                android:layout_weight="1"
+                android:text="1–5 кг" />
 
-            <!-- Краткое описание -->
-            <EditText
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWeight3"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Больше 5 кг" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <!-- ✅ ОПИСАНИЕ МЕСТА -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Описание места"
+            android:textSize="14sp"
+            android:textColor="#2C3E50"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Глубина, особенности дна, на что клевало..."
+            app:boxCornerRadiusTopStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusBottomEnd="12dp"
+            app:boxStrokeColor="#0288D1"
+            app:hintTextColor="#0288D1"
+            android:layout_marginBottom="16dp">
+
+            <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etDescription"
                 android:layout_width="match_parent"
-                android:layout_height="120dp"
-                android:layout_marginTop="16dp"
-                android:hint="Краткое описание (снасти, погода...)"
-                android:gravity="top|start"
+                android:layout_height="wrap_content"
                 android:inputType="textMultiLine"
-                android:backgroundTint="#E0E0E0"
-                android:padding="12dp"/>
+                android:minLines="3"
+                android:gravity="top"
+                android:fontFamily="sans-serif-medium" />
+        </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Отступ для круглой кнопки -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="80dp"/>
+        <!-- ✅ СЛУЖЕБНАЯ ИНФОРМАЦИЯ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📍 Координаты сохранены автоматически"
+            android:textSize="12sp"
+            android:textColor="#64748B"
+            android:layout_marginBottom="24dp" />
 
-        </LinearLayout>
-    </ScrollView>
+        <!-- ✅ КНОПКА СОХРАНИТЬ -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Сохранить точку"
+            android:textSize="16sp"
+            android:fontFamily="sans-serif-medium"
+            app:backgroundTint="#0288D1"
+            app:cornerRadius="16dp"
+            app:icon="@drawable/mymapblack"
+            app:iconGravity="textEnd"
+            app:iconTint="#FFFFFF" />
 
-    <!-- Круглая кнопка с галочкой (Floating Action Button) -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabSavePoint"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="24dp"
-        android:src="@android:drawable/ic_input_add"
-        app:tint="@android:color/white"
-        app:backgroundTint="#4CAF50" />
-
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+    </LinearLayout>
+</ScrollView>

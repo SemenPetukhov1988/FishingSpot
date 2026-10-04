@@ -206,6 +206,9 @@ class MyMapFragment : Fragment() {
         binding.tvLoadingText.visibility = View.GONE
     }
 
+    // =====================================================================
+    // ✅ ОБНОВЛЕННЫЙ МЕТОД ОТРИСОВКИ МАРКЕРОВ
+    // =====================================================================
     private fun drawMarkers(spots: List<FishingSpot>) {
         if (_binding == null) return
 
@@ -226,12 +229,20 @@ class MyMapFragment : Fragment() {
                     Log.d(TAG, "КЛИК! ID: ${spot.id}")
                     val clickedSpot = mapObject.userData as? FishingSpot ?: return false
 
+                    // ✅ ПОЛНЫЙ НАБОР ДАННЫХ ДЛЯ ЭКРАНА ДЕТАЛЕЙ
                     val detailsBundle = Bundle().apply {
                         putLong("spot_id", clickedSpot.id)
                         putString("spot_name", clickedSpot.name)
                         putString("spot_desc", clickedSpot.description)
                         putDouble("spot_weight", clickedSpot.catchWeight)
                         putLong("spot_created", clickedSpot.createdAt)
+
+                        // ✅ ДОБАВЛЕНЫ НОВЫЕ ПОЛЯ
+                        putDouble("spot_lat", clickedSpot.latitude)
+                        putDouble("spot_lon", clickedSpot.longitude)
+                        putString("spot_author", clickedSpot.authorId)
+                        putBoolean("spot_is_verified", clickedSpot.isVerified)
+                        putInt("source_tab", R.id.nav_my_places) // Чтобы кнопка "Назад" вернула именно сюда
                     }
 
                     findNavController().navigate(R.id.action_map_to_details, detailsBundle)
