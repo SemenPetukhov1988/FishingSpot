@@ -21,7 +21,6 @@ import com.yandex.mapkit.location.Location
 import com.yandex.mapkit.location.LocationListener
 import com.yandex.mapkit.location.LocationManager
 import com.yandex.mapkit.map.CameraPosition
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentRefineLocationBinding
@@ -127,16 +126,23 @@ class RefineLocationFragment : Fragment() {
         }
     }
 
-    private fun stopLocationUpdates() { locationManager?.unsubscribe(locationListener) }
-    private fun showLoading() { binding.progressLocation.visibility = View.VISIBLE; binding.tvLoadingText.visibility = View.VISIBLE }
-    private fun hideLoading() { binding.progressLocation.visibility = View.GONE; binding.tvLoadingText.visibility = View.GONE }
+    private fun stopLocationUpdates() {
+        locationManager?.unsubscribe(locationListener)
+    }
+
+    private fun showLoading() {
+        binding.progressLocation.visibility = View.VISIBLE
+        binding.tvLoadingText.visibility = View.VISIBLE
+    }
+
+    private fun hideLoading() {
+        binding.progressLocation.visibility = View.GONE
+        binding.tvLoadingText.visibility = View.GONE
+    }
 
     // --------------------------------------------------------------------------
     // ✅ ГЛАВНАЯ ЛОГИКА ПРОВЕРКИ И СОХРАНЕНИЯ
     // --------------------------------------------------------------------------
-    /**
-     * ✅ ГЛАВНАЯ ЛОГИКА ПРОВЕРКИ И СОХРАНЕНИЯ
-     */
     private fun checkWaterLocalAndSave(point: Point) {
         lifecycleScope.launch {
             binding.btnDone.isEnabled = false
@@ -163,7 +169,6 @@ class RefineLocationFragment : Fragment() {
                 // ⚠️ 2B. Воды нет в БД, НО Рыбак рядом -> Сомнительная
                 !isWaterInDb && distance < MAX_DISTANCE_METERS -> {
                     Log.w(TAG, "[SUSPICIOUS] GPS совпал, но воды нет в БД")
-                    // Показываем диалог вместо мгновенного сохранения
                     showSuspiciousDialog(point)
                 }
 
@@ -188,26 +193,25 @@ class RefineLocationFragment : Fragment() {
             .setMessage(
                 "Рядом с вами нет зарегистрированного водоема. " +
                         "Возможно, это новое или маленькое место.\n\n" +
-                        "Точка будет добавлена на общую карту со статусом «Сомнительная» (желтый маркер). " +
+                        "Точка будет добавлена на общую карту со статусом «Сомнительная». " +
                         "Другие рыболовы смогут подтвердить наличие воды здесь."
             )
             .setPositiveButton("Сохранить как сомнительную") { dialog, _ ->
                 dialog.dismiss()
                 if (isAdded) {
+                    // ✅ Вызываем общий метод, ViewModel сама поймет, что isVerified = false
                     saveToRoomAndFirebase(point, isPublic = true, isVerified = false)
                 }
             }
             .setNegativeButton("Отмена") { dialog, _ ->
                 dialog.dismiss()
             }
-            .setCancelable(false) // Запрещаем закрытие по клику вне окна
+            .setCancelable(false)
             .create()
             .show()
     }
 
     /** Сохранение ТОЛЬКО в Room (Личные или отклоненные) */
-    /** Сохранение ТОЛЬКО в Room (Личные или отклоненные) */
-    // ✅ Убрали suspend, так как ViewModel сама управляет корутиной
     private fun saveToRoomOnly(point: Point, isPublic: Boolean, isVerified: Boolean) {
         spotViewModel.addFullSpot(
             lat = point.latitude, lon = point.longitude, name = spotName,
@@ -218,31 +222,16 @@ class RefineLocationFragment : Fragment() {
     }
 
     /** Сохранение в Room + Отправка в Firebase (Публичные) */
-    // ✅ Тоже убираем suspend. Внутренний launch для Firebase оставляем.
     private fun saveToRoomAndFirebase(point: Point, isPublic: Boolean, isVerified: Boolean) {
-        // 1. Сначала гарантированно сохраняем локально
+        // ✅ ViewModel сама увидит isPublic = true и отправит данные в Firebase с правильным authorId
         spotViewModel.addFullSpot(
             lat = point.latitude, lon = point.longitude, name = spotName,
             description = spotDesc, weight = spotWeight, isPublic = isPublic,
             isVerified = isVerified, photoPath = photoPath
         )
-
-        // 2. 🔥 ЗАГЛУШКА ДЛЯ FIREBASE (запускаем отдельную корутину)
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                /*
-                 * TODO: Подключить Firebase Repository
-                 * val publicSpot = localSpot.toPublicSpot(currentUserId)
-                 * firebaseRepository.uploadSpot(publicSpot)
-                 */
-                Log.d(TAG, "[FIREBASE STUB] Отправка точки verified=$isVerified...")
-            } catch (e: Exception) {
-                Log.e(TAG, "[FIREBASE STUB] Ошибка отправки", e)
-            }
-        }
-
         navigateBack()
     }
+
     /** Диалог при нарушении дистанции */
     private fun showFarAwayDialog(point: Point) {
         AlertDialog.Builder(requireContext())
@@ -257,8 +246,11 @@ class RefineLocationFragment : Fragment() {
     }
 
     private fun navigateBack() {
-        try { requireActivity().findNavController(R.id.fragmentContainer).navigate(R.id.action_refine_to_tabs) }
-        catch (e: Exception) { requireActivity().onBackPressedDispatcher.onBackPressed() }
+        try {
+            requireActivity().findNavController(R.id.fragmentContainer).navigate(R.id.action_refine_to_tabs)
+        } catch (e: Exception) {
+            requireActivity().onBackPressedDispatcher.onBackPressed()
+        }
     }
 
     private fun calculateDistance(p1: Point, p2: Point): Double {
@@ -269,6 +261,13 @@ class RefineLocationFragment : Fragment() {
         return r * 2 * atan2(sqrt(a), sqrt(1 - a))
     }
 
-    override fun onStop() { binding.refineMapView.onStop(); super.onStop() }
-    override fun onDestroyView() { _binding = null; super.onDestroyView() }
+    override fun onStop() {
+        binding.refineMapView.onStop()
+        super.onStop()
+    }
+
+    override fun onDestroyView() {
+        _binding = null
+        super.onDestroyView()
+    }
 }

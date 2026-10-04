@@ -23,4 +23,8 @@
         android:id="@+id/nav_fishermen"
         android:icon="@drawable/fisher_selector"
         android:title="Рыболовы" />
+    <item
+        android:id="@+id/nav_feed"
+        android:icon="@drawable/menu_24dp_000000_fill0_wght400_grad0_opsz24__1_"
+    android:title="Лента" />
 </menu>

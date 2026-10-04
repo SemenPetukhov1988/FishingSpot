@@ -79,6 +79,7 @@ dependencies {
     implementation("androidx.fragment:fragment-ktx:1.8.0")
     implementation(libs.logging.interceptor)
     implementation(libs.glide)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     implementation("com.yandex.android:maps.mobile:4.8.1-full")
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.swiperefreshlayout)
