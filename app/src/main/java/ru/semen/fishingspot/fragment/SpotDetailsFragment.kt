@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.navigation.fragment.findNavController
+import com.google.firebase.firestore.FirebaseFirestore
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.data.FishingSpot
 import ru.semen.fishingspot.databinding.FragmentSpotDetailsBinding
@@ -26,6 +27,7 @@ class SpotDetailsFragment : Fragment() {
     private var _binding: FragmentSpotDetailsBinding? = null
     private val binding get() = _binding!!
     private val spotViewModel: SpotViewModel by activityViewModels()
+    private val firestore = FirebaseFirestore.getInstance()
 
     companion object {
         private const val ARG_SPOT_ID = "spot_id"
@@ -91,6 +93,23 @@ class SpotDetailsFragment : Fragment() {
 
         binding.cardSuspiciousWarning.visibility = if (isVerified) View.GONE else View.VISIBLE
 
+        // =====================================================================
+        // ✅ УМНАЯ ЛОГИКА ОТОБРАЖЕНИЯ КНОПКИ "СОХРАНИТЬ"
+        // =====================================================================
+        // Скрываем кнопку, если:
+        // 1. Это автор точки (она и так у него в базе)
+        // 2. ИЛИ пользователь открыл точку из вкладки "Мои места" (она там уже есть)
+        // ВАЖНО: Замени R.id.nav_my_map на реальный ID твоей вкладки "Мои места" из nav_graph.xml,
+        // если он называется иначе (например, R.id.nav_local_map или R.id.nav_diary)
+        val isFromMyMap = (sourceTab == R.id.nav_my_places)
+
+        if (isAuthor || isFromMyMap) {
+            binding.btnSaveToLocal.visibility = View.GONE
+        } else {
+            binding.btnSaveToLocal.visibility = View.VISIBLE
+        }
+        // =====================================================================
+
         // --- КНОПКИ ---
 
         binding.btnShare.setOnClickListener {
@@ -136,46 +155,91 @@ class SpotDetailsFragment : Fragment() {
             }
         }
 
-        // ✅ КНОПКА СОХРАНИТЬ С ЗАЩИТОТ ОТ ДУБЛИКАТОВ
+        // ✅ КНОПКА СОХРАНИТЬ (Она сработает только если кнопка видима, т.е. это чужая точка с общей карты)
         binding.btnSaveToLocal.setOnClickListener {
-            if (isAuthor) {
-                Toast.makeText(requireContext(), "⚠️ Это уже ваша точка! Она в вашем дневнике.", Toast.LENGTH_SHORT).show()
-            } else {
-                // Проверка: а может, я уже сохранял её ранее?
-                val currentLocalSpots = spotViewModel.allSpots.value ?: emptyList()
-                val isAlreadySaved = currentLocalSpots.any { localSpot ->
-                    localSpot.name == name &&
-                            localSpot.latitude == lat &&
-                            localSpot.longitude == lon &&
-                            localSpot.authorId == authorId
-                }
+            val currentLocalSpots = spotViewModel.allSpots.value ?: emptyList()
+            val isAlreadySaved = currentLocalSpots.any { localSpot ->
+                localSpot.name == name &&
+                        localSpot.latitude == lat &&
+                        localSpot.longitude == lon
+            }
 
-                if (isAlreadySaved) {
-                    Toast.makeText(requireContext(), "✅ Эта точка уже сохранена в вашем дневнике!", Toast.LENGTH_SHORT).show()
-                } else {
-                    spotViewModel.addFullSpot(
-                        lat = lat,
-                        lon = lon,
-                        name = name,
-                        description = desc,
-                        weight = weight,
-                        isPublic = false,
-                        photoPath = arguments?.getString(ARG_PHOTO_PATH),
-                        isVerified = isVerified
-                    )
-                    Toast.makeText(requireContext(), "✅ Точка '$name' добавлена в дневник!", Toast.LENGTH_SHORT).show()
-                }
+            if (isAlreadySaved) {
+                Toast.makeText(requireContext(), "✅ Эта точка уже сохранена в вашем дневнике!", Toast.LENGTH_SHORT).show()
+            } else {
+                spotViewModel.addFullSpot(
+                    lat = lat,
+                    lon = lon,
+                    name = name,
+                    description = desc,
+                    weight = weight,
+                    isPublic = false,
+                    photoPath = arguments?.getString(ARG_PHOTO_PATH),
+                    isVerified = isVerified
+                )
+                Toast.makeText(requireContext(), "✅ Точка '$name' добавлена в дневник!", Toast.LENGTH_SHORT).show()
             }
         }
 
-        binding.btnComments.setOnClickListener {
-            Toast.makeText(requireContext(), "💬 Комментарии скоро будут", Toast.LENGTH_SHORT).show()
+        // ✅ Проверяем, есть ли эта точка в Firebase (публичная ли она)
+        checkIfSpotIsPublic(name, lat, lon)
+
+        // ✅ ЕДИНСТВЕННЫЙ ОБРАБОТЧИК ДЛЯ КНОПКИ ОТЗЫВЫ
+        binding.btnReviews.setOnClickListener {
+            findFirebaseSpotAndOpenReviews(name, lat, lon)
         }
 
         binding.btnBack.setOnClickListener {
             spotViewModel.setSelectedTab(sourceTab)
             findNavController().navigateUp()
         }
+    }
+
+    /**
+     * Проверяет, есть ли точка в Firebase по координатам и имени.
+     * Если да — показываем кнопку "Отзывы".
+     */
+    private fun checkIfSpotIsPublic(name: String, lat: Double, lon: Double) {
+        firestore.collection("public_spots")
+            .whereEqualTo("name", name)
+            .whereEqualTo("latitude", lat)
+            .whereEqualTo("longitude", lon)
+            .limit(1)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                if (!snapshot.isEmpty) {
+                    binding.btnReviews.visibility = View.VISIBLE
+                } else {
+                    binding.btnReviews.visibility = View.GONE
+                }
+            }
+            .addOnFailureListener {
+                binding.btnReviews.visibility = View.GONE
+            }
+    }
+
+    /**
+     * Ищет точку в Firebase и открывает BottomSheet с отзывами
+     */
+    private fun findFirebaseSpotAndOpenReviews(name: String, lat: Double, lon: Double) {
+        firestore.collection("public_spots")
+            .whereEqualTo("name", name)
+            .whereEqualTo("latitude", lat)
+            .whereEqualTo("longitude", lon)
+            .limit(1)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                if (!snapshot.isEmpty) {
+                    val firebaseSpotId = snapshot.documents[0].id
+                    val reviewsSheet = ReviewsBottomSheetDialogFragment.newInstance(firebaseSpotId)
+                    reviewsSheet.show(childFragmentManager, "reviews")
+                } else {
+                    Toast.makeText(requireContext(), "⚠️ Точка не опубликована на общей карте", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(requireContext(), "❌ Ошибка загрузки отзывов", Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun getWeightText(weight: Double): String {

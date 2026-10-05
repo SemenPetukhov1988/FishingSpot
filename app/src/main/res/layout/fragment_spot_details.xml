@@ -102,7 +102,6 @@
                 android:layout_weight="1"
                 android:text="Подтвердить"
                 android:textSize="14sp"
-
                 app:iconGravity="textStart"
                 app:cornerRadius="12dp"
                 app:backgroundTint="#4CAF50" />
@@ -116,7 +115,6 @@
                 android:layout_marginStart="8dp"
                 android:text="Опровергнуть"
                 android:textSize="14sp"
-
                 app:iconGravity="textStart"
                 app:cornerRadius="12dp"
                 app:strokeColor="#F44336"
@@ -262,9 +260,9 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- Комментарии -->
+            <!-- ✅ ОТЗЫВЫ (Заменили Комментарии) -->
             <LinearLayout
-                android:id="@+id/btnComments"
+                android:id="@+id/btnReviews"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -273,26 +271,27 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:clickable="true"
                 android:focusable="true"
-                android:padding="8dp">
+                android:padding="8dp"
+                android:visibility="gone"> <!-- Скрыта по умолчанию, покажем через код -->
 
                 <ImageView
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:src="@drawable/comment_24dp_000000_fill0_wght400_grad0_opsz24"
-                    app:tint="#616161"
+                    app:tint="#0288D1"
                     android:layout_marginBottom="4dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Коммент."
+                    android:text="Отзывы"
                     android:textSize="12sp"
-                    android:textColor="#616161"
+                    android:textColor="#0288D1"
                     android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- ✅ 9. КНОПКА ПОДЕЛИТЬСЯ (Видна всегда, логику сделаем потом) -->
+        <!-- ✅ 9. КНОПКА ПОДЕЛИТЬСЯ -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnShare"
             style="@style/Widget.MaterialComponents.Button.TextButton"
@@ -300,7 +299,6 @@
             android:layout_height="48dp"
             android:text="Поделиться этой точкой"
             android:textSize="14sp"
-
             app:iconGravity="textStart"
             android:textColor="#0288D1" />
 

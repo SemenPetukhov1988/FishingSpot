@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="?attr/colorSurface"
+    android:paddingBottom="16dp">
+
+    <!-- "Ручка" для перетаскивания -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="8dp"
+       />
+
+    <!-- Заголовок -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="8dp"
+        android:text="💬 Отзывы"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="?attr/colorOnSurface"/>
+
+    <!-- Счётчик отзывов -->
+    <TextView
+        android:id="@+id/tvReviewsCount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="12dp"
+        android:textSize="13sp"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:text="Нет отзывов. Будьте первым!"/>
+
+    <!-- Список отзывов -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvReviews"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:minHeight="300dp"
+        android:maxHeight="500dp"
+        android:clipToPadding="false"
+        android:paddingBottom="8dp"/>
+
+    <!-- Пустое состояние -->
+    <TextView
+        android:id="@+id/tvEmptyReviews"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="32dp"
+        android:gravity="center"
+        android:text="Пока никто не оставил отзыв.\nСтаньте первым!"
+        android:textSize="14sp"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:visibility="gone"/>
+
+    <!-- Кнопка "Написать отзыв" -->
+    <com.google.android.material.button.MaterialButton
+
+        android:id="@+id/btnWriteReview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:text="✍️ Написать отзыв"
+        android:textAllCaps="false"/>
+
+</LinearLayout>
