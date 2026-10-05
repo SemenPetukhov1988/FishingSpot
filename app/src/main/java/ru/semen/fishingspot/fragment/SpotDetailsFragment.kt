@@ -33,8 +33,6 @@ class SpotDetailsFragment : Fragment() {
         private const val ARG_SPOT_DESC = "spot_desc"
         private const val ARG_SPOT_WEIGHT = "spot_weight"
         private const val ARG_SPOT_CREATED = "spot_created"
-
-        // ✅ Новые поля для передачи
         private const val ARG_SPOT_LAT = "spot_lat"
         private const val ARG_SPOT_LON = "spot_lon"
         private const val ARG_SPOT_AUTHOR = "spot_author"
@@ -50,8 +48,6 @@ class SpotDetailsFragment : Fragment() {
                     putString(ARG_SPOT_DESC, spot.description)
                     putDouble(ARG_SPOT_WEIGHT, spot.catchWeight)
                     putLong(ARG_SPOT_CREATED, spot.createdAt)
-
-                    // ✅ Передаем новые данные
                     putDouble(ARG_SPOT_LAT, spot.latitude)
                     putDouble(ARG_SPOT_LON, spot.longitude)
                     putString(ARG_SPOT_AUTHOR, spot.authorId)
@@ -71,12 +67,10 @@ class SpotDetailsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 1. Получаем все данные из Bundle
         val name = arguments?.getString(ARG_SPOT_NAME) ?: ""
         val desc = arguments?.getString(ARG_SPOT_DESC) ?: ""
         val weight = arguments?.getDouble(ARG_SPOT_WEIGHT) ?: 0.0
         val created = arguments?.getLong(ARG_SPOT_CREATED) ?: 0L
-
         val lat = arguments?.getDouble(ARG_SPOT_LAT) ?: 0.0
         val lon = arguments?.getDouble(ARG_SPOT_LON) ?: 0.0
         val authorId = arguments?.getString(ARG_SPOT_AUTHOR) ?: "неизвестно"
@@ -86,114 +80,98 @@ class SpotDetailsFragment : Fragment() {
         val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: ""
         val isAuthor = currentUserId.isNotEmpty() && currentUserId == authorId
 
-        // 2. Заполняем UI (старая логика сохранена)
         binding.tvSpotName.text = name
         binding.tvDescription.text = desc.ifEmpty { "Нет описания" }
         binding.tvCatchWeight.text = getWeightText(weight)
 
         val dateFormat = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
         binding.tvCreatedAt.text = "📅 Создано: ${dateFormat.format(Date(created))}"
-
-        // ✅ Заполняем новые поля
         binding.tvCoordinates.text = "📍 Широта: %.4f, Долгота: %.4f".format(lat, lon)
         binding.tvAuthor.text = "👤 Автор: $authorId"
 
-        // ✅ Логика карточки-предупреждения
         binding.cardSuspiciousWarning.visibility = if (isVerified) View.GONE else View.VISIBLE
 
-        // =====================================================================
-        // 3. НАСТРОЙКА КНОПОК (Заглушки с Toast, чтобы ничего не сломать)
-        // =====================================================================
+        // --- КНОПКИ ---
 
         binding.btnShare.setOnClickListener {
-            if (!isAuthor) {
-                Toast.makeText(requireContext(), "🔒 Поделиться может только автор точки", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(requireContext(), "📤 Функция 'Поделиться' в разработке", Toast.LENGTH_SHORT).show()
-            }
+            if (!isAuthor) Toast.makeText(requireContext(), "🔒 Поделиться может только автор", Toast.LENGTH_SHORT).show()
+            else Toast.makeText(requireContext(), "📤 Функция в разработке", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnConfirmSpot.setOnClickListener {
-            if (isAuthor) {
-                Toast.makeText(requireContext(), "ℹ️ Это ваша точка, подтверждение не требуется", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(requireContext(), "✅ Функция 'Подтвердить' в разработке", Toast.LENGTH_SHORT).show()
-            }
+            if (isAuthor) Toast.makeText(requireContext(), "ℹ️ Это ваша точка", Toast.LENGTH_SHORT).show()
+            else Toast.makeText(requireContext(), "✅ Функция в разработке", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnDisputeSpot.setOnClickListener {
-            if (isAuthor) {
-                Toast.makeText(requireContext(), "ℹ️ Это ваша точка", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(requireContext(), "⚠️ Функция 'Опровергнуть' в разработке", Toast.LENGTH_SHORT).show()
-            }
+            if (isAuthor) Toast.makeText(requireContext(), "ℹ️ Это ваша точка", Toast.LENGTH_SHORT).show()
+            else Toast.makeText(requireContext(), "⚠️ Функция в разработке", Toast.LENGTH_SHORT).show()
         }
 
-        // Кнопка ДОБРАТЬСЯ (Реальная навигация)
-
-        // Кнопка ДОБРАТЬСЯ (Самый надёжный способ)
-        // Кнопка ДОБРАТЬСЯ (Официальная логика Яндекс + fallback)
         binding.btnNavigate.setOnClickListener {
-            val lat = arguments?.getDouble(ARG_SPOT_LAT)
-            val lon = arguments?.getDouble(ARG_SPOT_LON)
-
-            if (lat == null || lon == null || (lat == 0.0 && lon == 0.0)) {
-                Toast.makeText(requireContext(), "⚠️ Координаты точки не найдены", Toast.LENGTH_SHORT).show()
+            if (lat == 0.0 && lon == 0.0) {
+                Toast.makeText(requireContext(), "⚠️ Координаты не найдены", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-
-            // 1. Пробуем Яндекс Карты через стандартный HTTPS-интент, привязанный к пакету
             if (isPackageInstalled("ru.yandex.yandexmaps", requireContext())) {
-                // Это официальный веб-формат построения маршрутов, который Яндекс Карты перехватывают идеально
-                val uri = Uri.parse("https://yandex.ru{lat},${lon}&rtt=mt")
+                val uri = Uri.parse("https://yandex.ru/maps/?rtext=~$lat,$lon&rtt=auto")
                 val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                     setPackage("ru.yandex.yandexmaps")
-                    // Добавляем флаг, чтобы интент открывался как новая задача, не ломая стек вашего приложения
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                try {
-                    startActivity(intent)
-                    return@setOnClickListener // Успешно открыли Яндекс Карты, выходим
-                } catch (e: Exception) {
-                    // Если произошел внутренний сбой в самом Яндексе — не падаем, идем к Google Картам
-                }
+                try { startActivity(intent); return@setOnClickListener } catch (e: Exception) { }
             }
-
-            // 2. Пробуем Google Карты
             if (isPackageInstalled("com.google.android.apps.maps", requireContext())) {
-                val uri = Uri.parse("https://google.com{lat},${lon}")
+                val uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lon")
                 val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                     setPackage("com.google.android.apps.maps")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                try {
-                    startActivity(intent)
-                    return@setOnClickListener // Успешно открыли Google Карты, выходим
-                } catch (e: Exception) {
-                    // Игнорируем ошибку и идем в системный fallback
-                }
+                try { startActivity(intent); return@setOnClickListener } catch (e: Exception) { }
             }
-
-            // 3. Универсальный fallback: любой доступный навигатор в системе (2ГИС, Maps.me и др.)
-            val uriGeo = Uri.parse("geo:${lat},${lon}?q=${lat},${lon}")
-            val intentGeo = Intent(Intent.ACTION_VIEW, uriGeo)
             try {
-                startActivity(intentGeo)
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon")))
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "Не удалось открыть карты", Toast.LENGTH_SHORT).show()
             }
         }
 
-
+        // ✅ КНОПКА СОХРАНИТЬ С ЗАЩИТОТ ОТ ДУБЛИКАТОВ
         binding.btnSaveToLocal.setOnClickListener {
-            Toast.makeText(requireContext(), "💾 Сохранение на локальную карту (в разработке)", Toast.LENGTH_SHORT).show()
+            if (isAuthor) {
+                Toast.makeText(requireContext(), "⚠️ Это уже ваша точка! Она в вашем дневнике.", Toast.LENGTH_SHORT).show()
+            } else {
+                // Проверка: а может, я уже сохранял её ранее?
+                val currentLocalSpots = spotViewModel.allSpots.value ?: emptyList()
+                val isAlreadySaved = currentLocalSpots.any { localSpot ->
+                    localSpot.name == name &&
+                            localSpot.latitude == lat &&
+                            localSpot.longitude == lon &&
+                            localSpot.authorId == authorId
+                }
+
+                if (isAlreadySaved) {
+                    Toast.makeText(requireContext(), "✅ Эта точка уже сохранена в вашем дневнике!", Toast.LENGTH_SHORT).show()
+                } else {
+                    spotViewModel.addFullSpot(
+                        lat = lat,
+                        lon = lon,
+                        name = name,
+                        description = desc,
+                        weight = weight,
+                        isPublic = false,
+                        photoPath = arguments?.getString(ARG_PHOTO_PATH),
+                        isVerified = isVerified
+                    )
+                    Toast.makeText(requireContext(), "✅ Точка '$name' добавлена в дневник!", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
 
         binding.btnComments.setOnClickListener {
-            Toast.makeText(requireContext(), "💬 Комментарии скоро будут добавлены", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "💬 Комментарии скоро будут", Toast.LENGTH_SHORT).show()
         }
 
-        // 4. Кнопка НАЗАД (возвращает именно туда, откуда пришли, благодаря sourceTab)
         binding.btnBack.setOnClickListener {
             spotViewModel.setSelectedTab(sourceTab)
             findNavController().navigateUp()
@@ -214,17 +192,13 @@ class SpotDetailsFragment : Fragment() {
         super.onDestroyView()
     }
 
-    // ✅ Вспомогательная функция проверки установки пакета
     private fun isPackageInstalled(packageName: String, context: Context): Boolean {
         return try {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                context.packageManager.getPackageInfo(
-                    packageName,
-                    PackageManager.PackageInfoFlags.of(PackageManager.GET_ACTIVITIES.toLong())
-                )
+                context.packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
             } else {
                 @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES)
+                context.packageManager.getPackageInfo(packageName, 0)
             }
             true
         } catch (e: PackageManager.NameNotFoundException) {

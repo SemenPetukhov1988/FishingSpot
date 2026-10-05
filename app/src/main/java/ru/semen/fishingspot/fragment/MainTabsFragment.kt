@@ -19,6 +19,7 @@ import ru.netology.fishingspot.ui.stats.StatsFragment
 import ru.netology.fishingspot.ui.user.FishermenFragment
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentMainTabsBinding
+import ru.semen.fishingspot.feed.FeedFragment
 import ru.semen.fishingspot.ui.map.GlobalMapFragment
 import ru.semen.fishingspot.viewmodel.SpotViewModel
 
@@ -73,6 +74,10 @@ class MainTabsFragment : Fragment() {
             when (item.itemId) {
                 R.id.nav_my_places -> switchFragment(MyMapFragment(), item.itemId)
                 R.id.nav_global_map -> switchFragment(GlobalMapFragment(), item.itemId)
+
+                // ✅ ДОБАВЛЯЕМ ЭТУ СТРОКУ:
+                R.id.nav_feed -> switchFragment(FeedFragment(), item.itemId)
+
                 R.id.nav_stats -> switchFragment(StatsFragment(), item.itemId)
                 R.id.nav_fishermen -> switchFragment(FishermenFragment(), item.itemId)
                 else -> false

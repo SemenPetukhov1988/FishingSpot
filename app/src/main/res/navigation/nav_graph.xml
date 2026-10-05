@@ -62,4 +62,9 @@
         android:name="ru.semen.fishingspot.fragment.SpotDetailsFragment"
         android:label="Детали точки" />
 
+    <fragment
+        android:id="@+id/feedFragment"
+        android:name="ru.semen.fishingspot.feed.FeedFragment"
+        android:label="Лента точек" />
+
 </navigation>

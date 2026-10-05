@@ -80,7 +80,7 @@
                         android:textSize="12sp"
                         app:backgroundTint="#4CAF50"
                         app:cornerRadius="8dp"
-                        app:icon="@drawable/ic_check_circle"
+
                         app:iconGravity="textStart"
                         app:iconSize="16dp" />
 
@@ -94,7 +94,7 @@
                         android:text="Опровергнуть"
                         android:textSize="12sp"
                         app:cornerRadius="8dp"
-                        app:icon="@drawable/ic_warning"
+                        app:icon="@drawable/warning_24dp_000000_fill0_wght400_grad0_opsz24"
                         app:iconGravity="textStart"
                         app:iconSize="16dp"
                         app:strokeColor="#F44336"
