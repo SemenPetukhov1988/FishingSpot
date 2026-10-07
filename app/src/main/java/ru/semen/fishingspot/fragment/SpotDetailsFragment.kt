@@ -96,11 +96,6 @@ class SpotDetailsFragment : Fragment() {
         // =====================================================================
         // ✅ УМНАЯ ЛОГИКА ОТОБРАЖЕНИЯ КНОПКИ "СОХРАНИТЬ"
         // =====================================================================
-        // Скрываем кнопку, если:
-        // 1. Это автор точки (она и так у него в базе)
-        // 2. ИЛИ пользователь открыл точку из вкладки "Мои места" (она там уже есть)
-        // ВАЖНО: Замени R.id.nav_my_map на реальный ID твоей вкладки "Мои места" из nav_graph.xml,
-        // если он называется иначе (например, R.id.nav_local_map или R.id.nav_diary)
         val isFromMyMap = (sourceTab == R.id.nav_my_places)
 
         if (isAuthor || isFromMyMap) {
@@ -128,34 +123,57 @@ class SpotDetailsFragment : Fragment() {
         }
 
         binding.btnNavigate.setOnClickListener {
-            if (lat == 0.0 && lon == 0.0) {
-                Toast.makeText(requireContext(), "⚠️ Координаты не найдены", Toast.LENGTH_SHORT).show()
+            val lat = arguments?.getDouble(ARG_SPOT_LAT)
+            val lon = arguments?.getDouble(ARG_SPOT_LON)
+
+            if (lat == null || lon == null || (lat == 0.0 && lon == 0.0)) {
+                Toast.makeText(requireContext(), "⚠️ Координаты точки не найдены", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+
+            // 1. Пробуем Яндекс Карты через стандартный HTTPS-интент, привязанный к пакету
             if (isPackageInstalled("ru.yandex.yandexmaps", requireContext())) {
-                val uri = Uri.parse("https://yandex.ru/maps/?rtext=~$lat,$lon&rtt=auto")
+                // Это официальный веб-формат построения маршрутов, который Яндекс Карты перехватывают идеально
+                val uri = Uri.parse("https://yandex.ru{lat},${lon}&rtt=mt")
                 val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                     setPackage("ru.yandex.yandexmaps")
+                    // Добавляем флаг, чтобы интент открывался как новая задача, не ломая стек вашего приложения
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                try { startActivity(intent); return@setOnClickListener } catch (e: Exception) { }
+                try {
+                    startActivity(intent)
+                    return@setOnClickListener // Успешно открыли Яндекс Карты, выходим
+                } catch (e: Exception) {
+                    // Если произошел внутренний сбой в самом Яндексе — не падаем, идем к Google Картам
+                }
             }
+
+            // 2. Пробуем Google Карты
             if (isPackageInstalled("com.google.android.apps.maps", requireContext())) {
-                val uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lon")
+                val uri = Uri.parse("https://google.com{lat},${lon}")
                 val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                     setPackage("com.google.android.apps.maps")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                try { startActivity(intent); return@setOnClickListener } catch (e: Exception) { }
+                try {
+                    startActivity(intent)
+                    return@setOnClickListener // Успешно открыли Google Карты, выходим
+                } catch (e: Exception) {
+                    // Игнорируем ошибку и идем в системный fallback
+                }
             }
+
+            // 3. Универсальный fallback: любой доступный навигатор в системе (2ГИС, Maps.me и др.)
+            val uriGeo = Uri.parse("geo:${lat},${lon}?q=${lat},${lon}")
+            val intentGeo = Intent(Intent.ACTION_VIEW, uriGeo)
             try {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:$lat,$lon?q=$lat,$lon")))
+                startActivity(intentGeo)
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "Не удалось открыть карты", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // ✅ КНОПКА СОХРАНИТЬ (Она сработает только если кнопка видима, т.е. это чужая точка с общей карты)
+        // ✅ КНОПКА СОХРАНИТЬ
         binding.btnSaveToLocal.setOnClickListener {
             val currentLocalSpots = spotViewModel.allSpots.value ?: emptyList()
             val isAlreadySaved = currentLocalSpots.any { localSpot ->
@@ -184,9 +202,9 @@ class SpotDetailsFragment : Fragment() {
         // ✅ Проверяем, есть ли эта точка в Firebase (публичная ли она)
         checkIfSpotIsPublic(name, lat, lon)
 
-        // ✅ ЕДИНСТВЕННЫЙ ОБРАБОТЧИК ДЛЯ КНОПКИ ОТЗЫВЫ
+        // ✅ ЕДИНСТВЕННЫЙ ОБРАБОТЧИК ДЛЯ КНОПКИ ОТЗЫВЫ (✅ ИСПРАВЛЕНО: передаем authorId)
         binding.btnReviews.setOnClickListener {
-            findFirebaseSpotAndOpenReviews(name, lat, lon)
+            findFirebaseSpotAndOpenReviews(name, lat, lon, authorId)
         }
 
         binding.btnBack.setOnClickListener {
@@ -195,10 +213,6 @@ class SpotDetailsFragment : Fragment() {
         }
     }
 
-    /**
-     * Проверяет, есть ли точка в Firebase по координатам и имени.
-     * Если да — показываем кнопку "Отзывы".
-     */
     private fun checkIfSpotIsPublic(name: String, lat: Double, lon: Double) {
         firestore.collection("public_spots")
             .whereEqualTo("name", name)
@@ -220,8 +234,11 @@ class SpotDetailsFragment : Fragment() {
 
     /**
      * Ищет точку в Firebase и открывает BottomSheet с отзывами
+     * ✅ ИСПРАВЛЕНО: добавлен параметр authorId
      */
-    private fun findFirebaseSpotAndOpenReviews(name: String, lat: Double, lon: Double) {
+    private fun findFirebaseSpotAndOpenReviews(name: String, lat: Double, lon: Double, authorId: String) {
+        android.util.Log.d("DEBUG_SPOT", "🔍 Ищем точку в Firebase: name=$name, lat=$lat, lon=$lon, authorId=$authorId")
+
         firestore.collection("public_spots")
             .whereEqualTo("name", name)
             .whereEqualTo("latitude", lat)
@@ -231,13 +248,21 @@ class SpotDetailsFragment : Fragment() {
             .addOnSuccessListener { snapshot ->
                 if (!snapshot.isEmpty) {
                     val firebaseSpotId = snapshot.documents[0].id
-                    val reviewsSheet = ReviewsBottomSheetDialogFragment.newInstance(firebaseSpotId)
+                    android.util.Log.d("DEBUG_SPOT", "✅ Точка найдена! firebaseSpotId=$firebaseSpotId")
+
+                    val reviewsSheet = ReviewsBottomSheetDialogFragment.newInstance(
+                        firebaseSpotId = firebaseSpotId,
+                        spotAuthorId = authorId,
+                        spotName = name
+                    )
                     reviewsSheet.show(childFragmentManager, "reviews")
                 } else {
+                    android.util.Log.e("DEBUG_SPOT", "❌ Точка НЕ найдена в public_spots. Проверь точное совпадение имени и координат.")
                     Toast.makeText(requireContext(), "⚠️ Точка не опубликована на общей карте", Toast.LENGTH_SHORT).show()
                 }
             }
-            .addOnFailureListener {
+            .addOnFailureListener { e ->
+                android.util.Log.e("DEBUG_SPOT", "❌ Ошибка запроса к Firebase", e)
                 Toast.makeText(requireContext(), "❌ Ошибка загрузки отзывов", Toast.LENGTH_SHORT).show()
             }
     }

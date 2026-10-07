@@ -1,21 +1,16 @@
 package ru.semen.fishingspot.fragment
 
-import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import com.yandex.mapkit.MapKitFactory
-import ru.netology.fishingspot.ui.stats.StatsFragment
+
 import ru.netology.fishingspot.ui.user.FishermenFragment
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentMainTabsBinding
@@ -78,7 +73,7 @@ class MainTabsFragment : Fragment() {
                 // ✅ ДОБАВЛЯЕМ ЭТУ СТРОКУ:
                 R.id.nav_feed -> switchFragment(FeedFragment(), item.itemId)
 
-                R.id.nav_stats -> switchFragment(StatsFragment(), item.itemId)
+                R.id.nav_stats -> switchFragment(MessagesFragment(), item.itemId)
                 R.id.nav_fishermen -> switchFragment(FishermenFragment(), item.itemId)
                 else -> false
             }

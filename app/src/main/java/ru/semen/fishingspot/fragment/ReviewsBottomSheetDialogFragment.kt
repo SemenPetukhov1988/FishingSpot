@@ -17,30 +17,41 @@ import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.adapter.ReviewsAdapter
+import ru.semen.fishingspot.data.MessagesRepository // ✅ Добавили репозиторий
 import ru.semen.fishingspot.data.Review
 import ru.semen.fishingspot.data.ReviewsRepository
-import ru.semen.fishingspot.databinding.FragmentReviewsBottomSheetDialogBinding // ✅ ИСПРАВЛЕНО
+import ru.semen.fishingspot.databinding.FragmentReviewsBottomSheetDialogBinding
 import ru.semen.fishingspot.utils.UserSessionManager
 
 class ReviewsBottomSheetDialogFragment : BottomSheetDialogFragment() {
 
-    // ✅ ИСПРАВЛЕНО ИМЯ КЛАССА БИНДИНГА
     private var _binding: FragmentReviewsBottomSheetDialogBinding? = null
     private val binding get() = _binding!!
 
     private val reviewsRepository = ReviewsRepository()
+    private val messagesRepository = MessagesRepository() // ✅ Инициализируем
     private lateinit var adapter: ReviewsAdapter
     private var reviewsListener: ListenerRegistration? = null
 
     private var firebaseSpotId: String = ""
+    private var spotAuthorId: String = "" // ✅ ID автора точки
+    private var spotName: String = ""     // ✅ Название точки
 
     companion object {
         private const val ARG_SPOT_ID = "firebase_spot_id"
+        private const val ARG_SPOT_AUTHOR_ID = "spot_author_id" // ✅ Новый аргумент
+        private const val ARG_SPOT_NAME = "spot_name"           // ✅ Новый аргумент
 
-        fun newInstance(firebaseSpotId: String): ReviewsBottomSheetDialogFragment {
+        fun newInstance(
+            firebaseSpotId: String,
+            spotAuthorId: String,
+            spotName: String
+        ): ReviewsBottomSheetDialogFragment {
             return ReviewsBottomSheetDialogFragment().apply {
                 arguments = Bundle().apply {
                     putString(ARG_SPOT_ID, firebaseSpotId)
+                    putString(ARG_SPOT_AUTHOR_ID, spotAuthorId)
+                    putString(ARG_SPOT_NAME, spotName)
                 }
             }
         }
@@ -49,6 +60,8 @@ class ReviewsBottomSheetDialogFragment : BottomSheetDialogFragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         firebaseSpotId = arguments?.getString(ARG_SPOT_ID) ?: ""
+        spotAuthorId = arguments?.getString(ARG_SPOT_AUTHOR_ID) ?: ""
+        spotName = arguments?.getString(ARG_SPOT_NAME) ?: ""
     }
 
     override fun onCreateView(
@@ -56,7 +69,6 @@ class ReviewsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        // ✅ ИСПРАВЛЕНО ИМЯ КЛАССА ПРИ ИНФЛЕЙТЕ
         _binding = FragmentReviewsBottomSheetDialogBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -64,23 +76,17 @@ class ReviewsBottomSheetDialogFragment : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Настраиваем RecyclerView
         adapter = ReviewsAdapter()
         binding.rvReviews.layoutManager = LinearLayoutManager(requireContext())
         binding.rvReviews.adapter = adapter
 
-        // Подписываемся на отзывы в реальном времени
         subscribeToReviews()
 
-        // Кнопка "Написать отзыв"
         binding.btnWriteReview.setOnClickListener {
             showWriteReviewDialog()
         }
     }
 
-    /**
-     * Подписка на изменения отзывов в реальном времени
-     */
     private fun subscribeToReviews() {
         reviewsListener = reviewsRepository.subscribeToReviews(firebaseSpotId) { reviews ->
             adapter.submitList(reviews)
@@ -88,9 +94,6 @@ class ReviewsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         }
     }
 
-    /**
-     * Обновляет UI в зависимости от количества отзывов
-     */
     private fun updateEmptyState(count: Int) {
         if (count == 0) {
             binding.tvEmptyReviews.visibility = View.VISIBLE
@@ -108,27 +111,18 @@ class ReviewsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         }
     }
 
-    /**
-     * Показывает диалог для написания отзыва
-     */
     private fun showWriteReviewDialog() {
         val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: "unknown"
 
-        // Проверяем, не оставлял ли пользователь уже отзыв
         viewLifecycleOwner.lifecycleScope.launch {
             val hasReviewed = reviewsRepository.hasUserReviewed(firebaseSpotId, currentUserId)
                 .getOrDefault(false)
 
             if (hasReviewed) {
-                Toast.makeText(
-                    requireContext(),
-                    "⚠️ Вы уже оставляли отзыв к этой точке",
-                    Toast.LENGTH_SHORT
-                ).show()
+                Toast.makeText(requireContext(), "⚠️ Вы уже оставляли отзыв к этой точке", Toast.LENGTH_SHORT).show()
                 return@launch
             }
 
-            // Создаём диалог с полем ввода
             val editText = EditText(requireContext()).apply {
                 hint = "Расскажите о месте..."
                 setPadding(48, 32, 48, 32)
@@ -151,20 +145,14 @@ class ReviewsBottomSheetDialogFragment : BottomSheetDialogFragment() {
         }
     }
 
-    /**
-     * Отправляет отзыв в Firebase
-     */
-    /**
-     * Отправляет отзыв в Firebase
-     */
-    private fun submitReview(text: String, authorId: String) {
-        // ✅ ПОЛУЧАЕМ РЕАЛЬНЫЙ НИКНЕЙМ ПОЛЬЗОВАТЕЛЯ ИЗ СЕССИИ
-        // Если по какой-то причине он null, используем запасной вариант "Рыбак"
+    private fun submitReview(text: String, reviewerId: String) {
         val userName = UserSessionManager.getCurrentNickname(requireContext()) ?: "Рыбак"
 
+        android.util.Log.d("DEBUG_SPOT", "📝 Попытка сохранить отзыв. reviewerId=$reviewerId, spotAuthorId=$spotAuthorId")
+
         val review = Review(
-            authorId = authorId,
-            authorName = userName, // ✅ Теперь здесь реальный никнейм!
+            authorId = reviewerId,
+            authorName = userName,
             text = text,
             createdAt = System.currentTimeMillis()
         )
@@ -173,18 +161,40 @@ class ReviewsBottomSheetDialogFragment : BottomSheetDialogFragment() {
             val result = reviewsRepository.addReview(firebaseSpotId, review)
             result.fold(
                 onSuccess = {
+                    android.util.Log.d("DEBUG_SPOT", "✅ Отзыв успешно сохранен в Firebase!")
                     Toast.makeText(requireContext(), "✅ Отзыв опубликован!", Toast.LENGTH_SHORT).show()
+
+                    // ПРОВЕРКА: нужно ли отправлять уведомление
+                    if (spotAuthorId.isNotEmpty() && reviewerId != spotAuthorId) {
+                        android.util.Log.d("DEBUG_SPOT", "🔔 Автор точки ($spotAuthorId) и автор отзыва ($reviewerId) РАЗНЫЕ. Отправляем уведомление...")
+
+                        viewLifecycleOwner.lifecycleScope.launch {
+                            val msgResult = messagesRepository.sendReviewNotification(
+                                recipientId = spotAuthorId,
+                                senderId = reviewerId,
+                                senderName = userName,
+                                spotId = firebaseSpotId,
+                                spotName = spotName,
+                                reviewText = text
+                            )
+
+                            msgResult.fold(
+                                onSuccess = { android.util.Log.d("DEBUG_SPOT", "🚀 Уведомление УСПЕШНО отправлено в коллекцию messages!") },
+                                onFailure = { e -> android.util.Log.e("DEBUG_SPOT", "💥 ОШИБКА отправки уведомления", e) }
+                            )
+                        }
+                    } else {
+                        android.util.Log.d("DEBUG_SPOT", "⏭️ Уведомление НЕ отправлено (автор точки и автор отзыва совпадают, или spotAuthorId пуст)")
+                    }
                 },
-                onFailure = {
+                onFailure = { e ->
+                    android.util.Log.e("DEBUG_SPOT", "❌ Ошибка сохранения отзыва", e)
                     Toast.makeText(requireContext(), "❌ Ошибка публикации", Toast.LENGTH_SHORT).show()
                 }
             )
         }
     }
 
-    /**
-     * Делаем BottomSheet более высоким по умолчанию
-     */
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val dialog = super.onCreateDialog(savedInstanceState) as BottomSheetDialog
         dialog.setOnShowListener {
@@ -199,7 +209,6 @@ class ReviewsBottomSheetDialogFragment : BottomSheetDialogFragment() {
     }
 
     override fun onDestroyView() {
-        // Отписываемся от Firebase, чтобы не тратить батарею
         reviewsListener?.remove()
         reviewsListener = null
         _binding = null
