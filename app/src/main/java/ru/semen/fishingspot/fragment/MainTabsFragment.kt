@@ -9,7 +9,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import com.yandex.mapkit.MapKitFactory
+// ✅ УДАЛЕН ИМПОРТ YANDEX MAPKIT
 
 import ru.netology.fishingspot.ui.user.FishermenFragment
 import ru.semen.fishingspot.R
@@ -36,8 +36,6 @@ class MainTabsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-
 
         binding.bottomNavigation.itemIconTintList = null
         binding.bottomNavigation.itemActiveIndicatorColor = ColorStateList.valueOf(Color.TRANSPARENT)
@@ -69,10 +67,7 @@ class MainTabsFragment : Fragment() {
             when (item.itemId) {
                 R.id.nav_my_places -> switchFragment(MyMapFragment(), item.itemId)
                 R.id.nav_global_map -> switchFragment(GlobalMapFragment(), item.itemId)
-
-                // ✅ ДОБАВЛЯЕМ ЭТУ СТРОКУ:
                 R.id.nav_feed -> switchFragment(FeedFragment(), item.itemId)
-
                 R.id.nav_stats -> switchFragment(MessagesFragment(), item.itemId)
                 R.id.nav_fishermen -> switchFragment(FishermenFragment(), item.itemId)
                 else -> false
@@ -80,14 +75,14 @@ class MainTabsFragment : Fragment() {
         }
     }
 
+    // ✅ ОЧИЩЕНО: Убрали вызовы MapKitFactory.
+    // OSMDroid сам управляет своим onStart/onStop внутри конкретных фрагментов карт.
     override fun onStart() {
         super.onStart()
-        MapKitFactory.getInstance().onStart()
     }
 
     override fun onStop() {
         super.onStop()
-        MapKitFactory.getInstance().onStop()
     }
 
     private fun switchFragment(fragment: Fragment, itemId: Int): Boolean {

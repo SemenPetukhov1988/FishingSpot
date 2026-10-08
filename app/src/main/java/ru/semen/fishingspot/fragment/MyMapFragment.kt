@@ -2,6 +2,7 @@ package ru.semen.fishingspot.fragment
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -13,15 +14,10 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.navigation.findNavController
 import androidx.navigation.fragment.findNavController
-import com.yandex.mapkit.Animation
-import com.yandex.mapkit.MapKitFactory
-import com.yandex.mapkit.geometry.Point
-import com.yandex.mapkit.location.Location
-import com.yandex.mapkit.location.LocationListener
-import com.yandex.mapkit.location.LocationManager
-import com.yandex.mapkit.map.CameraPosition
-import com.yandex.mapkit.map.MapObject
-import com.yandex.mapkit.map.MapObjectTapListener
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.data.FishingSpot
 import ru.semen.fishingspot.databinding.FragmentMapBinding
@@ -32,58 +28,31 @@ class MyMapFragment : Fragment() {
     private var _binding: FragmentMapBinding? = null
     private val binding get() = _binding!!
 
-    private var locationManager: LocationManager? = null
     private val spotViewModel: SpotViewModel by activityViewModels()
-
-    private var lastKnownSpots: List<FishingSpot> = emptyList()
     private val TAG = "MAP_LIFECYCLE"
 
-    private val tapListeners = mutableListOf<MapObjectTapListener>()
-    private var viewAlive = false
-
-    private var lastUserLocation: Point? = null
+    private var lastUserLocation: GeoPoint? = null
     private var isLocationAlreadyShown = false
+    private var locationOverlay: MyLocationNewOverlay? = null
 
-    private val DEFAULT_POINT = Point(55.7520, 37.6175) // Москва
-    private val CITY_ZOOM = 11.0f
-    private val MAX_ZOOM_LIMIT = 18.5f
+    private val DEFAULT_POINT = GeoPoint(64.5401, 40.5433) // Архангельск
+    private val CITY_ZOOM = 11.0
+    private val MAX_ZOOM_LIMIT = 18.5
 
+    // ✅ СОВРЕМЕННЫЙ И НАДЕЖНЫЙ СПОСОБ ЗАПРОСА РАЗРЕШЕНИЙ
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            Log.d(TAG, "👍 Разрешение получено")
+            Log.d(TAG, "👍 Разрешение получено, запускаем GPS")
             startLocationTracking()
         } else {
             Log.w(TAG, "🚫 Разрешение отклонено")
             hideLoading()
+            // Если отказали, хотя бы показываем дефолтный город
+            binding.mapView.controller.setCenter(DEFAULT_POINT)
+            binding.mapView.controller.setZoom(CITY_ZOOM)
         }
-    }
-
-    private val locationListener: LocationListener = object : LocationListener {
-        override fun onLocationUpdated(location: Location) {
-            if (!viewAlive || _binding == null) return
-
-            val point = location.position
-            lastUserLocation = point
-
-            Log.d(TAG, "✅ GPS получен: ${point.latitude}, ${point.longitude}")
-
-            if (!isLocationAlreadyShown) {
-                binding.mapView.map.move(
-                    CameraPosition(point, CITY_ZOOM, 0.0f, 0.0f),
-                    Animation(Animation.Type.SMOOTH, 1.0f),
-                    null
-                )
-                isLocationAlreadyShown = true
-            }
-
-            binding.mapView.map.mapObjects.addPlacemark(point)
-            hideLoading()
-            stopLocationUpdates()
-        }
-
-        override fun onLocationStatusUpdated(status: com.yandex.mapkit.location.LocationStatus) {}
     }
 
     override fun onCreateView(
@@ -91,42 +60,34 @@ class MyMapFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        Log.d(TAG, "onCreateView")
         _binding = FragmentMapBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        Log.d(TAG, "onViewCreated")
-        viewAlive = true
         isLocationAlreadyShown = false
 
-        // ✅ ОГРАНИЧЕНИЕ ЗУМА ЧЕРЕЗ CAMERA LISTENER
-        binding.mapView.map.addCameraListener(object : com.yandex.mapkit.map.CameraListener {
-            override fun onCameraPositionChanged(
-                map: com.yandex.mapkit.map.Map,
-                cameraPosition: CameraPosition,
-                reason: com.yandex.mapkit.map.CameraUpdateReason,
-                finished: Boolean
-            ) {
-                if (cameraPosition.zoom > MAX_ZOOM_LIMIT) {
-                    map.move(
-                        CameraPosition(cameraPosition.target, MAX_ZOOM_LIMIT, cameraPosition.azimuth, cameraPosition.tilt),
-                        Animation(Animation.Type.SMOOTH, 0.0f),
-                        null
-                    )
-                }
-            }
-        })
+        val mapView = binding.mapView
+        mapView.setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
+        mapView.setMultiTouchControls(true)
+        mapView.setMaxZoomLevel(MAX_ZOOM_LIMIT)
+
+        // ✅ УБИРАЕМ КВАДРАТИКИ: задаем цвет фона, пока грузятся тайлы
+        mapView.setBackgroundColor(Color.parseColor("#E8E8E8"))
+
+        // 🌟 Инициализируем оверлей, но НЕ включаем поиск локации здесь!
+        locationOverlay = MyLocationNewOverlay(mapView)
+        locationOverlay?.setDrawAccuracyEnabled(true)
+        mapView.overlays.add(locationOverlay)
 
         checkLocationPermission()
 
         binding.btnAddPoint.setOnClickListener {
-            val cameraPosition = binding.mapView.map.cameraPosition
+            val center = mapView.mapCenter
             val bundle = Bundle().apply {
-                putDouble("LAT", cameraPosition.target.latitude)
-                putDouble("LON", cameraPosition.target.longitude)
+                putDouble("LAT", center.latitude)
+                putDouble("LON", center.longitude)
             }
             requireActivity().findNavController(R.id.fragmentContainer)
                 .navigate(R.id.action_mainTabs_to_addPoint, bundle)
@@ -134,56 +95,85 @@ class MyMapFragment : Fragment() {
 
         spotViewModel.allSpots.observe(viewLifecycleOwner) { spots ->
             Log.d(TAG, "LiveData update: ${spots.size} spots")
-            lastKnownSpots = spots
             drawMarkers(spots)
         }
     }
 
     override fun onStart() {
         super.onStart()
-        Log.d(TAG, "onStart")
-        binding.mapView.onStart()
+        binding.mapView.onResume()
 
         if (lastUserLocation != null && !isLocationAlreadyShown) {
             Log.d(TAG, "Мгновенный переход на сохраненную позицию")
-            binding.mapView.map.move(
-                CameraPosition(lastUserLocation!!, CITY_ZOOM, 0.0f, 0.0f),
-                Animation(Animation.Type.SMOOTH, 0.5f),
-                null
-            )
-            binding.mapView.map.mapObjects.addPlacemark(lastUserLocation!!)
+            binding.mapView.controller.setCenter(lastUserLocation)
+            binding.mapView.controller.setZoom(CITY_ZOOM)
             isLocationAlreadyShown = true
             hideLoading()
         } else if (lastUserLocation == null) {
-            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 startLocationTracking()
             }
         }
     }
 
+    override fun onStop() {
+        binding.mapView.onPause()
+        // Отключаем локацию при уходе с экрана для экономии батареи
+        locationOverlay?.disableMyLocation()
+        super.onStop()
+    }
+
+    // ✅ ЗАЩИТА ОТ ЗАВИСАНИЯ ПРИ "ХОЛОДНОМ СТАРТЕ" GPS
     private fun startLocationTracking() {
         if (_binding == null) return
         showLoading()
 
-        if (locationManager == null) {
-            locationManager = MapKitFactory.getInstance().createLocationManager()
+        // 🌟 ГЛАВНОЕ ИСПРАВЛЕНИЕ: Включаем отслеживание локации ТОЛЬКО тогда,
+        // когда разрешение железно предоставлено. Движок OSMDroid успешно свяжется с GPS.
+        locationOverlay?.enableMyLocation()
+
+        // 1. Сразу показываем дефолтную точку, чтобы экран не был пустым
+        binding.mapView.controller.setCenter(DEFAULT_POINT)
+        binding.mapView.controller.setZoom(CITY_ZOOM)
+
+        // 2. Таймер-страховка: если GPS не найден за 6 секунд, убираем загрузку
+        val timeoutRunnable = Runnable {
+            if (_binding != null && !isLocationAlreadyShown) {
+                Log.d(TAG, "⏱️ GPS таймаут (6 сек). Скрываем загрузку, показываем карту.")
+                hideLoading()
+            }
         }
+        binding.mapView.postDelayed(timeoutRunnable, 6000)
 
-        val instantAnimation = Animation(Animation.Type.SMOOTH, 0.0f)
-        binding.mapView.map.move(
-            CameraPosition(DEFAULT_POINT, CITY_ZOOM, 0.0f, 0.0f),
-            instantAnimation,
-            null
-        )
+        // 3. Ждем реальный GPS
+        locationOverlay?.runOnFirstFix {
+            val location = locationOverlay?.myLocation
+            if (location != null) {
+                val newLocation = GeoPoint(location.latitude, location.longitude)
 
-        locationManager?.requestSingleUpdate(locationListener)
+                requireActivity().runOnUiThread {
+                    if (_binding != null) {
+                        // Отменяем таймер, так как GPS успешно сработал!
+                        binding.mapView.removeCallbacks(timeoutRunnable)
+
+                        lastUserLocation = newLocation
+                        if (!isLocationAlreadyShown) {
+                            // 🌟 Плавная анимация центрирования (выглядит профессионально)
+                            binding.mapView.controller.animateTo(lastUserLocation)
+                            binding.mapView.controller.setZoom(CITY_ZOOM)
+                            isLocationAlreadyShown = true
+                        }
+                        hideLoading()
+                    }
+                }
+            }
+        }
     }
 
     private fun checkLocationPermission() {
         val permission = Manifest.permission.ACCESS_FINE_LOCATION
         if (ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, "🔐 Разрешение уже есть")
+            Log.d(TAG, "🔐 Разрешение уже есть, запускаем GPS")
             startLocationTracking()
         } else {
             Log.d(TAG, "⚠️ Запрашиваем разрешение...")
@@ -191,78 +181,57 @@ class MyMapFragment : Fragment() {
         }
     }
 
-    private fun stopLocationUpdates() {
-        locationManager?.unsubscribe(locationListener)
-    }
-
     private fun showLoading() {
-        binding.progressLocation.visibility = View.VISIBLE
-        binding.tvLoadingText.visibility = View.VISIBLE
-        binding.tvLoadingText.text = "Определяем местоположение..."
-    }
-
-    private fun hideLoading() {
-        binding.progressLocation.visibility = View.GONE
-        binding.tvLoadingText.visibility = View.GONE
-    }
-
-    // =====================================================================
-    // ✅ ОБНОВЛЕННЫЙ МЕТОД ОТРИСОВКИ МАРКЕРОВ
-    // =====================================================================
-    private fun drawMarkers(spots: List<FishingSpot>) {
-        if (_binding == null) return
-
-        tapListeners.clear()
-        binding.mapView.map.mapObjects.clear()
-
-        spots.forEach { spot ->
-            val point = Point(spot.latitude, spot.longitude)
-            val placemark = binding.mapView.map.mapObjects.addPlacemark(point)
-
-            placemark.setIcon(com.yandex.runtime.image.ImageProvider.fromResource(
-                requireContext(), R.drawable.metka4567))
-
-            placemark.userData = spot
-
-            val listener = object : MapObjectTapListener {
-                override fun onMapObjectTap(mapObject: MapObject, point: Point): Boolean {
-                    Log.d(TAG, "КЛИК! ID: ${spot.id}")
-                    val clickedSpot = mapObject.userData as? FishingSpot ?: return false
-
-                    // ✅ ПОЛНЫЙ НАБОР ДАННЫХ ДЛЯ ЭКРАНА ДЕТАЛЕЙ
-                    val detailsBundle = Bundle().apply {
-                        putLong("spot_id", clickedSpot.id)
-                        putString("spot_name", clickedSpot.name)
-                        putString("spot_desc", clickedSpot.description)
-                        putDouble("spot_weight", clickedSpot.catchWeight)
-                        putLong("spot_created", clickedSpot.createdAt)
-
-                        // ✅ ДОБАВЛЕНЫ НОВЫЕ ПОЛЯ
-                        putDouble("spot_lat", clickedSpot.latitude)
-                        putDouble("spot_lon", clickedSpot.longitude)
-                        putString("spot_author", clickedSpot.authorId)
-                        putBoolean("spot_is_verified", clickedSpot.isVerified)
-                        putInt("source_tab", R.id.nav_my_places) // Чтобы кнопка "Назад" вернула именно сюда
-                    }
-
-                    findNavController().navigate(R.id.action_map_to_details, detailsBundle)
-                    return true
-                }
-            }
-
-            tapListeners.add(listener)
-            placemark.addTapListener(listener)
+        if (_binding != null) {
+            binding.progressLocation.visibility = View.VISIBLE
+            binding.tvLoadingText.visibility = View.VISIBLE
+            binding.tvLoadingText.text = "Определяем местоположение..."
         }
     }
 
-    override fun onStop() {
-        binding.mapView.onStop()
-        super.onStop()
+    private fun hideLoading() {
+        if (_binding != null) {
+            binding.progressLocation.visibility = View.GONE
+            binding.tvLoadingText.visibility = View.GONE
+        }
+    }
+
+    private fun drawMarkers(spots: List<FishingSpot>) {
+        if (_binding == null) return
+
+        val mapView = binding.mapView
+        mapView.overlays.removeAll { it is Marker } // Очищаем только маркеры
+
+        spots.forEach { spot ->
+            val point = GeoPoint(spot.latitude, spot.longitude)
+            val marker = Marker(mapView)
+            marker.position = point
+            marker.setIcon(ContextCompat.getDrawable(requireContext(), R.drawable.metka4567))
+
+            marker.setOnMarkerClickListener { _, _ ->
+                Log.d(TAG, "КЛИК! ID: ${spot.id}")
+                val detailsBundle = Bundle().apply {
+                    putLong("spot_id", spot.id)
+                    putString("spot_name", spot.name)
+                    putString("spot_desc", spot.description)
+                    putDouble("spot_weight", spot.catchWeight)
+                    putLong("spot_created", spot.createdAt)
+                    putDouble("spot_lat", spot.latitude)
+                    putDouble("spot_lon", spot.longitude)
+                    putString("spot_author", spot.authorId)
+                    putBoolean("spot_is_verified", spot.isVerified)
+                    putInt("source_tab", R.id.nav_my_places)
+                }
+                findNavController().navigate(R.id.action_map_to_details, detailsBundle)
+                true
+            }
+            mapView.overlays.add(marker)
+        }
+        mapView.invalidate()
     }
 
     override fun onDestroyView() {
-        viewAlive = false
-        tapListeners.clear()
+        locationOverlay?.disableMyLocation()
         _binding = null
         super.onDestroyView()
     }

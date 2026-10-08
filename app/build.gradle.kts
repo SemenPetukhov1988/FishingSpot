@@ -83,6 +83,7 @@ dependencies {
     implementation("com.yandex.android:maps.mobile:4.8.1-full")
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.swiperefreshlayout)
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
     implementation(libs.imagepicker)
     implementation(libs.ucrop)
     implementation(libs.hilt.android)

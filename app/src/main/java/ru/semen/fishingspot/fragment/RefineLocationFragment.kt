@@ -14,14 +14,12 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.findNavController
-import com.yandex.mapkit.Animation
-import com.yandex.mapkit.MapKitFactory
-import com.yandex.mapkit.geometry.Point
-import com.yandex.mapkit.location.Location
-import com.yandex.mapkit.location.LocationListener
-import com.yandex.mapkit.location.LocationManager
-import com.yandex.mapkit.map.CameraPosition
 import kotlinx.coroutines.launch
+import org.osmdroid.api.IGeoPoint // ✅ ДОБАВЛЕН ЭТОТ ИМПОРТ
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.CopyrightOverlay
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentRefineLocationBinding
 import ru.semen.fishingspot.viewmodel.SpotViewModel
@@ -41,15 +39,17 @@ class RefineLocationFragment : Fragment() {
     private val spotViewModel: SpotViewModel by activityViewModels()
     private val TAG = "FISHING_DEBUG"
 
-    private var locationManager: LocationManager? = null
-    private var lastUserLocation: Point? = null
+    // ✅ Используем интерфейс IGeoPoint для универсальности
+    private var lastUserLocation: IGeoPoint? = null
     private var isLocationAlreadyShown = false
     private var isZoomAdjusted = false
 
-    private val DEFAULT_POINT = Point(55.7520, 37.6175)
-    private val CITY_ZOOM = 15.0f
-    private val TARGET_ZOOM = 17.5f
+    private val DEFAULT_POINT = GeoPoint(64.5401, 40.5433) // Архангельск
+    private val CITY_ZOOM = 15.0
+    private val TARGET_ZOOM = 17.5
     private val MAX_DISTANCE_METERS = 250.0
+
+    private var locationOverlay: MyLocationNewOverlay? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentRefineLocationBinding.inflate(inflater, container, false)
@@ -65,31 +65,41 @@ class RefineLocationFragment : Fragment() {
         isPublic = arguments?.getBoolean("IS_PUBLIC") ?: false
         photoPath = arguments?.getString("PHOTO_PATH")
 
-        MapKitFactory.getInstance().onStart()
-        binding.refineMapView.onStart()
+        val mapView = binding.refineMapView
+        mapView.setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
+        mapView.setMultiTouchControls(true)
+
+        val copyrightOverlay = CopyrightOverlay(requireContext())
+        mapView.overlays.add(copyrightOverlay)
+
+        locationOverlay = MyLocationNewOverlay(mapView)
+        locationOverlay?.enableMyLocation()
+        locationOverlay?.setDrawAccuracyEnabled(true)
+        mapView.overlays.add(locationOverlay)
+
         checkLocationPermission()
 
         binding.btnDone.setOnClickListener {
-            val currentZoom = binding.refineMapView.map.cameraPosition.zoom
-            if (!isZoomAdjusted && currentZoom < 16.0f) {
-                binding.refineMapView.map.move(
-                    CameraPosition(binding.refineMapView.map.cameraPosition.target, TARGET_ZOOM, 0.0f, 0.0f),
-                    Animation(Animation.Type.SMOOTH, 0.6f), null
-                )
+            val currentZoom = mapView.zoomLevel
+            if (!isZoomAdjusted && currentZoom < 16.0) {
+                mapView.controller.setZoom(TARGET_ZOOM)
                 isZoomAdjusted = true
                 Toast.makeText(context, "📍 Уточните место на карте", Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
 
-            checkWaterLocalAndSave(binding.refineMapView.map.cameraPosition.target)
+            // ✅ mapView.mapCenter возвращает IGeoPoint, что теперь идеально совпадает с типом функции
+            checkWaterLocalAndSave(mapView.mapCenter)
         }
     }
 
-    override fun onStart() {
-        super.onStart()
-        binding.refineMapView.onStart()
+    override fun onResume() {
+        super.onResume()
+        binding.refineMapView.onResume()
+
         if (lastUserLocation != null && !isLocationAlreadyShown) {
-            binding.refineMapView.map.move(CameraPosition(lastUserLocation!!, CITY_ZOOM, 0.0f, 0.0f), Animation(Animation.Type.SMOOTH, 0.0f), null)
+            binding.refineMapView.controller.setCenter(lastUserLocation)
+            binding.refineMapView.controller.setZoom(CITY_ZOOM)
             isLocationAlreadyShown = true
             hideLoading()
         } else if (lastUserLocation == null && ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
@@ -97,25 +107,37 @@ class RefineLocationFragment : Fragment() {
         }
     }
 
-    private fun startLocationTracking() {
-        showLoading()
-        if (locationManager == null) locationManager = MapKitFactory.getInstance().createLocationManager()
-        binding.refineMapView.map.move(CameraPosition(DEFAULT_POINT, CITY_ZOOM, 0.0f, 0.0f), Animation(Animation.Type.SMOOTH, 0.0f), null)
-        locationManager?.requestSingleUpdate(locationListener)
+    override fun onPause() {
+        super.onPause()
+        binding.refineMapView.onPause()
     }
 
-    private val locationListener = object : LocationListener {
-        override fun onLocationUpdated(location: Location) {
-            if (_binding == null) return
-            lastUserLocation = location.position
-            if (!isLocationAlreadyShown) {
-                binding.refineMapView.map.move(CameraPosition(location.position, CITY_ZOOM, 0.0f, 0.0f), Animation(Animation.Type.SMOOTH, 1.0f), null)
-                isLocationAlreadyShown = true
+    private fun startLocationTracking() {
+        if (_binding == null) return
+        showLoading()
+
+        binding.refineMapView.controller.setCenter(DEFAULT_POINT)
+        binding.refineMapView.controller.setZoom(CITY_ZOOM)
+
+        locationOverlay?.runOnFirstFix {
+            val location = locationOverlay?.myLocation
+            if (location != null) {
+                val newLocation = GeoPoint(location.latitude, location.longitude)
+
+                // ✅ КРИТИЧЕСКИ ВАЖНО: Переходим в главный поток для обновления UI карты
+                requireActivity().runOnUiThread {
+                    if (_binding != null) {
+                        lastUserLocation = newLocation
+                        if (!isLocationAlreadyShown) {
+                            binding.refineMapView.controller.setCenter(lastUserLocation)
+                            binding.refineMapView.controller.setZoom(CITY_ZOOM)
+                            isLocationAlreadyShown = true
+                        }
+                        hideLoading()
+                    }
+                }
             }
-            hideLoading()
-            stopLocationUpdates()
         }
-        override fun onLocationStatusUpdated(status: com.yandex.mapkit.location.LocationStatus) {}
     }
 
     private fun checkLocationPermission() {
@@ -126,93 +148,86 @@ class RefineLocationFragment : Fragment() {
         }
     }
 
-    private fun stopLocationUpdates() {
-        locationManager?.unsubscribe(locationListener)
-    }
-
     private fun showLoading() {
-        binding.progressLocation.visibility = View.VISIBLE
-        binding.tvLoadingText.visibility = View.VISIBLE
+        if (_binding != null) {
+            binding.progressLocation.visibility = View.VISIBLE
+            binding.tvLoadingText.visibility = View.VISIBLE
+        }
     }
 
     private fun hideLoading() {
-        binding.progressLocation.visibility = View.GONE
-        binding.tvLoadingText.visibility = View.GONE
+        if (_binding != null) {
+            binding.progressLocation.visibility = View.GONE
+            binding.tvLoadingText.visibility = View.GONE
+        }
     }
 
     // --------------------------------------------------------------------------
-    // ✅ ГЛАВНАЯ ЛОГИКА ПРОВЕРКИ И СОХРАНЕНИЯ
+    // ✅ ВСЕ ФУНКЦИИ ТЕПЕРЬ ПРИНИМАЮТ IGeoPoint ВМЕСТО GeoPoint
     // --------------------------------------------------------------------------
-    private fun checkWaterLocalAndSave(point: Point) {
+    private fun checkWaterLocalAndSave(point: IGeoPoint) {
         lifecycleScope.launch {
+            if (_binding == null) return@launch
+
             binding.btnDone.isEnabled = false
             binding.btnDone.text = "Проверка..."
 
-            // СЦЕНАРИЙ 1: ЛИЧНАЯ ТОЧКА (флаг снят) -> Только Room
             if (!isPublic) {
                 saveToRoomOnly(point, isPublic = false, isVerified = false)
                 return@launch
             }
 
-            // СЦЕНАРИИ ДЛЯ ПУБЛИЧНОЙ ТОЧКИ
             val isWaterInDb = spotViewModel.findNearbyWater(point.latitude, point.longitude)
             val distance = if (lastUserLocation != null)
                 calculateDistance(lastUserLocation!!, point) else Double.MAX_VALUE
 
             when {
-                // ✅ 2A. Вода есть + Рыбак рядом -> Проверенная (Room + Firebase)
                 isWaterInDb && distance < MAX_DISTANCE_METERS -> {
                     Log.d(TAG, "[VERIFIED] Вода в БД + GPS совпал")
                     saveToRoomAndFirebase(point, isPublic = true, isVerified = true)
                 }
-
-                // ⚠️ 2B. Воды нет в БД, НО Рыбак рядом -> Сомнительная
                 !isWaterInDb && distance < MAX_DISTANCE_METERS -> {
                     Log.w(TAG, "[SUSPICIOUS] GPS совпал, но воды нет в БД")
                     showSuspiciousDialog(point)
                 }
-
-                // ❌ 2C. Рыбак далеко -> Предлагаем сохранить как личную
                 else -> {
                     Log.e(TAG, "[REJECTED] Рыбак далеко (${distance.toInt()} м)")
                     showFarAwayDialog(point)
                 }
             }
 
-            binding.btnDone.isEnabled = true
-            binding.btnDone.text = "Готово"
+            if (_binding != null) {
+                binding.btnDone.isEnabled = true
+                binding.btnDone.text = "Готово"
+            }
         }
     }
 
-    /**
-     * Диалог подтверждения для сомнительной точки
-     */
-    private fun showSuspiciousDialog(point: Point) {
+    private fun showSuspiciousDialog(point: IGeoPoint) {
+        if (!isAdded || _binding == null) return
+
         AlertDialog.Builder(requireContext())
             .setTitle("⚠️ Водоем не найден в базе")
-            .setMessage(
-                "Рядом с вами нет зарегистрированного водоема. " +
-                        "Возможно, это новое или маленькое место.\n\n" +
-                        "Точка будет добавлена на общую карту со статусом «Сомнительная». " +
-                        "Другие рыболовы смогут подтвердить наличие воды здесь."
-            )
+            .setMessage("Рядом с вами нет зарегистрированного водоема. Возможно, это новое или маленькое место.\n\nТочка будет добавлена на общую карту со статусом «Сомнительная». Другие рыболовы смогут подтвердить наличие воды здесь.")
             .setPositiveButton("Сохранить как сомнительную") { dialog, _ ->
                 dialog.dismiss()
-                if (isAdded) {
-                    // ✅ Вызываем общий метод, ViewModel сама поймет, что isVerified = false
+                if (isAdded && _binding != null) {
                     saveToRoomAndFirebase(point, isPublic = true, isVerified = false)
                 }
             }
             .setNegativeButton("Отмена") { dialog, _ ->
                 dialog.dismiss()
+                if (_binding != null) {
+                    binding.btnDone.isEnabled = true
+                    binding.btnDone.text = "Готово"
+                }
             }
             .setCancelable(false)
             .create()
             .show()
     }
 
-    /** Сохранение ТОЛЬКО в Room (Личные или отклоненные) */
-    private fun saveToRoomOnly(point: Point, isPublic: Boolean, isVerified: Boolean) {
+    private fun saveToRoomOnly(point: IGeoPoint, isPublic: Boolean, isVerified: Boolean) {
         spotViewModel.addFullSpot(
             lat = point.latitude, lon = point.longitude, name = spotName,
             description = spotDesc, weight = spotWeight, isPublic = isPublic,
@@ -221,9 +236,7 @@ class RefineLocationFragment : Fragment() {
         navigateBack()
     }
 
-    /** Сохранение в Room + Отправка в Firebase (Публичные) */
-    private fun saveToRoomAndFirebase(point: Point, isPublic: Boolean, isVerified: Boolean) {
-        // ✅ ViewModel сама увидит isPublic = true и отправит данные в Firebase с правильным authorId
+    private fun saveToRoomAndFirebase(point: IGeoPoint, isPublic: Boolean, isVerified: Boolean) {
         spotViewModel.addFullSpot(
             lat = point.latitude, lon = point.longitude, name = spotName,
             description = spotDesc, weight = spotWeight, isPublic = isPublic,
@@ -232,16 +245,23 @@ class RefineLocationFragment : Fragment() {
         navigateBack()
     }
 
-    /** Диалог при нарушении дистанции */
-    private fun showFarAwayDialog(point: Point) {
+    private fun showFarAwayDialog(point: IGeoPoint) {
+        if (!isAdded || _binding == null) return
+
         AlertDialog.Builder(requireContext())
             .setTitle("Вы слишком далеко!")
             .setMessage("Расстояние > 250м. Сохранить как ЛИЧНУЮ точку?")
             .setPositiveButton("Сохранить как личную") { d, _ ->
                 d.dismiss()
-                if (isAdded) saveToRoomOnly(point, isPublic = false, isVerified = false)
+                if (isAdded && _binding != null) saveToRoomOnly(point, isPublic = false, isVerified = false)
             }
-            .setNegativeButton("Отмена") { d, _ -> d.dismiss() }
+            .setNegativeButton("Отмена") { d, _ ->
+                d.dismiss()
+                if (_binding != null) {
+                    binding.btnDone.isEnabled = true
+                    binding.btnDone.text = "Готово"
+                }
+            }
             .create().show()
     }
 
@@ -253,7 +273,8 @@ class RefineLocationFragment : Fragment() {
         }
     }
 
-    private fun calculateDistance(p1: Point, p2: Point): Double {
+    // ✅ Формула работает с IGeoPoint точно так же, так как у него есть свойства latitude и longitude
+    private fun calculateDistance(p1: IGeoPoint, p2: IGeoPoint): Double {
         val r = 6371000.0
         val dLat = Math.toRadians(p2.latitude - p1.latitude)
         val dLon = Math.toRadians(p2.longitude - p1.longitude)
@@ -261,12 +282,8 @@ class RefineLocationFragment : Fragment() {
         return r * 2 * atan2(sqrt(a), sqrt(1 - a))
     }
 
-    override fun onStop() {
-        binding.refineMapView.onStop()
-        super.onStop()
-    }
-
     override fun onDestroyView() {
+        locationOverlay?.disableMyLocation()
         _binding = null
         super.onDestroyView()
     }
