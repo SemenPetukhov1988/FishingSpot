@@ -1,23 +1,30 @@
 package ru.semen
 
 import android.app.Application
-import android.content.Context
 import org.osmdroid.config.Configuration
+import java.io.File
 
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // ✅ ИНИЦИАЛИЗАЦИЯ OSMDROID
-        // 1. Загружаем конфигурацию (включает кэширование тайлов на устройство)
-        // Используем getSharedPreferences, так как мы в классе Application
-        Configuration.getInstance().load(
-            this,
-            getSharedPreferences("osmdroid_prefs", Context.MODE_PRIVATE)
-        )
-
-        // 2. Обязательно задаем User-Agent.
-        // Серверы OpenStreetMap требуют это, иначе они заблокируют запросы на получение карты.
+        Configuration.getInstance().load(this, getSharedPreferences("osmdroid_prefs", MODE_PRIVATE))
         Configuration.getInstance().userAgentValue = packageName
+
+        // ✅ ПРАВИЛЬНЫЙ ПУТЬ ДЛЯ СОВРЕМЕННЫХ ANDROID (API 29+)
+        // getExternalFilesDir(null) возвращает папку /Android/data/ru.semen.fishingspot/files
+        // Если она вдруг недоступна (эмулятор), используем внутренний кэш (cacheDir)
+        val externalDir = getExternalFilesDir(null) ?: cacheDir
+        val osmdroidBasePath = File(externalDir, "osmdroid")
+
+        if (!osmdroidBasePath.exists()) {
+            osmdroidBasePath.mkdirs()
+        }
+
+        Configuration.getInstance().osmdroidBasePath = osmdroidBasePath
+        Configuration.getInstance().osmdroidTileCache = File(osmdroidBasePath, "tiles")
+
+        // Ограничиваем кэш 300 МБ (хватит на несколько районов Архангельской области)
+        Configuration.getInstance().tileFileSystemCacheMaxBytes = 300L * 1024L * 1024L
     }
 }

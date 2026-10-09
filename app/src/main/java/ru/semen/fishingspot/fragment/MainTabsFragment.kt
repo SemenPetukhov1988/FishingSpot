@@ -11,7 +11,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 // ✅ УДАЛЕН ИМПОРТ YANDEX MAPKIT
 
-import ru.netology.fishingspot.ui.user.FishermenFragment
+
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentMainTabsBinding
 import ru.semen.fishingspot.feed.FeedFragment

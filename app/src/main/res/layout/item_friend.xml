@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="8dp"
+    android:layout_marginVertical="4dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="1dp"
+    app:strokeWidth="0dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp">
+
+        <!-- Аватар (заглушка) -->
+        <FrameLayout
+            android:id="@+id/avatarContainer"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <View
+                android:id="@+id/avatarCircle"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_avatar_circle" />
+
+            <TextView
+                android:id="@+id/tvAvatarLetter"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="А"
+                android:textColor="@android:color/white"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+        </FrameLayout>
+
+        <!-- Имя друга -->
+        <TextView
+            android:id="@+id/tvFriendName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="8dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Анна Мухина"
+            android:textColor="#000000"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toStartOf="@+id/btnRemoveFriend"
+            app:layout_constraintStart_toEndOf="@id/avatarContainer"
+            app:layout_constraintTop_toTopOf="@id/avatarContainer" />
+
+        <!-- Статус -->
+        <TextView
+            android:id="@+id/tvFriendStatus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="8dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Добавлен недавно"
+            android:textColor="#8E8E93"
+            android:textSize="13sp"
+            app:layout_constraintEnd_toStartOf="@+id/btnRemoveFriend"
+            app:layout_constraintStart_toEndOf="@id/avatarContainer"
+            app:layout_constraintTop_toBottomOf="@id/tvFriendName" />
+
+        <!-- Кнопка удаления (крестик) -->
+        <ImageButton
+            android:id="@+id/btnRemoveFriend"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Удалить из друзей"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="#8E8E93" />
+
+        <!-- Кнопка "Поделиться точкой" -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnShareSpot"
+            style="@style/Widget.MaterialComponents.Button"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="6dp"
+            android:text="Поделиться точкой"
+            android:textAllCaps="false"
+            android:textSize="13sp"
+            app:backgroundTint="#4C9AFF"
+            app:cornerRadius="8dp"
+            app:layout_constraintEnd_toStartOf="@+id/btnRequestSpot"
+            app:layout_constraintHorizontal_weight="1"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/avatarContainer" />
+
+        <!-- Кнопка "Запросить точку" (ВМЕСТО "Написать") -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnRequestSpot"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:layout_marginTop="12dp"
+            android:text="Попросить точку "
+            android:textAllCaps="false"
+            android:textColor="#4C9AFF"
+            android:textSize="13sp"
+            app:cornerRadius="8dp"
+            app:strokeColor="#4C9AFF"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_weight="1"
+            app:layout_constraintStart_toEndOf="@+id/btnShareSpot"
+            app:layout_constraintTop_toBottomOf="@id/avatarContainer" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.material.card.MaterialCardView>
