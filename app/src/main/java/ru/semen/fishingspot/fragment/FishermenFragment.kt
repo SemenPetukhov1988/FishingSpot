@@ -47,7 +47,11 @@ class FishermenFragment : Fragment() {
                 Toast.makeText(requireContext(), "📍 Поделиться с ${friend.name}", Toast.LENGTH_SHORT).show()
             },
             onRequestClick = { friend ->
-                Toast.makeText(requireContext(), " Запросить точку у ${friend.name}", Toast.LENGTH_SHORT).show()
+                // ✅ ОТКРЫВАЕМ ШТОРКУ ЗАПРОСА ВМЕСТО TOAST
+                RequestSpotBottomSheet(
+                    friendId = friend.id,
+                    friendName = friend.name
+                ).show(childFragmentManager, "request_spot_sheet")
             },
             onRemoveClick = { friend ->
                 Toast.makeText(requireContext(), "❌ Удалить ${friend.name}", Toast.LENGTH_SHORT).show()

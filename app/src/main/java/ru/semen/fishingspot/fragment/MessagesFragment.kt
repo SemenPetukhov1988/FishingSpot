@@ -6,12 +6,10 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import androidx.navigation.fragment.findNavController
+import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.Query
-
 import ru.semen.fishingspot.adapter.MessagesAdapter
 import ru.semen.fishingspot.data.AppMessage
 import ru.semen.fishingspot.databinding.FragmentMessagesBinding
@@ -26,6 +24,10 @@ class MessagesFragment : Fragment() {
     private lateinit var adapter: MessagesAdapter
     private var messagesListener: ListenerRegistration? = null
 
+    // ✅ Подключаем обе ViewModel
+    private val spotViewModel: ru.semen.fishingspot.viewmodel.SpotViewModel by viewModels()
+    private val friendsViewModel: ru.semen.fishingspot.viewmodel.FriendsViewModel by viewModels()
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -36,26 +38,76 @@ class MessagesFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 1. Настраиваем адаптер с простой и понятной логикой кликов
+        // 1. Настраиваем адаптер со всеми типами кликов
         adapter = MessagesAdapter(
             onSenderClick = { message ->
-                // ✅ ВРЕМЕННАЯ ЗАГЛУШКА (Пока не настроен nav_graph для профиля)
-                // Когда добавим ProfileFragment, здесь будет:
-                // findNavController().navigate(MessagesFragmentDirections.actionMessagesToProfile(message.senderId))
                 Toast.makeText(
                     requireContext(),
                     "Переход в профиль пользователя: ${message.senderName}",
                     Toast.LENGTH_SHORT
                 ).show()
+                // TODO: findNavController().navigate(MessagesFragmentDirections.actionMessagesToProfile(message.senderId))
             },
             onMessageClick = { message ->
-                // ✅ ПРОСТОЙ ОТКЛИК
+                if (message.type == "SPOT_SHARED") {
+                    Toast.makeText(requireContext(), "Забираем точку: ${message.spotName}", Toast.LENGTH_SHORT).show()
+                    // TODO: Логика сохранения точки в Room (будет на следующем большом этапе)
+                } else {
+                    Toast.makeText(requireContext(), "Открываем точку: ${message.spotName}", Toast.LENGTH_SHORT).show()
+                }
+            },
+            // ✅ Клик по кнопке "📍 Поделиться" в запросе
+            // ✅ НОВОЕ: Клик по кнопке "📍 Поделиться" в запросе
+            // ✅ НОВОЕ: Клик по кнопке "📍 Поделиться" в запросе
+            onShareRequestClick = { message ->
+                // Открываем шторку, передавая ей SpotViewModel
+                SelectSpotBottomSheet(
+                    spotViewModel = spotViewModel,
+                    requesterName = message.senderName
+                ) { selectedSpot ->
+                    // ЭТОТ КОД СРАБОТАЕТ, КОГДА АНЯ НАЖМЕТ "ОТПРАВИТЬ"
+
+                    // Вызываем метод отправки из FriendsViewModel
+                    friendsViewModel.sendSharedSpot(
+                        requesterId = message.senderId,
+                        requesterName = message.senderName,
+                        spot = selectedSpot,
+                        originalMessageId = message.id
+                    )
+                }.show(childFragmentManager, "select_spot_sheet")
+            },
+            // ✅ Клик по кнопке "Отклонить" в запросе
+            onDeclineRequestClick = { message ->
+                Toast.makeText(requireContext(), "Запрос от ${message.senderName} отклонен", Toast.LENGTH_SHORT).show()
+                deleteMessage(message.id) // Реально удаляем запрос из базы
+            },
+            // ✅ ФИНАЛЬНЫЙ ШАГ: Клик "Забрать в мой дневник"
+            // ✅ ФИНАЛЬНЫЙ ШАГ: Клик "Забрать в мой дневник"
+            onTakeSpotClick = { message ->
+                // 1. Сохраняем точку в локальную базу Room
+                spotViewModel.addFullSpot(
+                    lat = message.spotLat,
+                    lon = message.spotLon,
+                    name = message.spotName,
+                    description = "Получено от ${message.senderName}",
+                    weight = 0.0,
+                    isPublic = false, // Сохраняем в ЛИЧНЫЙ дневник
+                    photoPath = null,
+                    isVerified = false
+                )
+
+                // 2. Показываем успешное уведомление
                 Toast.makeText(
                     requireContext(),
-                    "Открываем точку: ${message.spotName}",
-                    Toast.LENGTH_SHORT
+                    "Точка '${message.spotName}' успешно сохранена в дневник! 🎣",
+                    Toast.LENGTH_LONG
                 ).show()
+
+                // 3. ✅ УДАЛЯЕМ сообщение из Firebase, чтобы карточка исчезла из списка
+                deleteMessage(message.id)
             }
+
+
         )
 
         binding.rvMessages.layoutManager = LinearLayoutManager(requireContext())
@@ -70,11 +122,10 @@ class MessagesFragment : Fragment() {
      */
     private fun subscribeToMessages() {
         val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: return
-        android.util.Log.d("DEBUG_SPOT", "👂 Подписка на сообщения для пользователя: $currentUserId")
+        android.util.Log.d("DEBUG_SPOT", " Подписка на сообщения для пользователя: $currentUserId")
 
         messagesListener = firestore.collection("messages")
             .whereEqualTo("recipientId", currentUserId)
-            // ✅ УБРАЛИ orderBy — он требует индекс в Firebase Console
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     android.util.Log.e("DEBUG_SPOT", "❌ Ошибка подписки на сообщения", error)
@@ -86,7 +137,7 @@ class MessagesFragment : Fragment() {
                         doc.toObject(AppMessage::class.java)?.copy(id = doc.id)
                     }
 
-                    // ✅ Сортируем на клиенте (от новых к старым)
+                    // ✅ Сортировка для Long (timestamp теперь Long, а не Timestamp)
                     val sortedMessages = messages.sortedByDescending { it.timestamp }
 
                     android.util.Log.d("DEBUG_SPOT", "📬 Получено сообщений из Firebase: ${sortedMessages.size}")
@@ -102,6 +153,22 @@ class MessagesFragment : Fragment() {
                         binding.rvMessages.visibility = View.VISIBLE
                     }
                 }
+            }
+    }
+
+    /**
+     * Удаляет сообщение из Firebase (используется при отклонении запроса)
+     */
+    private fun deleteMessage(messageId: String) {
+        firestore.collection("messages").document(messageId)
+            .delete()
+            .addOnSuccessListener {
+                android.util.Log.d("DEBUG_SPOT", "✅ Сообщение удалено из Firebase")
+                // Список обновится автоматически благодаря addSnapshotListener!
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("DEBUG_SPOT", "❌ Ошибка удаления сообщения", e)
+                Toast.makeText(requireContext(), "Ошибка удаления", Toast.LENGTH_SHORT).show()
             }
     }
 

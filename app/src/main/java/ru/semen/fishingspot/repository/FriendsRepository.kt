@@ -125,4 +125,92 @@ class FriendsRepository {
                     cont.resume(Result.failure(e))
                 }
         }
+
+    suspend fun sendSpotRequest(friendId: String, friendName: String, customMessage: String): Result<Boolean> =
+        suspendCancellableCoroutine { cont ->
+
+            val userId = currentUserId
+            val userName = auth.currentUser?.displayName ?: "Рыбак"
+
+            if (userId == null) {
+                cont.resume(Result.failure(Exception("Не авторизован")))
+                return@suspendCancellableCoroutine
+            }
+
+            val requestData = hashMapOf(
+                "senderId" to userId,
+                "senderName" to userName,
+                "recipientId" to friendId,
+                "type" to "SPOT_REQUEST",
+                "customMessage" to customMessage,
+                "contentText" to "",
+                "isRead" to false,
+                "timestamp" to System.currentTimeMillis() // ✅ Сохраняем как Long!
+            )
+
+            db.collection("messages")
+                .add(requestData)
+                .addOnSuccessListener {
+                    Log.d(TAG, "✅ Запрос точки отправлен")
+                    cont.resume(Result.success(true))
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "❌ Ошибка отправки запроса", e)
+                    cont.resume(Result.failure(e))
+                }
+        }
+
+    /**
+     * Отправляет точку другу и удаляет его исходный запрос (Batch operation)
+     */
+    suspend fun sendSharedSpot(
+        requesterId: String,
+        requesterName: String,
+        spot: ru.semen.fishingspot.data.FishingSpot,
+        originalMessageId: String
+    ): Result<Boolean> = suspendCancellableCoroutine { cont ->
+
+        val userId = currentUserId
+        val userName = auth.currentUser?.displayName ?: "Рыбак"
+
+        if (userId == null) {
+            cont.resume(Result.failure(Exception("Не авторизован")))
+            return@suspendCancellableCoroutine
+        }
+
+        val db = FirebaseFirestore.getInstance()
+        val batch = db.batch()
+
+        // 1. Создаем новое сообщение типа SPOT_SHARED
+        val newMessageRef = db.collection("messages").document()
+        val sharedData = hashMapOf(
+            "senderId" to userId,
+            "senderName" to userName,
+            "recipientId" to requesterId,
+            "type" to "SPOT_SHARED",
+            "spotId" to spot.id.toString(), // ID точки из Room
+            "spotName" to spot.name,
+            "spotLat" to spot.latitude,
+            "spotLon" to spot.longitude,
+            "contentText" to "Держи проверенное место!",
+            "timestamp" to System.currentTimeMillis(),
+            "isRead" to false
+        )
+        batch.set(newMessageRef, sharedData)
+
+        // 2. Удаляем старый запрос (SPOT_REQUEST), чтобы он не висел в базе
+        val oldRequestRef = db.collection("messages").document(originalMessageId)
+        batch.delete(oldRequestRef)
+
+        // 3. Выполняем всё атомарно
+        batch.commit()
+            .addOnSuccessListener {
+                Log.d(TAG, "✅ Точка отправлена, запрос удален")
+                cont.resume(Result.success(true))
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "❌ Ошибка отправки точки", e)
+                cont.resume(Result.failure(e))
+            }
+    }
 }

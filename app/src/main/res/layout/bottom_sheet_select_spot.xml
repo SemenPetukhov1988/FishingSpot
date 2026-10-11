@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@android:color/white"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Выберите точку для отправки"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="#000000"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Список точек -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvSpots"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="350dp"
+        android:clipToPadding="false" />
+
+    <!-- Кнопка отправки -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnSendSpot"
+        style="@style/Widget.MaterialComponents.Button"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginTop="16dp"
+        android:text="📍 Отправить точку"
+        android:textAllCaps="false"
+        android:textSize="16sp"
+        android:enabled="false"
+        app:backgroundTint="#4C9AFF"
+        app:cornerRadius="12dp" />
+
+</LinearLayout>

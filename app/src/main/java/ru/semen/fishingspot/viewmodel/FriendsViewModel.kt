@@ -49,4 +49,30 @@ class FriendsViewModel : ViewModel() {
     suspend fun searchUsers(query: String): List<User> {
         return repository.searchUsers(query)
     }
+
+    fun sendSpotRequest(friendId: String, friendName: String, customMessage: String) {
+        viewModelScope.launch {
+            val result = repository.sendSpotRequest(friendId, friendName, customMessage)
+            result.onFailure { error ->
+                _message.value = "❌ Ошибка отправки: ${error.message}"
+            }
+            // При успехе ничего не показываем, просто закрываем шторку (она сама закроется)
+        }
+    }
+    fun sendSharedSpot(
+        requesterId: String,
+        requesterName: String,
+        spot: ru.semen.fishingspot.data.FishingSpot,
+        originalMessageId: String
+    ) {
+        viewModelScope.launch {
+            val result = repository.sendSharedSpot(requesterId, requesterName, spot, originalMessageId)
+            result.onSuccess {
+                _message.value = "✅ Точка успешно отправлена!"
+            }
+            result.onFailure { error ->
+                _message.value = "❌ Ошибка отправки: ${error.message}"
+            }
+        }
+    }
 }
