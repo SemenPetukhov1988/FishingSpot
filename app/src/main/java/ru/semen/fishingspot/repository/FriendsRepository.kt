@@ -265,4 +265,63 @@ class FriendsRepository(private val context: Context) {
                     cont.resume(Result.failure(e))
                 }
         }
+
+    /**
+     * Уведомляет всех друзей о том, что пользователь добавил новую точку
+     */
+    /**
+     * Уведомляет всех друзей о том, что пользователь добавил новую точку
+     */
+    suspend fun notifyFriendsAboutNewSpot(spot: FishingSpot, authorName: String): Result<Boolean> =
+        suspendCancellableCoroutine { cont ->
+            val userId = currentUserId
+            if (userId == null) {
+                cont.resume(Result.failure(Exception("Не авторизован")))
+                return@suspendCancellableCoroutine
+            }
+
+            db.collection("users").document(userId).collection("friends").get()
+                .addOnSuccessListener { friendsSnapshot ->
+                    if (friendsSnapshot.isEmpty) {
+                        cont.resume(Result.success(true))
+                        return@addOnSuccessListener
+                    }
+
+                    val batch = db.batch()
+                    for (doc in friendsSnapshot.documents) {
+                        val friendId = doc.id
+                        val messageData = hashMapOf(
+                            "type" to "FRIEND_SPOT",
+                            "senderId" to userId,
+                            "senderName" to authorName,
+                            "recipientId" to friendId,
+                            "spotName" to spot.name,
+                            "spotLat" to spot.latitude,
+                            "spotLon" to spot.longitude,
+                            "spotDescription" to spot.description,
+                            "spotWeight" to spot.catchWeight,
+                            "spotCreatedAt" to spot.createdAt,
+                            "spotIsVerified" to spot.isVerified,
+                            "spotPhotoPath" to spot.photoPath,
+                            "timestamp" to System.currentTimeMillis(),
+                            "isRead" to false
+                        )
+                        batch.set(db.collection("messages").document(), messageData)
+                    }
+
+                    batch.commit()
+                        .addOnSuccessListener {
+                            Log.d(TAG, "✅ Друзья уведомлены о новой точке")
+                            cont.resume(Result.success(true))
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e(TAG, "❌ Ошибка уведомления друзей", e)
+                            cont.resume(Result.failure(e))
+                        }
+                }
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "❌ Ошибка получения списка друзей", e)
+                    cont.resume(Result.failure(e))
+                }
+        }
 }

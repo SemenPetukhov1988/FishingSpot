@@ -88,22 +88,7 @@
             app:tint="#8E8E93" />
 
         <!-- Кнопка "Поделиться точкой" -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnShareSpot"
-            style="@style/Widget.MaterialComponents.Button"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_marginTop="12dp"
-            android:layout_marginEnd="6dp"
-            android:text="Поделиться точкой"
-            android:textAllCaps="false"
-            android:textSize="13sp"
-            app:backgroundTint="#4C9AFF"
-            app:cornerRadius="8dp"
-            app:layout_constraintEnd_toStartOf="@+id/btnRequestSpot"
-            app:layout_constraintHorizontal_weight="1"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/avatarContainer" />
+
 
         <!-- Кнопка "Запросить точку" (ВМЕСТО "Написать") -->
         <com.google.android.material.button.MaterialButton
@@ -121,7 +106,7 @@
             app:strokeColor="#4C9AFF"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_weight="1"
-            app:layout_constraintStart_toEndOf="@+id/btnShareSpot"
+
             app:layout_constraintTop_toBottomOf="@id/avatarContainer" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>

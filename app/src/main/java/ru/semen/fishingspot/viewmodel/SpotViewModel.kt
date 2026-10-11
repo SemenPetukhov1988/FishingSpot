@@ -68,16 +68,25 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
     fun addFullSpot(
         lat: Double, lon: Double, name: String, description: String, weight: Double,
         isPublic: Boolean, photoPath: String?, isVerified: Boolean = false,
-        authorId: String? = null  // ✅ Если null, будет использован currentUserId
+        authorId: String? = null
     ) {
         viewModelScope.launch {
             val spot = FishingSpot(
                 latitude = lat, longitude = lon, name = name, description = description,
                 catchWeight = weight, isPublic = isPublic, photoPath = photoPath,
                 isVerified = isVerified,
-                authorId = authorId ?: currentUserId // ✅ Берем переданный ID или свой
+                authorId = authorId ?: currentUserId
             )
+
+            // 1. Сохраняем в Room
             repository.insert(spot)
+
+            // 2. ✅ Уведомляем друзей (создаем экземпляр репозитория на лету, т.к. ему нужен Context)
+            val context = getApplication<android.app.Application>().applicationContext
+            val myName = ru.semen.fishingspot.utils.UserSessionManager.getCurrentNickname(context) ?: "Рыбак"
+            val friendsRepo = ru.semen.fishingspot.data.FriendsRepository(context)
+            friendsRepo.notifyFriendsAboutNewSpot(spot, myName)
+
             if (isPublic) {
                 uploadSpotToFirebase(spot)
             }

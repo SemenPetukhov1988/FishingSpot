@@ -11,12 +11,18 @@ data class AppMessage(
     val spotId: String = "",
     val spotName: String = "",
 
-    // ✅ ДОБАВЛЯЕМ КООРДИНАТЫ, чтобы сохранить точку в Room
     val spotLat: Double = 0.0,
     val spotLon: Double = 0.0,
 
     val contentText: String = "",
     val customMessage: String = "",
+
+    // ✅ НОВЫЕ ПОЛЯ для уведомления "Друг сходил на рыбалку"
+    val spotDescription: String = "",
+    val spotWeight: Double = 0.0,
+    val spotCreatedAt: Long = System.currentTimeMillis(),
+    val spotIsVerified: Boolean = false,
+    val spotPhotoPath: String? = null,
 
     val isRead: Boolean = false,
     val timestamp: Long = System.currentTimeMillis()
@@ -27,5 +33,6 @@ enum class MessageType {
     SPOT_REQUEST,
     SPOT_SHARED,
     NEW_FRIEND,
-    SYSTEM
+    SYSTEM,
+    FRIEND_SPOT // ✅ Новый тип
 }

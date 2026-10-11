@@ -41,9 +41,7 @@ class FishermenFragment : Fragment() {
     private fun setupRecyclerView() {
         // Адаптер принимает лямбды для кликов
         adapter = FriendAdapter(
-            onShareClick = { friend ->
-                Toast.makeText(requireContext(), "📍 Поделиться с ${friend.name}", Toast.LENGTH_SHORT).show()
-            },
+
             onRequestClick = { friend ->
                 // ✅ ОТКРЫВАЕМ ШТОРКУ ЗАПРОСА ТОЧКИ
                 RequestSpotBottomSheet(

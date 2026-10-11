@@ -46,19 +46,16 @@ class MessagesFragment : Fragment() {
             onMessageClick = { message ->
                 Toast.makeText(requireContext(), "Открываем: ${message.spotName}", Toast.LENGTH_SHORT).show()
             },
-            // Запрос точки → Поделиться
             onShareRequestClick = { message ->
-                // ✅ Получаем свой ID для фильтрации точек в шторке
                 val myUserId = UserSessionManager.getCurrentUserId(requireContext())
                 if (myUserId == null) {
                     Toast.makeText(requireContext(), "Ошибка: не авторизован", Toast.LENGTH_SHORT).show()
                     return@MessagesAdapter
                 }
-
                 SelectSpotBottomSheet(
                     spotViewModel = spotViewModel,
                     requesterName = message.senderName,
-                    myUserId = myUserId  // ✅ Передаём свой ID для фильтрации
+                    myUserId = myUserId
                 ) { selectedSpot ->
                     friendsViewModel.sendSharedSpot(
                         requesterId = message.senderId,
@@ -68,12 +65,10 @@ class MessagesFragment : Fragment() {
                     )
                 }.show(childFragmentManager, "select_spot_sheet")
             },
-            // Запрос точки → Отклонить
             onDeclineRequestClick = { message ->
                 Toast.makeText(requireContext(), "Запрос отклонен", Toast.LENGTH_SHORT).show()
                 deleteMessage(message.id)
             },
-            // Полученная точка → Забрать в дневник
             onTakeSpotClick = { message ->
                 spotViewModel.addFullSpot(
                     lat = message.spotLat,
@@ -84,12 +79,11 @@ class MessagesFragment : Fragment() {
                     isPublic = false,
                     photoPath = null,
                     isVerified = false,
-                    authorId = message.senderId  // ✅ Сохраняем ID друга как автора
+                    authorId = message.senderId
                 )
                 Toast.makeText(requireContext(), "Точка '${message.spotName}' сохранена!", Toast.LENGTH_LONG).show()
                 deleteMessage(message.id)
             },
-            // ✅ Запрос в друзья → Принять
             onAcceptFriendClick = { message ->
                 friendsViewModel.acceptFriendRequest(
                     friendId = message.senderId,
@@ -97,10 +91,28 @@ class MessagesFragment : Fragment() {
                     messageId = message.id
                 )
             },
-            // ✅ Запрос в друзья → Отклонить
             onDeclineFriendClick = { message ->
                 Toast.makeText(requireContext(), "Запрос отклонен", Toast.LENGTH_SHORT).show()
                 deleteMessage(message.id)
+            },
+            // ✅ ФИНАЛЬНОЕ: Открываем красивую шторку-превью с заглушками карты и фото
+            // ✅ Открываем шторку-превью с возможностью отклонить и удалить сообщение
+            onViewFriendSpotClick = { message ->
+                SpotPreviewBottomSheet(
+                    spotViewModel = spotViewModel,
+                    senderName = message.senderName,
+                    senderId = message.senderId,
+                    spotName = message.spotName,
+                    spotDesc = message.spotDescription,
+                    spotLat = message.spotLat,
+                    spotLon = message.spotLon,
+                    spotWeight = message.spotWeight,
+                    spotCreatedAt = message.spotCreatedAt,
+                    messageId = message.id, // ✅ Передаем ID
+                    onDeclineAndDelete = {  // ✅ Передаем логику удаления
+                        deleteMessage(message.id)
+                    }
+                ).show(childFragmentManager, "spot_preview_sheet")
             }
         )
 

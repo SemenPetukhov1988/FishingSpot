@@ -9,7 +9,7 @@ import ru.semen.fishingspot.data.Friend
 import ru.semen.fishingspot.databinding.ItemFriendBinding
 
 class FriendAdapter(
-    private val onShareClick: (Friend) -> Unit,
+
     private val onRequestClick: (Friend) -> Unit,
     private val onRemoveClick: (Friend) -> Unit
 ) : ListAdapter<Friend, FriendAdapter.FriendViewHolder>(FriendDiffCallback()) {
@@ -38,7 +38,7 @@ class FriendAdapter(
             binding.tvAvatarLetter.text = firstLetter
 
             // Клики по кнопкам
-            binding.btnShareSpot.setOnClickListener { onShareClick(friend) }
+
             binding.btnRequestSpot.setOnClickListener { onRequestClick(friend) }
             binding.btnRemoveFriend.setOnClickListener { onRemoveClick(friend) }
         }
