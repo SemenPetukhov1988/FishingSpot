@@ -67,13 +67,15 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
 
     fun addFullSpot(
         lat: Double, lon: Double, name: String, description: String, weight: Double,
-        isPublic: Boolean, photoPath: String?, isVerified: Boolean = false
+        isPublic: Boolean, photoPath: String?, isVerified: Boolean = false,
+        authorId: String? = null  // ✅ Если null, будет использован currentUserId
     ) {
         viewModelScope.launch {
             val spot = FishingSpot(
                 latitude = lat, longitude = lon, name = name, description = description,
                 catchWeight = weight, isPublic = isPublic, photoPath = photoPath,
-                isVerified = isVerified, authorId = currentUserId
+                isVerified = isVerified,
+                authorId = authorId ?: currentUserId // ✅ Берем переданный ID или свой
             )
             repository.insert(spot)
             if (isPublic) {

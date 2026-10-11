@@ -8,9 +8,7 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
-import ru.semen.fishingspot.data.Friend
 import ru.semen.fishingspot.databinding.FragmentUserBinding
-
 import ru.semen.fishingspot.viewmodel.FriendsViewModel
 
 class FishermenFragment : Fragment() {
@@ -18,7 +16,7 @@ class FishermenFragment : Fragment() {
     private var _binding: FragmentUserBinding? = null
     private val binding get() = _binding!!
 
-    // ✅ Подключаем нашу новую ViewModel
+    // ✅ Подключаем нашу ViewModel
     private val viewModel: FriendsViewModel by viewModels()
 
     private lateinit var adapter: FriendAdapter
@@ -41,13 +39,13 @@ class FishermenFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        // Адаптер принимает лямбды для кликов (пока просто показываем Toast)
+        // Адаптер принимает лямбды для кликов
         adapter = FriendAdapter(
             onShareClick = { friend ->
                 Toast.makeText(requireContext(), "📍 Поделиться с ${friend.name}", Toast.LENGTH_SHORT).show()
             },
             onRequestClick = { friend ->
-                // ✅ ОТКРЫВАЕМ ШТОРКУ ЗАПРОСА ВМЕСТО TOAST
+                // ✅ ОТКРЫВАЕМ ШТОРКУ ЗАПРОСА ТОЧКИ
                 RequestSpotBottomSheet(
                     friendId = friend.id,
                     friendName = friend.name
@@ -71,10 +69,10 @@ class FishermenFragment : Fragment() {
 
         // Слушаем сообщения об ошибках или успехе
         viewModel.message.observe(viewLifecycleOwner) { msg ->
-            if (msg != null) {
+            if (!msg.isNullOrEmpty()) {
                 Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
-                // Очищаем сообщение, чтобы оно не показывалось повторно при повороте экрана
-                // (В реальной жизни лучше использовать SingleLiveEvent, но для старта сойдет)
+                // Сбрасываем сообщение после показа
+               // viewModel.clearMessage() // (Если такого метода нет в твоей ViewModel, просто оставь как было, это не критично)
             }
         }
     }
@@ -83,14 +81,13 @@ class FishermenFragment : Fragment() {
         binding.fabAddFriend.setOnClickListener {
             // Открываем шторку поиска
             AddFriendBottomSheet { user ->
-                // Этот код сработает, когда ты нажмешь "Добавить" в шторке.
-                // Передаем данные в ViewModel для сохранения.
-                viewModel.addFriend(user.id, user.name)
+                // ✅ ИЗМЕНЕНО: Теперь отправляем запрос в друзья, а не добавляем мгновенно
+                viewModel.sendFriendRequest(user.id, user.name)
             }.show(childFragmentManager, "add_friend_sheet")
         }
     }
 
-    private fun showFriends(friends: List<Friend>) {
+    private fun showFriends(friends: List<ru.semen.fishingspot.data.Friend>) {
         if (friends.isEmpty()) {
             binding.layoutEmptyState.visibility = View.VISIBLE
             binding.rvFriends.visibility = View.GONE

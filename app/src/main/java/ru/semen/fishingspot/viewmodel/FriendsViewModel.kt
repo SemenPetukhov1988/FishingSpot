@@ -1,17 +1,20 @@
 package ru.semen.fishingspot.viewmodel
 
+import android.app.Application // ✅ Добавлен импорт
+import androidx.lifecycle.AndroidViewModel // ✅ Изменено с ViewModel на AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.data.Friend
 import ru.semen.fishingspot.data.FriendsRepository
 import ru.semen.fishingspot.data.User
 
-class FriendsViewModel : ViewModel() {
+// ✅ Теперь принимаем Application в конструкторе
+class FriendsViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = FriendsRepository()
+    // ✅ Передаём контекст приложения в репозиторий
+    private val repository = FriendsRepository(application.applicationContext)
 
     private val _friends = MutableLiveData<List<Friend>>()
     val friends: LiveData<List<Friend>> = _friends
@@ -20,7 +23,6 @@ class FriendsViewModel : ViewModel() {
     val message: LiveData<String> = _message
 
     init {
-        // Запускаем постоянное слушание базы данных
         observeFriends()
     }
 
@@ -32,13 +34,12 @@ class FriendsViewModel : ViewModel() {
         }
     }
 
-    fun addFriend(friendId: String, friendName: String) {
+    fun sendFriendRequest(friendId: String, friendName: String) {
         viewModelScope.launch {
-            val result = repository.addFriend(friendId, friendName)
+            val result = repository.sendFriendRequest(friendId, friendName)
 
             result.onSuccess {
-                _message.value = "✅ $friendName теперь в друзьях!"
-                // Список обновится САМ благодаря Flow в observeFriends()
+                _message.value = "✅ Запрос в друзья отправлен!"
             }
             result.onFailure { error ->
                 _message.value = "❌ Ошибка: ${error.message}"
@@ -56,9 +57,9 @@ class FriendsViewModel : ViewModel() {
             result.onFailure { error ->
                 _message.value = "❌ Ошибка отправки: ${error.message}"
             }
-            // При успехе ничего не показываем, просто закрываем шторку (она сама закроется)
         }
     }
+
     fun sendSharedSpot(
         requesterId: String,
         requesterName: String,
@@ -72,6 +73,18 @@ class FriendsViewModel : ViewModel() {
             }
             result.onFailure { error ->
                 _message.value = "❌ Ошибка отправки: ${error.message}"
+            }
+        }
+    }
+
+    fun acceptFriendRequest(friendId: String, friendName: String, messageId: String) {
+        viewModelScope.launch {
+            val result = repository.acceptFriendRequest(friendId, friendName, messageId)
+            result.onSuccess {
+                _message.value = "✅ Теперь вы друзья!"
+            }
+            result.onFailure { error ->
+                _message.value = "❌ Ошибка: ${error.message}"
             }
         }
     }

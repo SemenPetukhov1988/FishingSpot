@@ -14,6 +14,8 @@ import ru.semen.fishingspot.adapter.MessagesAdapter
 import ru.semen.fishingspot.data.AppMessage
 import ru.semen.fishingspot.databinding.FragmentMessagesBinding
 import ru.semen.fishingspot.utils.UserSessionManager
+import ru.semen.fishingspot.viewmodel.FriendsViewModel
+import ru.semen.fishingspot.viewmodel.SpotViewModel
 
 class MessagesFragment : Fragment() {
 
@@ -24,9 +26,8 @@ class MessagesFragment : Fragment() {
     private lateinit var adapter: MessagesAdapter
     private var messagesListener: ListenerRegistration? = null
 
-    // ✅ Подключаем обе ViewModel
-    private val spotViewModel: ru.semen.fishingspot.viewmodel.SpotViewModel by viewModels()
-    private val friendsViewModel: ru.semen.fishingspot.viewmodel.FriendsViewModel by viewModels()
+    private val spotViewModel: SpotViewModel by viewModels()
+    private val friendsViewModel: FriendsViewModel by viewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -38,36 +39,27 @@ class MessagesFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // 1. Настраиваем адаптер со всеми типами кликов
         adapter = MessagesAdapter(
             onSenderClick = { message ->
-                Toast.makeText(
-                    requireContext(),
-                    "Переход в профиль пользователя: ${message.senderName}",
-                    Toast.LENGTH_SHORT
-                ).show()
-                // TODO: findNavController().navigate(MessagesFragmentDirections.actionMessagesToProfile(message.senderId))
+                Toast.makeText(requireContext(), "Профиль: ${message.senderName}", Toast.LENGTH_SHORT).show()
             },
             onMessageClick = { message ->
-                if (message.type == "SPOT_SHARED") {
-                    Toast.makeText(requireContext(), "Забираем точку: ${message.spotName}", Toast.LENGTH_SHORT).show()
-                    // TODO: Логика сохранения точки в Room (будет на следующем большом этапе)
-                } else {
-                    Toast.makeText(requireContext(), "Открываем точку: ${message.spotName}", Toast.LENGTH_SHORT).show()
-                }
+                Toast.makeText(requireContext(), "Открываем: ${message.spotName}", Toast.LENGTH_SHORT).show()
             },
-            // ✅ Клик по кнопке "📍 Поделиться" в запросе
-            // ✅ НОВОЕ: Клик по кнопке "📍 Поделиться" в запросе
-            // ✅ НОВОЕ: Клик по кнопке "📍 Поделиться" в запросе
+            // Запрос точки → Поделиться
             onShareRequestClick = { message ->
-                // Открываем шторку, передавая ей SpotViewModel
+                // ✅ Получаем свой ID для фильтрации точек в шторке
+                val myUserId = UserSessionManager.getCurrentUserId(requireContext())
+                if (myUserId == null) {
+                    Toast.makeText(requireContext(), "Ошибка: не авторизован", Toast.LENGTH_SHORT).show()
+                    return@MessagesAdapter
+                }
+
                 SelectSpotBottomSheet(
                     spotViewModel = spotViewModel,
-                    requesterName = message.senderName
+                    requesterName = message.senderName,
+                    myUserId = myUserId  // ✅ Передаём свой ID для фильтрации
                 ) { selectedSpot ->
-                    // ЭТОТ КОД СРАБОТАЕТ, КОГДА АНЯ НАЖМЕТ "ОТПРАВИТЬ"
-
-                    // Вызываем метод отправки из FriendsViewModel
                     friendsViewModel.sendSharedSpot(
                         requesterId = message.senderId,
                         requesterName = message.senderName,
@@ -76,59 +68,57 @@ class MessagesFragment : Fragment() {
                     )
                 }.show(childFragmentManager, "select_spot_sheet")
             },
-            // ✅ Клик по кнопке "Отклонить" в запросе
+            // Запрос точки → Отклонить
             onDeclineRequestClick = { message ->
-                Toast.makeText(requireContext(), "Запрос от ${message.senderName} отклонен", Toast.LENGTH_SHORT).show()
-                deleteMessage(message.id) // Реально удаляем запрос из базы
+                Toast.makeText(requireContext(), "Запрос отклонен", Toast.LENGTH_SHORT).show()
+                deleteMessage(message.id)
             },
-            // ✅ ФИНАЛЬНЫЙ ШАГ: Клик "Забрать в мой дневник"
-            // ✅ ФИНАЛЬНЫЙ ШАГ: Клик "Забрать в мой дневник"
+            // Полученная точка → Забрать в дневник
             onTakeSpotClick = { message ->
-                // 1. Сохраняем точку в локальную базу Room
                 spotViewModel.addFullSpot(
                     lat = message.spotLat,
                     lon = message.spotLon,
                     name = message.spotName,
                     description = "Получено от ${message.senderName}",
                     weight = 0.0,
-                    isPublic = false, // Сохраняем в ЛИЧНЫЙ дневник
+                    isPublic = false,
                     photoPath = null,
-                    isVerified = false
+                    isVerified = false,
+                    authorId = message.senderId  // ✅ Сохраняем ID друга как автора
                 )
-
-                // 2. Показываем успешное уведомление
-                Toast.makeText(
-                    requireContext(),
-                    "Точка '${message.spotName}' успешно сохранена в дневник! 🎣",
-                    Toast.LENGTH_LONG
-                ).show()
-
-                // 3. ✅ УДАЛЯЕМ сообщение из Firebase, чтобы карточка исчезла из списка
+                Toast.makeText(requireContext(), "Точка '${message.spotName}' сохранена!", Toast.LENGTH_LONG).show()
+                deleteMessage(message.id)
+            },
+            // ✅ Запрос в друзья → Принять
+            onAcceptFriendClick = { message ->
+                friendsViewModel.acceptFriendRequest(
+                    friendId = message.senderId,
+                    friendName = message.senderName,
+                    messageId = message.id
+                )
+            },
+            // ✅ Запрос в друзья → Отклонить
+            onDeclineFriendClick = { message ->
+                Toast.makeText(requireContext(), "Запрос отклонен", Toast.LENGTH_SHORT).show()
                 deleteMessage(message.id)
             }
-
-
         )
 
         binding.rvMessages.layoutManager = LinearLayoutManager(requireContext())
         binding.rvMessages.adapter = adapter
 
-        // 2. Подписываемся на сообщения
         subscribeToMessages()
     }
 
-    /**
-     * Подписка на коллекцию сообщений в реальном времени
-     */
     private fun subscribeToMessages() {
         val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: return
-        android.util.Log.d("DEBUG_SPOT", " Подписка на сообщения для пользователя: $currentUserId")
+        android.util.Log.d("DEBUG_SPOT", "👂 Подписка на сообщения для: $currentUserId")
 
         messagesListener = firestore.collection("messages")
             .whereEqualTo("recipientId", currentUserId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    android.util.Log.e("DEBUG_SPOT", "❌ Ошибка подписки на сообщения", error)
+                    android.util.Log.e("DEBUG_SPOT", "❌ Ошибка подписки", error)
                     return@addSnapshotListener
                 }
 
@@ -136,12 +126,7 @@ class MessagesFragment : Fragment() {
                     val messages = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(AppMessage::class.java)?.copy(id = doc.id)
                     }
-
-                    // ✅ Сортировка для Long (timestamp теперь Long, а не Timestamp)
                     val sortedMessages = messages.sortedByDescending { it.timestamp }
-
-                    android.util.Log.d("DEBUG_SPOT", "📬 Получено сообщений из Firebase: ${sortedMessages.size}")
-                    android.util.Log.d("DEBUG_SPOT", "📋 Список: $sortedMessages")
 
                     adapter.submitList(sortedMessages)
 
@@ -156,24 +141,18 @@ class MessagesFragment : Fragment() {
             }
     }
 
-    /**
-     * Удаляет сообщение из Firebase (используется при отклонении запроса)
-     */
     private fun deleteMessage(messageId: String) {
         firestore.collection("messages").document(messageId)
             .delete()
             .addOnSuccessListener {
-                android.util.Log.d("DEBUG_SPOT", "✅ Сообщение удалено из Firebase")
-                // Список обновится автоматически благодаря addSnapshotListener!
+                android.util.Log.d("DEBUG_SPOT", "✅ Сообщение удалено")
             }
             .addOnFailureListener { e ->
-                android.util.Log.e("DEBUG_SPOT", "❌ Ошибка удаления сообщения", e)
-                Toast.makeText(requireContext(), "Ошибка удаления", Toast.LENGTH_SHORT).show()
+                android.util.Log.e("DEBUG_SPOT", "❌ Ошибка удаления", e)
             }
     }
 
     override fun onDestroyView() {
-        // Чистая уборка: отписка от Firebase
         messagesListener?.remove()
         messagesListener = null
         _binding = null

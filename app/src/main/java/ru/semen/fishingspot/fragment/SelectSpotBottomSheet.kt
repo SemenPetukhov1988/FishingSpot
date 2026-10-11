@@ -15,6 +15,7 @@ import ru.semen.fishingspot.viewmodel.SpotViewModel
 class SelectSpotBottomSheet(
     private val spotViewModel: SpotViewModel,
     private val requesterName: String,
+    private val myUserId: String, // ✅ Твой ID для фильтрации
     private val onSpotSelected: (FishingSpot) -> Unit
 ) : BottomSheetDialogFragment() {
 
@@ -31,7 +32,6 @@ class SelectSpotBottomSheet(
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setupRecyclerView()
         observeSpots()
         setupSendButton()
@@ -48,15 +48,19 @@ class SelectSpotBottomSheet(
     }
 
     private fun observeSpots() {
-        // ✅ НАБЛЮДАЕМ ЗА ТВОИМИ РЕАЛЬНЫМИ ТОЧКАМИ ИЗ ROOM ЧЕРЕЗ SpotViewModel
         spotViewModel.allSpots.observe(viewLifecycleOwner) { spots ->
-            if (spots.isNullOrEmpty()) {
-                binding.rvSpots.visibility = View.GONE
-                // Можно добавить TextView "У вас пока нет сохраненных точек"
+            // ✅ ФИЛЬТР: показываем только точки, где автор - это мы
+            val mySpots = spots.filter { it.authorId == myUserId }
+
+            if (mySpots.isEmpty()) {
+                binding.btnSendSpot.text = "Нет своих точек для отправки"
+                binding.btnSendSpot.isEnabled = false
             } else {
-                binding.rvSpots.visibility = View.VISIBLE
-                spotsAdapter?.submitList(spots)
+                binding.btnSendSpot.text = "📍 Отправить точку"
+                binding.btnSendSpot.isEnabled = false // Сбрасываем при обновлении списка
             }
+
+            spotsAdapter?.submitList(mySpots)
         }
     }
 
@@ -100,7 +104,6 @@ class SelectSpotBottomSheet(
 
         inner class SpotViewHolder(private val binding: ItemSelectSpotBinding) : RecyclerView.ViewHolder(binding.root) {
             fun bind(spot: FishingSpot, isSelected: Boolean) {
-                // ✅ Используем реальные поля из твоего класса FishingSpot
                 binding.tvSpotName.text = spot.name
                 binding.tvSpotCoords.text = "${spot.latitude}, ${spot.longitude}"
                 binding.ivCheck.visibility = if (isSelected) View.VISIBLE else View.GONE
