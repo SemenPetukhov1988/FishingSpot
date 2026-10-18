@@ -7,7 +7,7 @@
     <!-- ✅ ФРАГМЕНТ АВТОРИЗАЦИИ (НОВЫЙ) -->
     <fragment
         android:id="@+id/loginFragment"
-        android:name="ru.semen.fishingspot.ui.auth.LoginFragment"
+        android:name="ru.semen.fishingspot.fragment.LoginFragment"
         android:label="LoginFragment">
 
         <!-- Экшен на главную карту/табы -->

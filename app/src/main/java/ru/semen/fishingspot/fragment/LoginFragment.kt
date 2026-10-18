@@ -1,26 +1,26 @@
-package ru.semen.fishingspot.ui.auth
+package ru.semen.fishingspot.fragment
 
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.snackbar.Snackbar
-import com.google.firebase.Timestamp
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentLoginBinding
 import ru.semen.fishingspot.utils.UserSessionManager
+import ru.semen.fishingspot.viewmodel.AuthUiState
+import ru.semen.fishingspot.viewmodel.AuthViewModel
 
 class LoginFragment : Fragment() {
 
     private var _binding: FragmentLoginBinding? = null
     private val binding get() = _binding!!
 
-    private val auth = FirebaseAuth.getInstance()
-    private val firestore = FirebaseFirestore.getInstance()
+    // Инициализируем ViewModel (она сама создаст Repository с контекстом приложения)
+    private val viewModel: AuthViewModel by viewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -39,6 +39,7 @@ class LoginFragment : Fragment() {
         }
 
         setupClickListeners()
+        observeViewModel()
     }
 
     private fun setupClickListeners() {
@@ -47,78 +48,43 @@ class LoginFragment : Fragment() {
 
             when {
                 nickname.isEmpty() -> {
-                    Snackbar.make(binding.root, "Введите никнейм!", Snackbar.LENGTH_SHORT).show()
+                    showError("Введите никнейм!")
                 }
                 nickname.length < 3 -> {
-                    Snackbar.make(binding.root, "Никнейм слишком короткий", Snackbar.LENGTH_SHORT).show()
+                    showError("Никнейм слишком короткий (мин. 3 символа)")
                 }
                 else -> {
-                    performFirebaseLogin(nickname)
+                    // Запускаем процесс входа через ViewModel
+                    viewModel.login(nickname)
                 }
             }
         }
     }
 
-    /**
-     * Реальная анонимная авторизация через Firebase
-     */
-    private fun performFirebaseLogin(nickname: String) {
-        binding.btnEnter.isEnabled = false
-        binding.btnEnter.text = "Проверка..."
-
-        // ✅ ШАГ 1: Проверяем, занят ли ник
-        firestore.collection("users")
-            .whereEqualTo("nickname", nickname)
-            .limit(1)
-            .get()
-            .addOnSuccessListener { documents ->
-                if (!documents.isEmpty) {
-                    // Ник занят!
-                    showError("Ник \"$nickname\" уже занят. Попробуйте другой.")
-                    return@addOnSuccessListener
+    private fun observeViewModel() {
+        viewModel.uiState.observe(viewLifecycleOwner) { state ->
+            when (state) {
+                is AuthUiState.Loading -> {
+                    binding.btnEnter.isEnabled = false
+                    binding.btnEnter.text = "Создание аккаунта..."
                 }
-
-                // ✅ ШАГ 2: Ник свободен — создаём аккаунт
-                auth.signInAnonymously()
-                    .addOnSuccessListener { result ->
-                        val userId = result.user?.uid ?: run {
-                            showError("Не удалось создать аккаунт")
-                            return@addOnSuccessListener
-                        }
-
-                        // Сохраняем профиль
-                        val userProfile = hashMapOf(
-                            "nickname" to nickname,
-                            "createdAt" to Timestamp.now(),
-                            "isProfileDeleted" to false
-                        )
-
-                        firestore.collection("users").document(userId)
-                            .set(userProfile)
-                            .addOnSuccessListener {
-                                UserSessionManager.saveUserSession(requireContext(), userId, nickname)
-                                navigateToMainTabs()
-                            }
-                            .addOnFailureListener { e ->
-                                // Даже если запись в Firestore не удалась,
-                                // локальная сессия создана — пользователь сможет работать оффлайн
-                                UserSessionManager.saveUserSession(requireContext(), userId, nickname)
-                                navigateToMainTabs()
-                            }
-                    }
-                    .addOnFailureListener { e ->
-                        showError("Ошибка входа: ${e.localizedMessage}")
-                    }
+                is AuthUiState.Success -> {
+                    navigateToMainTabs()
+                }
+                is AuthUiState.Error -> {
+                    showError(state.message)
+                    viewModel.resetState() // Сбрасываем состояние, чтобы можно было попробовать снова
+                }
+                is AuthUiState.Idle -> {
+                    binding.btnEnter.isEnabled = true
+                    binding.btnEnter.text = "Войти"
+                }
             }
-            .addOnFailureListener { e ->
-                showError("Ошибка проверки ника: ${e.localizedMessage}")
-            }
+        }
     }
 
     private fun showError(message: String) {
         Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
-        binding.btnEnter.isEnabled = true
-        binding.btnEnter.text = "Войти"
     }
 
     private fun navigateToMainTabs() {

@@ -69,7 +69,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     ksp(libs.androidx.room.compiler)
     implementation(libs.material)
-
+    implementation("io.appwrite:sdk-for-android:6.0.0")
     implementation(libs.firebase.auth)      // Для анонимной авторизации
     implementation(libs.firebase.firestore) // Для базы данных точек
     implementation(platform(libs.firebase.bom))
@@ -90,4 +90,13 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.paging.runtime.ktx)
     coreLibraryDesugaring(libs.desugaring)
+}
+// === ФИКС КОНФЛИКТА OKHTTP ДЛЯ APPWRITE ===
+// === ФИКС КОНФЛИКТА OKHTTP ДЛЯ APPWRITE (Kotlin DSL) ===
+configurations.all {
+    resolutionStrategy {
+        force("com.squareup.okhttp3:okhttp:4.12.0")
+        force("com.squareup.okhttp3:logging-interceptor:4.12.0")
+        force("com.squareup.okhttp3:okhttp-sse:4.12.0")
+    }
 }
