@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.feed
+package ru.semen.fishingspot.repository // ⚠️ Проверь, что пакет совпадает с реальной папкой файла!
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -6,20 +6,20 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
-
-import ru.semen.fishingspot.viewmodel.SpotViewModel
+import ru.semen.fishingspot.data.FishingSpot // ✅ Импортируем нашу единую модель
 
 /**
- * Отвечает ТОЛЬКО за получение публичных точек из Firebase для ленты.
- * Ничего не знает про Room, карты и прочее.
+ * Отвечает за получение публичных точек для ленты.
+ * Временно использует Firebase. Позже мы переключим его на Appwrite.
  */
 class FeedRepository {
 
     private val firestore = FirebaseFirestore.getInstance()
     private val collection = firestore.collection("public_spots")
 
-    private val _spots = MutableLiveData<List<SpotViewModel.PublicSpot>>()
-    val spots: LiveData<List<SpotViewModel.PublicSpot>> = _spots
+    // ✅ Используем FishingSpot вместо PublicSpot
+    private val _spots = MutableLiveData<List<FishingSpot>>()
+    val spots: LiveData<List<FishingSpot>> = _spots
 
     private var listener: ListenerRegistration? = null
 
@@ -35,19 +35,18 @@ class FeedRepository {
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     // Если Firebase просит создать индекс — в логе будет ссылка.
-                    // Временно можно убрать .orderBy() и сортировать вручную.
                     return@addSnapshotListener
                 }
 
-                val list = mutableListOf<SpotViewModel.PublicSpot>()
+                val list = mutableListOf<FishingSpot>()
                 for (doc in snapshot!!) {
                     val data = doc.data
                     val timestamp = (data["createdAt"] as? Timestamp)?.toDate()?.time
                         ?: System.currentTimeMillis()
 
                     list.add(
-                        SpotViewModel.PublicSpot(
-                            id = doc.id,
+                        FishingSpot(
+                            id = 0, // ID для Room (если точку сохранят локально, Room сгенерирует свой)
                             latitude = (data["latitude"] as? Double) ?: 0.0,
                             longitude = (data["longitude"] as? Double) ?: 0.0,
                             name = (data["name"] as? String) ?: "Без названия",
@@ -55,6 +54,7 @@ class FeedRepository {
                             catchWeight = (data["catchWeight"] as? Double) ?: 0.0,
                             isVerified = (data["isVerified"] as? Boolean) ?: false,
                             authorId = (data["authorId"] as? String) ?: "unknown",
+                            visibility = "public", // ✅ Явно указываем, что это публичная точка
                             createdAt = timestamp
                         )
                     )

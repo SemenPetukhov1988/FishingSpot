@@ -48,7 +48,8 @@ class SelectSpotBottomSheet(
     }
 
     private fun observeSpots() {
-        spotViewModel.allSpots.observe(viewLifecycleOwner) { spots ->
+        // ✅ ИЗМЕНЕНО: используем localSpots вместо allSpots
+        spotViewModel.localSpots.observe(viewLifecycleOwner) { spots ->
             // ✅ ФИЛЬТР: показываем только точки, где автор - это мы
             val mySpots = spots.filter { it.authorId == myUserId }
 

@@ -11,15 +11,16 @@ data class FishingSpot(
     val name: String,
     val description: String = "",
     val catchWeight: Double = 0.0,
-    val photoPath: String? = null,
-    val isPublic: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis(),
 
-    // ✅ Новое поле для разделения проверенных и сомнительных точек
-    // По умолчанию false (сомнительная), при успешной проверке воды ставим true
+    // ✅ НОВЫЕ ПОЛЯ
+    val fishType: String? = null,       // Вид рыбы (окунь, щука и т.д.)
+    val photoPath: String? = null,      // Локальный путь к фото (для оффлайна)
+    val photoUrl: String? = null,       // Ссылка на фото в Appwrite Storage
     val isVerified: Boolean = false,
-
-    // ✅ НОВОЕ ПОЛЕ: ID автора из Firebase Auth / UserSessionManager
-    // Дефолтное значение "" гарантирует, что старые записи не сломаются
-    val authorId: String = ""
-)
+    val authorId: String = "",
+    val visibility: String = "private", // "private", "friends", "public"
+    val createdAt: Long = System.currentTimeMillis()
+) {
+    // Удобное свойство для быстрой проверки
+    val isPublic: Boolean get() = visibility == "public"
+}

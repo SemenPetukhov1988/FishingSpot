@@ -27,6 +27,8 @@ class SpotDetailsFragment : Fragment() {
     private var _binding: FragmentSpotDetailsBinding? = null
     private val binding get() = _binding!!
     private val spotViewModel: SpotViewModel by activityViewModels()
+
+    // TODO: Позже удалим FirebaseFirestore, так как статус точки будем брать из модели (spot.isPublic)
     private val firestore = FirebaseFirestore.getInstance()
 
     companion object {
@@ -123,48 +125,42 @@ class SpotDetailsFragment : Fragment() {
         }
 
         binding.btnNavigate.setOnClickListener {
-            val lat = arguments?.getDouble(ARG_SPOT_LAT)
-            val lon = arguments?.getDouble(ARG_SPOT_LON)
+            val navLat = arguments?.getDouble(ARG_SPOT_LAT)
+            val navLon = arguments?.getDouble(ARG_SPOT_LON)
 
-            if (lat == null || lon == null || (lat == 0.0 && lon == 0.0)) {
+            if (navLat == null || navLon == null || (navLat == 0.0 && navLon == 0.0)) {
                 Toast.makeText(requireContext(), "⚠️ Координаты точки не найдены", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            // 1. Пробуем Яндекс Карты через стандартный HTTPS-интент, привязанный к пакету
+            // 1. Пробуем Яндекс Карты
             if (isPackageInstalled("ru.yandex.yandexmaps", requireContext())) {
-                // Это официальный веб-формат построения маршрутов, который Яндекс Карты перехватывают идеально
-                val uri = Uri.parse("https://yandex.ru{lat},${lon}&rtt=mt")
+                val uri = Uri.parse("https://yandex.ru/maps/?rtext=~$navLat,$navLon&rtt=auto")
                 val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                     setPackage("ru.yandex.yandexmaps")
-                    // Добавляем флаг, чтобы интент открывался как новая задача, не ломая стек вашего приложения
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 try {
                     startActivity(intent)
-                    return@setOnClickListener // Успешно открыли Яндекс Карты, выходим
-                } catch (e: Exception) {
-                    // Если произошел внутренний сбой в самом Яндексе — не падаем, идем к Google Картам
-                }
+                    return@setOnClickListener
+                } catch (e: Exception) { /* ignore */ }
             }
 
             // 2. Пробуем Google Карты
             if (isPackageInstalled("com.google.android.apps.maps", requireContext())) {
-                val uri = Uri.parse("https://google.com{lat},${lon}")
+                val uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$navLat,$navLon")
                 val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                     setPackage("com.google.android.apps.maps")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 try {
                     startActivity(intent)
-                    return@setOnClickListener // Успешно открыли Google Карты, выходим
-                } catch (e: Exception) {
-                    // Игнорируем ошибку и идем в системный fallback
-                }
+                    return@setOnClickListener
+                } catch (e: Exception) { /* ignore */ }
             }
 
-            // 3. Универсальный fallback: любой доступный навигатор в системе (2ГИС, Maps.me и др.)
-            val uriGeo = Uri.parse("geo:${lat},${lon}?q=${lat},${lon}")
+            // 3. Fallback
+            val uriGeo = Uri.parse("geo:$navLat,$navLon?q=$navLat,$navLon")
             val intentGeo = Intent(Intent.ACTION_VIEW, uriGeo)
             try {
                 startActivity(intentGeo)
@@ -175,7 +171,8 @@ class SpotDetailsFragment : Fragment() {
 
         // ✅ КНОПКА СОХРАНИТЬ
         binding.btnSaveToLocal.setOnClickListener {
-            val currentLocalSpots = spotViewModel.allSpots.value ?: emptyList()
+            // ✅ ИСПРАВЛЕНО: используем localSpots вместо allSpots
+            val currentLocalSpots = spotViewModel.localSpots.value ?: emptyList()
             val isAlreadySaved = currentLocalSpots.any { localSpot ->
                 localSpot.name == name &&
                         localSpot.latitude == lat &&
@@ -193,16 +190,16 @@ class SpotDetailsFragment : Fragment() {
                     weight = weight,
                     isPublic = false,
                     photoPath = arguments?.getString(ARG_PHOTO_PATH),
+                    fishType = null, // Пока передаем null, позже добавим в аргументы
                     isVerified = isVerified
                 )
                 Toast.makeText(requireContext(), "✅ Точка '$name' добавлена в дневник!", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // ✅ Проверяем, есть ли эта точка в Firebase (публичная ли она)
+        // TODO: Позже заменим эту проверку на чтение из модели (spot.isPublic), чтобы убрать Firebase отсюда
         checkIfSpotIsPublic(name, lat, lon)
 
-        // ✅ ЕДИНСТВЕННЫЙ ОБРАБОТЧИК ДЛЯ КНОПКИ ОТЗЫВЫ (✅ ИСПРАВЛЕНО: передаем authorId)
         binding.btnReviews.setOnClickListener {
             findFirebaseSpotAndOpenReviews(name, lat, lon, authorId)
         }
@@ -232,10 +229,6 @@ class SpotDetailsFragment : Fragment() {
             }
     }
 
-    /**
-     * Ищет точку в Firebase и открывает BottomSheet с отзывами
-     * ✅ ИСПРАВЛЕНО: добавлен параметр authorId
-     */
     private fun findFirebaseSpotAndOpenReviews(name: String, lat: Double, lon: Double, authorId: String) {
         android.util.Log.d("DEBUG_SPOT", "🔍 Ищем точку в Firebase: name=$name, lat=$lat, lon=$lon, authorId=$authorId")
 
@@ -257,7 +250,7 @@ class SpotDetailsFragment : Fragment() {
                     )
                     reviewsSheet.show(childFragmentManager, "reviews")
                 } else {
-                    android.util.Log.e("DEBUG_SPOT", "❌ Точка НЕ найдена в public_spots. Проверь точное совпадение имени и координат.")
+                    android.util.Log.e("DEBUG_SPOT", "❌ Точка НЕ найдена в public_spots.")
                     Toast.makeText(requireContext(), "⚠️ Точка не опубликована на общей карте", Toast.LENGTH_SHORT).show()
                 }
             }

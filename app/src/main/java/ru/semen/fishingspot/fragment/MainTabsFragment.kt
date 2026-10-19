@@ -9,24 +9,19 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-// ✅ УДАЛЕН ИМПОРТ YANDEX MAPKIT
-
-
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentMainTabsBinding
-import ru.semen.fishingspot.feed.FeedFragment
-import ru.semen.fishingspot.ui.map.GlobalMapFragment
 import ru.semen.fishingspot.viewmodel.SpotViewModel
 
 class MainTabsFragment : Fragment() {
 
     private var _binding: FragmentMainTabsBinding? = null
     private val binding get() = _binding!!
+
+    // ✅ Общая ViewModel для управления состоянием точек
     private val spotViewModel: SpotViewModel by activityViewModels()
 
     private var currentFragment: Fragment? = null
-
-    // ✅ НОВОЕ: Храним ID выбранной вкладки в переменной, чтобы не лезть в binding при уничтожении
     private var currentSelectedItemId = R.id.nav_my_places
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -40,22 +35,24 @@ class MainTabsFragment : Fragment() {
         binding.bottomNavigation.itemIconTintList = null
         binding.bottomNavigation.itemActiveIndicatorColor = ColorStateList.valueOf(Color.TRANSPARENT)
 
-        // Синхронизация вкладки при возврате из SpotDetailsFragment
+        // Синхронизация вкладки при возврате из других фрагментов
         spotViewModel.selectedTabId.observe(viewLifecycleOwner) { tabId ->
-            currentSelectedItemId = tabId // ✅ Обновляем и нашу переменную
+            currentSelectedItemId = tabId
             binding.bottomNavigation.selectedItemId = tabId
         }
 
         if (savedInstanceState == null) {
             switchFragment(MyMapFragment(), R.id.nav_my_places)
+            spotViewModel.switchToMySpots() // По умолчанию показываем мои точки
         } else {
             currentSelectedItemId = savedInstanceState.getInt("SELECTED_ITEM", R.id.nav_my_places)
             binding.bottomNavigation.selectedItemId = currentSelectedItemId
         }
 
         binding.bottomNavigation.setOnItemSelectedListener { item ->
-            currentSelectedItemId = item.itemId // ✅ Запоминаем выбор
+            currentSelectedItemId = item.itemId
 
+            // Анимация иконки (твоя классная фишка, оставляем!)
             val iconView = binding.bottomNavigation.findViewById<View>(item.itemId)
                 ?.findViewById<ImageView>(com.google.android.material.R.id.navigation_bar_item_icon_view)
 
@@ -65,8 +62,20 @@ class MainTabsFragment : Fragment() {
                 }?.start()
 
             when (item.itemId) {
-                R.id.nav_my_places -> switchFragment(MyMapFragment(), item.itemId)
-                R.id.nav_global_map -> switchFragment(GlobalMapFragment(), item.itemId)
+                R.id.nav_my_places -> {
+                    // 1. Убеждаемся, что открыта карта
+                    ensureMapFragmentIsVisible()
+                    // 2. Переключаем ViewModel в режим "Мои точки"
+                    spotViewModel.switchToMySpots()
+                    true
+                }
+                R.id.nav_global_map -> {
+                    // 1. Убеждаемся, что открыта карта (если мы были в ленте, переключит на карту)
+                    ensureMapFragmentIsVisible()
+                    // 2. Переключаем ViewModel в режим "Публичные точки"
+                    spotViewModel.switchToPublicSpots()
+                    true
+                }
                 R.id.nav_feed -> switchFragment(FeedFragment(), item.itemId)
                 R.id.nav_stats -> switchFragment(MessagesFragment(), item.itemId)
                 R.id.nav_fishermen -> switchFragment(FishermenFragment(), item.itemId)
@@ -75,14 +84,12 @@ class MainTabsFragment : Fragment() {
         }
     }
 
-    // ✅ ОЧИЩЕНО: Убрали вызовы MapKitFactory.
-    // OSMDroid сам управляет своим onStart/onStop внутри конкретных фрагментов карт.
-    override fun onStart() {
-        super.onStart()
-    }
-
-    override fun onStop() {
-        super.onStop()
+    // ✅ НОВЫЙ МЕТОД: Переключает на MyMapFragment только если мы сейчас НЕ на нём.
+    // Это сохраняет состояние карты (зум, GPS), когда мы просто переключаем режимы!
+    private fun ensureMapFragmentIsVisible() {
+        if (currentFragment !is MyMapFragment) {
+            switchFragment(MyMapFragment(), currentSelectedItemId)
+        }
     }
 
     private fun switchFragment(fragment: Fragment, itemId: Int): Boolean {
@@ -99,7 +106,6 @@ class MainTabsFragment : Fragment() {
         return true
     }
 
-    // ✅ ИСПРАВЛЕННЫЙ МЕТОД: больше не обращаемся к binding, который может быть null
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putInt("SELECTED_ITEM", currentSelectedItemId)

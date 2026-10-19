@@ -93,8 +93,10 @@ class MyMapFragment : Fragment() {
                 .navigate(R.id.action_mainTabs_to_addPoint, bundle)
         }
 
-        spotViewModel.allSpots.observe(viewLifecycleOwner) { spots ->
-            Log.d(TAG, "LiveData update: ${spots.size} spots")
+        // ✅ ИЗМЕНЕНИЕ: слушаем currentSpots вместо allSpots.
+        // Теперь этот поток сам переключается между Room и Appwrite!
+        spotViewModel.currentSpots.observe(viewLifecycleOwner) { spots ->
+            Log.d(TAG, "LiveData update: ${spots.size} spots (Режим: ${spotViewModel.mapMode.value})")
             drawMarkers(spots)
         }
     }

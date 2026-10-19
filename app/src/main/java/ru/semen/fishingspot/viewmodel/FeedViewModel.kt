@@ -1,8 +1,9 @@
-package ru.semen.fishingspot.feed
+package ru.semen.fishingspot.viewmodel
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.ViewModel
-import ru.semen.fishingspot.viewmodel.SpotViewModel
+import ru.semen.fishingspot.data.FishingSpot // ✅ Импортируем единую модель
+import ru.semen.fishingspot.repository.FeedRepository
 
 /**
  * ViewModel ТОЛЬКО для ленты.
@@ -12,7 +13,8 @@ class FeedViewModel : ViewModel() {
 
     private val repository = FeedRepository()
 
-    val spots: LiveData<List<SpotViewModel.PublicSpot>> = repository.spots
+    // ✅ ИСПРАВЛЕНО: используем FishingSpot вместо SpotViewModel.PublicSpot
+    val spots: LiveData<List<FishingSpot>> = repository.spots
 
     fun startListening() {
         repository.startListening()
@@ -23,7 +25,7 @@ class FeedViewModel : ViewModel() {
     }
 
     // В будущем здесь появятся методы:
-    // fun saveSpotToMyMap(spot: PublicSpot) { ... }
+    // fun saveSpotToMyMap(spot: FishingSpot) { ... }
     // fun confirmSpot(spotId: String) { ... }
     // fun disputeSpot(spotId: String) { ... }
 }

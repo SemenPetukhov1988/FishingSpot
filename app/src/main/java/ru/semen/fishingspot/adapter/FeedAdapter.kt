@@ -9,18 +9,19 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import ru.semen.fishingspot.R
-import ru.semen.fishingspot.viewmodel.SpotViewModel
+import ru.semen.fishingspot.data.FishingSpot // ✅ Импортируем нашу главную модель
 
 class FeedAdapter(
-    private val onSaveClick: (SpotViewModel.PublicSpot) -> Unit,
-    private val onCommentClick: (SpotViewModel.PublicSpot) -> Unit,
-    private val onConfirmClick: (SpotViewModel.PublicSpot) -> Unit,
-    private val onDisputeClick: (SpotViewModel.PublicSpot) -> Unit
+    private val onSaveClick: (FishingSpot) -> Unit,
+    private val onCommentClick: (FishingSpot) -> Unit,
+    private val onConfirmClick: (FishingSpot) -> Unit,
+    private val onDisputeClick: (FishingSpot) -> Unit
 ) : RecyclerView.Adapter<FeedAdapter.FeedViewHolder>() {
 
-    private var items: List<SpotViewModel.PublicSpot> = emptyList()
+    // ✅ Теперь используем List<FishingSpot>
+    private var items: List<FishingSpot> = emptyList()
 
-    fun submitList(newList: List<SpotViewModel.PublicSpot>) {
+    fun submitList(newList: List<FishingSpot>) {
         items = newList
         notifyDataSetChanged()
     }
@@ -61,9 +62,12 @@ class FeedAdapter(
             else -> "⚖️ Больше 5 кг"
         }
 
-        // Рыбу берем из описания (первая строка до двойного переноса)
-        val fishInfo = spot.description.substringBefore("\n\n").ifEmpty { "🐟 Не указана" }
-        holder.tvFish.text = fishInfo
+        // ✅ УЛУЧШЕНИЕ: Теперь берем рыбу из отдельного поля fishType, а не парсим описание!
+        holder.tvFish.text = if (!spot.fishType.isNullOrEmpty()) {
+            "🐟 ${spot.fishType}"
+        } else {
+            "🐟 Не указана"
+        }
 
         // Фото (пока заглушка, потом подключим Glide/Coil)
         holder.ivPhoto.visibility = View.GONE
