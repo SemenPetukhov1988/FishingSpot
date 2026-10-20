@@ -105,4 +105,36 @@ class SpotAppwriteRepository(private val context: Context) {
             Result.failure(e)
         }
     }
+
+    /**
+     * Удаляет точку из облака Appwrite по уникальному сочетанию автора и времени создания
+     */
+    suspend fun deleteSpotFromCloud(authorId: String, createdAt: Long): Result<Unit> {
+        return try {
+            // Ищем документ в облаке, который совпадает с автором и точным временем создания
+            val response = AppwriteManager.databases.listDocuments(
+                databaseId = databaseId,
+                collectionId = spotsCollectionId,
+                queries = listOf(
+                    Query.equal("authorId", authorId),
+                    Query.equal("createdAt", createdAt),
+                    Query.limit(1)
+                )
+            )
+
+            if (response.documents.isNotEmpty()) {
+                val documentId = response.documents[0].id
+                AppwriteManager.databases.deleteDocument(
+                    databaseId = databaseId,
+                    collectionId = spotsCollectionId,
+                    documentId = documentId
+                )
+                Log.d("APPWRITE_SPOT", "✅ Точка удалена из облака (DocID: $documentId)")
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("APPWRITE_SPOT", "❌ Ошибка удаления из облака", e)
+            Result.failure(e)
+        }
+    }
 }

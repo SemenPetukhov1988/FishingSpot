@@ -1,8 +1,7 @@
 package ru.semen.fishingspot.fragment
 
-import android.content.Context
+import android.app.AlertDialog
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -12,7 +11,6 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.navigation.fragment.findNavController
-import com.google.firebase.firestore.FirebaseFirestore
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.data.FishingSpot
 import ru.semen.fishingspot.databinding.FragmentSpotDetailsBinding
@@ -28,8 +26,9 @@ class SpotDetailsFragment : Fragment() {
     private val binding get() = _binding!!
     private val spotViewModel: SpotViewModel by activityViewModels()
 
-    // TODO: Позже удалим FirebaseFirestore, так как статус точки будем брать из модели (spot.isPublic)
-    private val firestore = FirebaseFirestore.getInstance()
+    private var currentSpotId: Long = 0
+    private var currentVisibility: String = "private"
+    private var isCurrentlyPublicOnMap: Boolean = false
 
     companion object {
         private const val ARG_SPOT_ID = "spot_id"
@@ -39,12 +38,15 @@ class SpotDetailsFragment : Fragment() {
         private const val ARG_SPOT_CREATED = "spot_created"
         private const val ARG_SPOT_LAT = "spot_lat"
         private const val ARG_SPOT_LON = "spot_lon"
-        private const val ARG_SPOT_AUTHOR = "spot_author"
+        private const val ARG_SPOT_AUTHOR_ID = "spot_author_id"       // ✅ Переименовали для ясности
+        private const val ARG_SPOT_AUTHOR_NAME = "spot_author_name"   // ✅ Новое поле для ника
         private const val ARG_SPOT_IS_VERIFIED = "spot_is_verified"
         private const val ARG_SOURCE_TAB = "source_tab"
         private const val ARG_PHOTO_PATH = "photo_path"
+        private const val ARG_VISIBILITY = "visibility"
+        private const val ARG_IS_PUBLIC_ON_MAP = "is_public_on_map"
 
-        fun newInstance(spot: FishingSpot, sourceTab: Int = R.id.nav_global_map): SpotDetailsFragment {
+        fun newInstance(spot: FishingSpot, sourceTab: Int = R.id.nav_my_places): SpotDetailsFragment {
             return SpotDetailsFragment().apply {
                 arguments = Bundle().apply {
                     putLong(ARG_SPOT_ID, spot.id)
@@ -54,9 +56,12 @@ class SpotDetailsFragment : Fragment() {
                     putLong(ARG_SPOT_CREATED, spot.createdAt)
                     putDouble(ARG_SPOT_LAT, spot.latitude)
                     putDouble(ARG_SPOT_LON, spot.longitude)
-                    putString(ARG_SPOT_AUTHOR, spot.authorId)
+                    putString(ARG_SPOT_AUTHOR_ID, spot.authorId)
+                    putString(ARG_SPOT_AUTHOR_NAME, spot.authorName) // ✅ Передаем имя автора
                     putBoolean(ARG_SPOT_IS_VERIFIED, spot.isVerified)
                     putString(ARG_PHOTO_PATH, spot.photoPath)
+                    putString(ARG_VISIBILITY, spot.visibility)
+                    putBoolean(ARG_IS_PUBLIC_ON_MAP, spot.isPublicOnMap)
                     putInt(ARG_SOURCE_TAB, sourceTab)
                 }
             }
@@ -74,134 +79,150 @@ class SpotDetailsFragment : Fragment() {
         val name = arguments?.getString(ARG_SPOT_NAME) ?: ""
         val desc = arguments?.getString(ARG_SPOT_DESC) ?: ""
         val weight = arguments?.getDouble(ARG_SPOT_WEIGHT) ?: 0.0
-        val created = arguments?.getLong(ARG_SPOT_CREATED) ?: 0L
+        val created = arguments?.getLong(ARG_SPOT_CREATED) ?: System.currentTimeMillis()
         val lat = arguments?.getDouble(ARG_SPOT_LAT) ?: 0.0
         val lon = arguments?.getDouble(ARG_SPOT_LON) ?: 0.0
-        val authorId = arguments?.getString(ARG_SPOT_AUTHOR) ?: "неизвестно"
-        val isVerified = arguments?.getBoolean(ARG_SPOT_IS_VERIFIED) ?: false
-        val sourceTab = arguments?.getInt(ARG_SOURCE_TAB, R.id.nav_global_map) ?: R.id.nav_global_map
+
+        // ✅ Читаем оригинальные данные автора
+        val originalAuthorId = arguments?.getString(ARG_SPOT_AUTHOR_ID) ?: "unknown"
+        val originalAuthorName = arguments?.getString(ARG_SPOT_AUTHOR_NAME) ?: "Рыбак"
+
+        currentVisibility = arguments?.getString(ARG_VISIBILITY) ?: "private"
+        isCurrentlyPublicOnMap = arguments?.getBoolean(ARG_IS_PUBLIC_ON_MAP) ?: false
+        currentSpotId = arguments?.getLong(ARG_SPOT_ID) ?: 0L
+        val sourceTab = arguments?.getInt(ARG_SOURCE_TAB, R.id.nav_my_places) ?: R.id.nav_my_places
 
         val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: ""
-        val isAuthor = currentUserId.isNotEmpty() && currentUserId == authorId
 
+        // ✅ isAuthor будет true ТОЛЬКО если текущий пользователь совпадает с ОРИГИНАЛЬНЫМ автором
+        val isAuthor = currentUserId.isNotEmpty() && currentUserId == originalAuthorId
+
+        // 1. Заполнение UI
         binding.tvSpotName.text = name
         binding.tvDescription.text = desc.ifEmpty { "Нет описания" }
         binding.tvCatchWeight.text = getWeightText(weight)
 
-        val dateFormat = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
-        binding.tvCreatedAt.text = "📅 Создано: ${dateFormat.format(Date(created))}"
-        binding.tvCoordinates.text = "📍 Широта: %.4f, Долгота: %.4f".format(lat, lon)
-        binding.tvAuthor.text = "👤 Автор: $authorId"
+        // ✅ Показываем ник, а не ID!
+        binding.tvAuthorName.text = if (isAuthor) "Вы (Автор)" else originalAuthorName
 
-        binding.cardSuspiciousWarning.visibility = if (isVerified) View.GONE else View.VISIBLE
+        val dateFormat = SimpleDateFormat("dd MMMM yyyy", Locale("ru"))
+        binding.tvFishingDate.text = "📅 Рыбалка: ${dateFormat.format(Date(created))}"
 
         // =====================================================================
-        // ✅ УМНАЯ ЛОГИКА ОТОБРАЖЕНИЯ КНОПКИ "СОХРАНИТЬ"
-        // =====================================================================
-        val isFromMyMap = (sourceTab == R.id.nav_my_places)
-
-        if (isAuthor || isFromMyMap) {
-            binding.btnSaveToLocal.visibility = View.GONE
-        } else {
-            binding.btnSaveToLocal.visibility = View.VISIBLE
-        }
+        // 2. ЛОГИКА КНОПОК
         // =====================================================================
 
-        // --- КНОПКИ ---
-
-        binding.btnShare.setOnClickListener {
-            if (!isAuthor) Toast.makeText(requireContext(), "🔒 Поделиться может только автор", Toast.LENGTH_SHORT).show()
-            else Toast.makeText(requireContext(), "📤 Функция в разработке", Toast.LENGTH_SHORT).show()
-        }
-
-        binding.btnConfirmSpot.setOnClickListener {
-            if (isAuthor) Toast.makeText(requireContext(), "ℹ️ Это ваша точка", Toast.LENGTH_SHORT).show()
-            else Toast.makeText(requireContext(), "✅ Функция в разработке", Toast.LENGTH_SHORT).show()
-        }
-
-        binding.btnDisputeSpot.setOnClickListener {
-            if (isAuthor) Toast.makeText(requireContext(), "ℹ️ Это ваша точка", Toast.LENGTH_SHORT).show()
-            else Toast.makeText(requireContext(), "⚠️ Функция в разработке", Toast.LENGTH_SHORT).show()
-        }
-
+        // ✅ КНОПКА 1: Добраться (ВСЕГДА видна)
+        binding.btnNavigate.visibility = View.VISIBLE
         binding.btnNavigate.setOnClickListener {
-            val navLat = arguments?.getDouble(ARG_SPOT_LAT)
-            val navLon = arguments?.getDouble(ARG_SPOT_LON)
-
-            if (navLat == null || navLon == null || (navLat == 0.0 && navLon == 0.0)) {
-                Toast.makeText(requireContext(), "⚠️ Координаты точки не найдены", Toast.LENGTH_SHORT).show()
+            if (lat == 0.0 && lon == 0.0) {
+                Toast.makeText(requireContext(), "⚠️ Координаты не найдены", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-
-            // 1. Пробуем Яндекс Карты
-            if (isPackageInstalled("ru.yandex.yandexmaps", requireContext())) {
-                val uri = Uri.parse("https://yandex.ru/maps/?rtext=~$navLat,$navLon&rtt=auto")
-                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                    setPackage("ru.yandex.yandexmaps")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                try {
-                    startActivity(intent)
-                    return@setOnClickListener
-                } catch (e: Exception) { /* ignore */ }
-            }
-
-            // 2. Пробуем Google Карты
-            if (isPackageInstalled("com.google.android.apps.maps", requireContext())) {
-                val uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$navLat,$navLon")
-                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                    setPackage("com.google.android.apps.maps")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                try {
-                    startActivity(intent)
-                    return@setOnClickListener
-                } catch (e: Exception) { /* ignore */ }
-            }
-
-            // 3. Fallback
-            val uriGeo = Uri.parse("geo:$navLat,$navLon?q=$navLat,$navLon")
-            val intentGeo = Intent(Intent.ACTION_VIEW, uriGeo)
+            val uri = Uri.parse("geo:$lat,$lon?q=$lat,$lon")
+            val intent = Intent(Intent.ACTION_VIEW, uri)
             try {
-                startActivity(intentGeo)
+                startActivity(intent)
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "Не удалось открыть карты", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // ✅ КНОПКА СОХРАНИТЬ
-        binding.btnSaveToLocal.setOnClickListener {
-            // ✅ ИСПРАВЛЕНО: используем localSpots вместо allSpots
-            val currentLocalSpots = spotViewModel.localSpots.value ?: emptyList()
-            val isAlreadySaved = currentLocalSpots.any { localSpot ->
-                localSpot.name == name &&
-                        localSpot.latitude == lat &&
-                        localSpot.longitude == lon
+        if (isAuthor) {
+            // ✅ КНОПКА 2: Управление видимостью для друзей (ТОЛЬКО ОРИГИНАЛЬНЫЙ АВТОР)
+            binding.btnToggleFriendsVisibility.visibility = View.VISIBLE
+            updateFriendsButtonUI()
+            binding.btnToggleFriendsVisibility.setOnClickListener {
+                if (currentVisibility == "friends") {
+                    showConfirmationDialog("Скрыть от друзей?", "Эта точка станет видимой только для вас.", "Скрыть") {
+                        currentVisibility = "private"
+                        spotViewModel.updateSpotVisibility(currentSpotId, "private")
+                        updateFriendsButtonUI()
+                        Toast.makeText(requireContext(), "Точка скрыта от друзей", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    showConfirmationDialog("Показать друзьям?", "Эта точка станет видимой для всех ваших друзей.", "Показать") {
+                        currentVisibility = "friends"
+                        spotViewModel.updateSpotVisibility(currentSpotId, "friends")
+                        updateFriendsButtonUI()
+                        Toast.makeText(requireContext(), "Точка теперь видна друзьям", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
 
-            if (isAlreadySaved) {
-                Toast.makeText(requireContext(), "✅ Эта точка уже сохранена в вашем дневнике!", Toast.LENGTH_SHORT).show()
-            } else {
-                spotViewModel.addFullSpot(
-                    lat = lat,
-                    lon = lon,
-                    name = name,
-                    description = desc,
-                    weight = weight,
-                    isPublic = false,
-                    photoPath = arguments?.getString(ARG_PHOTO_PATH),
-                    fishType = null, // Пока передаем null, позже добавим в аргументы
-                    isVerified = isVerified
-                )
-                Toast.makeText(requireContext(), "✅ Точка '$name' добавлена в дневник!", Toast.LENGTH_SHORT).show()
+            // ✅ КНОПКА 3: Управление публичной картой (ТОЛЬКО ОРИГИНАЛЬНЫЙ АВТОР)
+            binding.btnTogglePublicMap.visibility = View.VISIBLE
+            updatePublicMapButtonUI()
+            binding.btnTogglePublicMap.setOnClickListener {
+                if (!isCurrentlyPublicOnMap) {
+                    showConfirmationDialog("Показать на публичной карте?", "Эта точка станет видна всем пользователям приложения.", "Показать") {
+                        isCurrentlyPublicOnMap = true
+                        spotViewModel.updatePublicMapVisibility(currentSpotId, true)
+                        updatePublicMapButtonUI()
+                        Toast.makeText(requireContext(), "Точка на публичной карте", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    showConfirmationDialog("Скрыть с публичной карты?", "Эта точка исчезнет с публичной карты, но останется в вашем дневнике.", "Скрыть") {
+                        isCurrentlyPublicOnMap = false
+                        spotViewModel.updatePublicMapVisibility(currentSpotId, false)
+                        updatePublicMapButtonUI()
+                        Toast.makeText(requireContext(), "Точка скрыта с публичной карты", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
-        }
 
-        // TODO: Позже заменим эту проверку на чтение из модели (spot.isPublic), чтобы убрать Firebase отсюда
-        checkIfSpotIsPublic(name, lat, lon)
+            // ✅ КНОПКА 4: Удалить точку (ТОЛЬКО ОРИГИНАЛЬНЫЙ АВТОР - удаляет везде)
+            binding.btnDeleteSpot.visibility = View.VISIBLE
+            binding.btnDeleteSpot.setOnClickListener {
+                showConfirmationDialog("Удалить точку?", "Точка будет удалена везде: из вашего дневника и с публичной карты. Это действие нельзя отменить.", "Удалить", true) {
+                    spotViewModel.deleteSpot(currentSpotId)
+                    Toast.makeText(requireContext(), "Точка удалена", Toast.LENGTH_SHORT).show()
+                    findNavController().navigateUp()
+                }
+            }
 
-        binding.btnReviews.setOnClickListener {
-            findFirebaseSpotAndOpenReviews(name, lat, lon, authorId)
+            // Кнопка "Сохранить" скрыта для автора
+            binding.btnSaveToLocal.visibility = View.GONE
+
+        } else {
+            // =====================================================================
+            // ЛОГИКА ДЛЯ НЕ-АВТОРА (Тот, кто просматривает чужую точку)
+            // =====================================================================
+            binding.btnToggleFriendsVisibility.visibility = View.GONE
+            binding.btnTogglePublicMap.visibility = View.GONE
+
+            // ✅ КНОПКА: Удалить (Удаляет только мою локальную копию)
+            binding.btnDeleteSpot.visibility = View.VISIBLE
+            binding.btnDeleteSpot.setOnClickListener {
+                showConfirmationDialog("Удалить из дневника?", "Эта точка будет удалена только из вашего дневника. Оригинал у автора останется.", "Удалить", true) {
+                    spotViewModel.deleteSpot(currentSpotId)
+                    Toast.makeText(requireContext(), "Точка удалена из дневника", Toast.LENGTH_SHORT).show()
+                    findNavController().navigateUp()
+                }
+            }
+
+            // ✅ КНОПКА: Сохранить (Если мы еще не сохранили её)
+            binding.btnSaveToLocal.visibility = View.VISIBLE
+            binding.btnSaveToLocal.setOnClickListener {
+                val currentLocalSpots = spotViewModel.localSpots.value ?: emptyList()
+                val isAlreadySaved = currentLocalSpots.any { it.name == name && it.latitude == lat && it.longitude == lon }
+
+                if (isAlreadySaved) {
+                    Toast.makeText(requireContext(), "✅ Эта точка уже в вашем дневнике!", Toast.LENGTH_SHORT).show()
+                } else {
+                    // ✅ ГЛАВНОЕ ИСПРАВЛЕНИЕ: передаем ОРИГИНАЛЬНЫЕ authorId и authorName!
+                    spotViewModel.addFullSpot(
+                        lat = lat, lon = lon, name = name, description = desc, weight = weight,
+                        visibility = "private", photoPath = arguments?.getString(ARG_PHOTO_PATH),
+                        fishType = null, isVerified = false, createdAt = created,
+                        authorId = originalAuthorId,      // <-- Оставляем оригинального автора!
+                        authorName = originalAuthorName   // <-- Оставляем оригинальный ник!
+                    )
+                    Toast.makeText(requireContext(), "✅ Точка '$name' добавлена в дневник!", Toast.LENGTH_SHORT).show()
+                    // После сохранения кнопка исчезает, так как точка теперь "в дневнике"
+                    binding.btnSaveToLocal.visibility = View.GONE
+                }
+            }
         }
 
         binding.btnBack.setOnClickListener {
@@ -210,54 +231,24 @@ class SpotDetailsFragment : Fragment() {
         }
     }
 
-    private fun checkIfSpotIsPublic(name: String, lat: Double, lon: Double) {
-        firestore.collection("public_spots")
-            .whereEqualTo("name", name)
-            .whereEqualTo("latitude", lat)
-            .whereEqualTo("longitude", lon)
-            .limit(1)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (!snapshot.isEmpty) {
-                    binding.btnReviews.visibility = View.VISIBLE
-                } else {
-                    binding.btnReviews.visibility = View.GONE
-                }
-            }
-            .addOnFailureListener {
-                binding.btnReviews.visibility = View.GONE
-            }
+    // --- Вспомогательные методы ---
+
+    private fun updateFriendsButtonUI() {
+        binding.btnToggleFriendsVisibility.text = if (currentVisibility == "friends") "🙈 Скрыть от друзей" else "👥 Показать точку друзьям"
     }
 
-    private fun findFirebaseSpotAndOpenReviews(name: String, lat: Double, lon: Double, authorId: String) {
-        android.util.Log.d("DEBUG_SPOT", "🔍 Ищем точку в Firebase: name=$name, lat=$lat, lon=$lon, authorId=$authorId")
+    private fun updatePublicMapButtonUI() {
+        binding.btnTogglePublicMap.text = if (isCurrentlyPublicOnMap) "🌍 Скрыть с публичной карты" else "🌍 Показать на публичной карте"
+    }
 
-        firestore.collection("public_spots")
-            .whereEqualTo("name", name)
-            .whereEqualTo("latitude", lat)
-            .whereEqualTo("longitude", lon)
-            .limit(1)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (!snapshot.isEmpty) {
-                    val firebaseSpotId = snapshot.documents[0].id
-                    android.util.Log.d("DEBUG_SPOT", "✅ Точка найдена! firebaseSpotId=$firebaseSpotId")
-
-                    val reviewsSheet = ReviewsBottomSheetDialogFragment.newInstance(
-                        firebaseSpotId = firebaseSpotId,
-                        spotAuthorId = authorId,
-                        spotName = name
-                    )
-                    reviewsSheet.show(childFragmentManager, "reviews")
-                } else {
-                    android.util.Log.e("DEBUG_SPOT", "❌ Точка НЕ найдена в public_spots.")
-                    Toast.makeText(requireContext(), "⚠️ Точка не опубликована на общей карте", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .addOnFailureListener { e ->
-                android.util.Log.e("DEBUG_SPOT", "❌ Ошибка запроса к Firebase", e)
-                Toast.makeText(requireContext(), "❌ Ошибка загрузки отзывов", Toast.LENGTH_SHORT).show()
-            }
+    private fun showConfirmationDialog(title: String, message: String, positiveText: String, isDestructive: Boolean = false, onConfirm: () -> Unit) {
+        if (!isAdded || _binding == null) return
+        val builder = AlertDialog.Builder(requireContext()).setTitle(title).setMessage(message)
+            .setPositiveButton(positiveText) { dialog, _ -> dialog.dismiss(); onConfirm() }
+            .setNegativeButton("Отмена") { dialog, _ -> dialog.dismiss() }
+        val dialog = builder.create()
+        dialog.show()
+        if (isDestructive) dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(requireContext().getColor(android.R.color.holo_red_dark))
     }
 
     private fun getWeightText(weight: Double): String {
@@ -272,19 +263,5 @@ class SpotDetailsFragment : Fragment() {
     override fun onDestroyView() {
         _binding = null
         super.onDestroyView()
-    }
-
-    private fun isPackageInstalled(packageName: String, context: Context): Boolean {
-        return try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                context.packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(packageName, 0)
-            }
-            true
-        } catch (e: PackageManager.NameNotFoundException) {
-            false
-        }
     }
 }

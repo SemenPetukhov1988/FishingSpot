@@ -51,15 +51,14 @@ class SpotPreviewBottomSheet(
                 name = spotName,
                 description = "Получено от $senderName: $spotDesc",
                 weight = spotWeight,
-                isPublic = false,
+                visibility = "private", // ✅ ИСПРАВЛЕНО: было isPublic = false
                 photoPath = null,
+                fishType = null,        // ✅ ДОБАВЛЕНО
                 isVerified = false,
+                createdAt = spotCreatedAt ?: System.currentTimeMillis(), // ✅ ДОБАВЛЕНО: сохраняем оригинальную дату
                 authorId = senderId
             )
-            Toast.makeText(requireContext(), "✅ Точка '$spotName' сохранена в дневник!", Toast.LENGTH_LONG).show()
-
-            // После сохранения тоже можно удалить сообщение, чтобы не висело,
-            // или оставить на усмотрение. Пока оставим удаление только по кнопке "Отклонить"
+            // Обычно здесь идет dismiss() или закрытие шторки
             dismiss()
         }
 

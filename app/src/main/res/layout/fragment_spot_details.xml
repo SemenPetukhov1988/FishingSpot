@@ -3,22 +3,22 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFF"
+    android:background="#F8FAFC"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="20dp">
 
-        <!-- ✅ 1. ВЕРХНЯЯ ПАНЕЛЬ (Название) -->
+        <!-- ✅ 1. ШАПКА -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="12dp">
+            android:layout_marginBottom="16dp">
 
             <ImageButton
                 android:id="@+id/btnBack"
@@ -27,280 +27,228 @@
                 android:src="@drawable/back"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="Назад"
-                app:tint="#212121" />
+                app:tint="#2C3E50" />
 
             <TextView
                 android:id="@+id/tvSpotName"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textSize="20sp"
+                android:textSize="22sp"
                 android:textStyle="bold"
-                android:textColor="#212121"
-                android:layout_marginStart="8dp" />
+                android:textColor="#2C3E50"
+                android:layout_marginStart="8dp"
+                android:maxLines="2"
+                android:ellipsize="end" />
         </LinearLayout>
 
         <!-- ✅ 2. БЛОК ФОТО -->
-        <FrameLayout
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
-            android:layout_height="220dp"
-            android:background="#F5F5F5"
-            app:cornerRadius="16dp">
+            android:layout_height="240dp"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="4dp"
+            android:layout_marginBottom="20dp">
 
-            <ImageView
-                android:id="@+id/ivPhotoPlaceholder"
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:layout_gravity="center"
-                android:src="@drawable/add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_"
-                app:tint="#BDBDBD" />
-
-            <ImageView
-                android:id="@+id/ivSpotPhoto"
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:visibility="gone" />
-        </FrameLayout>
+                android:background="#E2E8F0">
 
-        <!-- ✅ 3. БЛОК ВЕРИФИКАЦИИ (Сразу под фото) -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardSuspiciousWarning"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="#FFF3E0"
-            app:strokeColor="#FF9800"
-            app:strokeWidth="1dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="0dp"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="8dp"
-            android:visibility="gone">
+                <ImageView
+                    android:id="@+id/ivPhotoPlaceholder"
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_"
+                    app:tint="#94A3B8" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="⚠️ Точка требует подтверждения. Рыбаки еще не проверяли это место."
-                android:textSize="13sp"
-                android:textColor="#E65100"
-                android:padding="12dp"
-                android:textStyle="bold" />
+                <ImageView
+                    android:id="@+id/ivSpotPhoto"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
+            </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Кнопки Подтвердить / Опровергнуть (в ряд, под фото/предупреждением) -->
-        <LinearLayout
+        <!-- ✅ 3. КАРТОЧКА АВТОРА И ДАТЫ -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
+            app:cardBackgroundColor="#FFFFFF"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="0dp"
+            android:layout_marginBottom="20dp">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnConfirmSpot"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:text="Подтвердить"
-                android:textSize="14sp"
-                app:iconGravity="textStart"
-                app:cornerRadius="12dp"
-                app:backgroundTint="#4CAF50" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnDisputeSpot"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:text="Опровергнуть"
-                android:textSize="14sp"
-                app:iconGravity="textStart"
-                app:cornerRadius="12dp"
-                app:strokeColor="#F44336"
-                android:textColor="#F44336" />
-        </LinearLayout>
-
-        <!-- ✅ 4. МЕТАДАННЫЕ (Автор, Координаты, Дата) -->
-        <TextView
-            android:id="@+id/tvAuthor"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="👤 Автор: unknown_user"
-            android:textSize="13sp"
-            android:textColor="#616161"
-            android:textStyle="bold"
-            android:layout_marginBottom="4dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
-
-            <TextView
-                android:id="@+id/tvCoordinates"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="📍 64.53, 40.54"
-                android:textSize="12sp"
-                android:textColor="#757575" />
+                android:orientation="horizontal"
+                android:padding="16dp"
+                android:gravity="center_vertical">
 
-            <TextView
-                android:id="@+id/tvCreatedAt"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="📅 12 окт, 14:30"
-                android:textSize="12sp"
-                android:textColor="#9E9E9E" />
-        </LinearLayout>
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/ivAuthorAvatar"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/account_circle_24dp"
+                    app:shapeAppearanceOverlay="@style/CircleImageView"
+                    android:background="#E2E8F0" />
 
-        <!-- ✅ 5. ВЕС УЛОВА (Зеленый, жирный) -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginStart="16dp">
+
+                    <TextView
+                        android:id="@+id/tvAuthorName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Автор"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#2C3E50" />
+
+                    <TextView
+                        android:id="@+id/tvFishingDate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="📅 Дата не указана"
+                        android:textSize="13sp"
+                        android:textColor="#64748B"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ✅ 4. ВЕС УЛОВА -->
         <TextView
             android:id="@+id/tvCatchWeight"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="⚖️ Вес улова: Не указан"
-            android:textSize="16sp"
-            android:textColor="#4CAF50"
+            android:text="⚖️ Улов не указан"
+            android:textSize="18sp"
+            android:textColor="#0288D1"
             android:textStyle="bold"
-            android:layout_marginBottom="12dp" />
+            android:background="#E3F2FD"
+            android:padding="16dp"
 
-        <!-- ✅ 6. ОПИСАНИЕ -->
+            android:drawablePadding="12dp"
+            app:cornerRadius="12dp"
+            android:layout_marginBottom="20dp" />
+
+        <!-- ✅ 5. ОПИСАНИЕ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Описание"
-            android:textSize="13sp"
+            android:text="Описание места"
+            android:textSize="14sp"
             android:textStyle="bold"
-            android:textColor="#212121"
-            android:layout_marginBottom="4dp" />
+            android:textColor="#2C3E50"
+            android:layout_marginBottom="8dp" />
 
         <TextView
             android:id="@+id/tvDescription"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Здесь будет описание места..."
-            android:textSize="14sp"
-            android:textColor="#424242"
-            android:lineSpacingExtra="4dp"
+            android:text="Описание..."
+            android:textSize="15sp"
+            android:textColor="#475569"
+            android:lineSpacingExtra="6dp"
             android:layout_marginBottom="24dp" />
 
-        <!-- ✅ 7. РАЗДЕЛИТЕЛЬ -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#E0E0E0"
-            android:layout_marginBottom="16dp" />
+        <!-- ✅ 6. БЛОК ДЕЙСТВИЙ -->
 
-        <!-- ✅ 8. ПАНЕЛЬ БЫСТРЫХ ДЕЙСТВИЙ (3 иконки с текстом) -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_marginBottom="16dp">
-
-            <!-- Добраться -->
-            <LinearLayout
-                android:id="@+id/btnNavigate"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:clickable="true"
-                android:focusable="true"
-                android:padding="8dp">
-
-                <ImageView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:src="@drawable/alt_route_24dp_000000_fill0_wght400_grad0_opsz24"
-                    app:tint="#0288D1"
-                    android:layout_marginBottom="4dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Добраться"
-                    android:textSize="12sp"
-                    android:textColor="#0288D1"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <!-- Сохранить -->
-            <LinearLayout
-                android:id="@+id/btnSaveToLocal"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:clickable="true"
-                android:focusable="true"
-                android:padding="8dp">
-
-                <ImageView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:src="@drawable/save_24dp_000000_fill0_wght400_grad0_opsz24"
-                    app:tint="#0288D1"
-                    android:layout_marginBottom="4dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Сохранить"
-                    android:textSize="12sp"
-                    android:textColor="#0288D1"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <!-- ✅ ОТЗЫВЫ (Заменили Комментарии) -->
-            <LinearLayout
-                android:id="@+id/btnReviews"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:clickable="true"
-                android:focusable="true"
-                android:padding="8dp"
-                android:visibility="gone"> <!-- Скрыта по умолчанию, покажем через код -->
-
-                <ImageView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:src="@drawable/comment_24dp_000000_fill0_wght400_grad0_opsz24"
-                    app:tint="#0288D1"
-                    android:layout_marginBottom="4dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Отзывы"
-                    android:textSize="12sp"
-                    android:textColor="#0288D1"
-                    android:textStyle="bold" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- ✅ 9. КНОПКА ПОДЕЛИТЬСЯ -->
+        <!-- Добраться -->
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnShare"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:id="@+id/btnNavigate"
+            style="?attr/materialButtonOutlinedStyle"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="Поделиться этой точкой"
-            android:textSize="14sp"
+            android:layout_height="56dp"
+            android:text="📍 Добраться до места"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:icon="@drawable/alt_route_24dp_000000_fill0_wght400_grad0_opsz24"
             app:iconGravity="textStart"
-            android:textColor="#0288D1" />
+            app:iconTint="#0288D1"
+            app:strokeColor="#0288D1"
+            android:textColor="#0288D1"
+            app:cornerRadius="16dp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Показать / Скрыть от друзей -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnToggleFriendsVisibility"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="👥 Показать точку друзьям"
+            android:textSize="15sp"
+            android:textStyle="bold"
+
+            app:iconGravity="textStart"
+            app:iconTint="#0288D1"
+            app:strokeColor="#0288D1"
+            android:textColor="#0288D1"
+            app:cornerRadius="16dp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Показать / Скрыть с публичной карты -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnTogglePublicMap"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="🌍 Показать на публичной карте"
+            android:textSize="15sp"
+            android:textStyle="bold"
+
+            app:iconGravity="textStart"
+            app:iconTint="#0288D1"
+            app:strokeColor="#0288D1"
+            android:textColor="#0288D1"
+            app:cornerRadius="16dp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Сохранить (Для не-автора) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSaveToLocal"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="💾 Сохранить в дневник"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:icon="@drawable/save_24dp_000000_fill0_wght400_grad0_opsz24"
+            app:iconGravity="textStart"
+            app:iconTint="#0288D1"
+            app:strokeColor="#0288D1"
+            android:textColor="#0288D1"
+            app:cornerRadius="16dp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Удалить точку (Только для автора) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDeleteSpot"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="🗑️ Удалить точку"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+
+            app:iconGravity="textStart"
+            app:iconTint="#E53935"
+            app:strokeColor="#E53935"
+            android:textColor="#E53935"
+            app:cornerRadius="16dp"
+            android:layout_marginBottom="24dp" />
 
     </LinearLayout>
 </ScrollView>

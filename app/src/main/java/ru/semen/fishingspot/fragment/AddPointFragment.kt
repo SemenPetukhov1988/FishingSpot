@@ -1,5 +1,6 @@
 package ru.semen.fishingspot.fragment
 
+import android.app.DatePickerDialog
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -10,16 +11,24 @@ import androidx.navigation.fragment.findNavController
 import com.google.android.material.chip.Chip
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentAddPointBinding
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 class AddPointFragment : Fragment() {
 
     private var _binding: FragmentAddPointBinding? = null
     private val binding get() = _binding!!
 
-    // Переменная для хранения выбранной рыбы
     private var selectedFish: String = "Не указано"
-    // Переменная для пути к фото (пока null, позже подключим ImagePicker)
     private var currentPhotoPath: String? = null
+
+    // ✅ Новые переменные для расширенной информации
+    private var selectedDate: Long = System.currentTimeMillis()
+    private var selectedLocation: String = "С берега"
+    private var selectedTackle: String = "Не указано"
+    private var selectedBait: String = "Не указано"
+    private var selectedVisibility: String = "private" // По умолчанию личная
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -31,32 +40,74 @@ class AddPointFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // Установка текущей даты по умолчанию
+        updateDateText(selectedDate)
+
         // ✅ 1. КНОПКА НАЗАД
         binding.btnBack.setOnClickListener {
             findNavController().navigateUp()
         }
 
-        // ✅ 2. ЛОГИКА ВЫБОРА РЫБЫ (ЧИПЫ)
+        // ✅ 2. ВЫБОР ДАТЫ РЫБАЛКИ
+        binding.layoutFishingDate.setEndIconOnClickListener {
+            showDatePicker()
+        }
+
+        // ✅ 3. ПЕРЕКЛЮЧАТЕЛЬ ВИДИМОСТИ
+        binding.toggleGroupVisibility.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                selectedVisibility = when (checkedId) {
+                    R.id.btnVisibilityPrivate -> "private"
+                    R.id.btnVisibilityFriends -> "friends"
+                    R.id.btnVisibilityPublic -> "public"
+                    else -> "private"
+                }
+            }
+        }
+        // Установим "Личная" как выбранную по умолчанию
+        binding.btnVisibilityPrivate.isChecked = true
+
+        // ✅ 4. МЕСТО ЛОВЛИ
+        binding.toggleGroupLocation.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                selectedLocation = if (checkedId == R.id.btnLocationShore) "С берега" else "С лодки"
+            }
+        }
+        binding.btnLocationShore.isChecked = true
+
+        // ✅ 5. СНАСТИ
+        binding.chipGroupTackle.setOnCheckedStateChangeListener { group, checkedIds ->
+            if (checkedIds.isNotEmpty()) {
+                selectedTackle = group.findViewById<Chip>(checkedIds[0]).text.toString()
+            }
+        }
+
+        // ✅ 6. НАЖИВКА
+        binding.chipGroupBait.setOnCheckedStateChangeListener { group, checkedIds ->
+            if (checkedIds.isNotEmpty()) {
+                selectedBait = group.findViewById<Chip>(checkedIds[0]).text.toString()
+            }
+        }
+
+        // ✅ 7. ВИД РЫБЫ
         binding.chipGroupFish.setOnCheckedStateChangeListener { group, checkedIds ->
             if (checkedIds.isNotEmpty()) {
                 val checkedChip = group.findViewById<Chip>(checkedIds[0])
                 selectedFish = checkedChip.text.toString()
 
-                // Если выбрали "Другое", показываем поле для ввода
                 if (selectedFish == "Другое") {
                     binding.layoutOtherFish.visibility = View.VISIBLE
                     binding.etOtherFish.requestFocus()
                 } else {
                     binding.layoutOtherFish.visibility = View.GONE
-                    binding.etOtherFish.text?.clear() // Очищаем, если передумали
+                    binding.etOtherFish.text?.clear()
                 }
             }
         }
 
-        // ✅ 3. ЗАГЛУШКА ДЛЯ ФОТО (ПОДГОТОВКА ПОД IMAGE PICKER)
+        // ✅ 8. ФОТО (Заглушка под ImagePicker)
         binding.cardPhoto.setOnClickListener {
-            // TODO: Здесь будет вызов ImagePicker (только камера)
-            Toast.makeText(context, "📸 Скоро здесь откроется камера", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "📸 Здесь будет выбор: Камера или Галерея", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnRemovePhoto.setOnClickListener {
@@ -64,67 +115,97 @@ class AddPointFragment : Fragment() {
             binding.ivPhotoPreview.visibility = View.GONE
             binding.btnRemovePhoto.visibility = View.GONE
             binding.tvPhotoHint.visibility = View.VISIBLE
-            // TODO: Вернуть иконку камеры на место
+            binding.ivPhotoIcon.visibility = View.VISIBLE
         }
 
-        // ✅ 4. КНОПКА СОХРАНИТЬ И ПЕРЕХОД К УТОЧНЕНИЮ
+        // ✅ 9. КНОПКА СОХРАНИТЬ И ПЕРЕХОД К УТОЧНЕНИЮ
         binding.btnSave.setOnClickListener {
             val name = binding.etSpotName.text.toString().trim()
-
-            // Валидация названия
             if (name.isEmpty()) {
                 binding.etSpotName.error = "Введите название места"
                 binding.etSpotName.requestFocus()
                 return@setOnClickListener
             }
 
-            // Определяем итоговое название рыбы
-            val finalFishName = if (binding.chipOther.isChecked) {
+            val finalFishName = if (binding.chipOtherFish.isChecked) {
                 binding.etOtherFish.text.toString().trim().ifEmpty { "Другая рыба" }
             } else {
                 selectedFish
             }
 
-            // Определяем вес (ВРЕМЕННЫЙ МАППИНГ ПОД СТАРУЮ МОДЕЛЬ)
-            // Позже, когда обновим модель, будем передавать строку или Enum
             val weightValue = when (binding.toggleGroupWeight.checkedButtonId) {
-                R.id.btnWeight1 -> 0.5  // До 1 кг
-                R.id.btnWeight2 -> 3.0  // 1-5 кг (среднее)
-                R.id.btnWeight3 -> 6.0  // Больше 5 кг
+                R.id.btnWeight1 -> 0.5
+                R.id.btnWeight2 -> 3.0
+                R.id.btnWeight3 -> 6.0
                 else -> 0.0
             }
 
-            // Собираем описание. Добавим туда рыбу, пока не обновим модель данных
+            // Формируем красивое описание из новых полей
             val baseDescription = binding.etDescription.text.toString().trim()
-            val finalDescription = if (baseDescription.isNotEmpty()) {
-                "🐟 В улове: $finalFishName.\n\n$baseDescription"
-            } else {
-                "🐟 В улове: $finalFishName."
+            val finalDescription = buildString {
+                append("📅 Дата: ${formatDate(selectedDate)}\n")
+                append("📍 Место: $selectedLocation\n")
+                append("🎣 Снасть: $selectedTackle | 🪱 Наживка: $selectedBait\n")
+                append("🐟 В улове: $finalFishName\n\n")
+                if (baseDescription.isNotEmpty()) {
+                    append(baseDescription)
+                }
             }
 
-            // Берем координаты, которые передал MyMapFragment или GlobalMapFragment
             val startLat = arguments?.getDouble("LAT") ?: 0.0
             val startLon = arguments?.getDouble("LON") ?: 0.0
 
             if (startLat == 0.0 && startLon == 0.0) {
-                Toast.makeText(context, "⚠️ Ошибка: не удалось получить координаты", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "⚠️ Ошибка координат", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            // Формируем Bundle для RefineLocationFragment
+            // ✅ Передаем ВСЕ новые данные в RefineLocationFragment
             val bundle = Bundle().apply {
                 putString("NAME", name)
-                putString("DESC", finalDescription) // Передаем рыбу внутри описания (временно)
+                putString("DESC", finalDescription)
                 putDouble("WEIGHT", weightValue)
-                putBoolean("IS_PUBLIC", binding.switchPublic.isChecked)
+                putString("VISIBILITY", selectedVisibility) // Новое!
+                putLong("CREATED_AT", selectedDate)         // Новое!
+                putString("FISH_TYPE", finalFishName)       // Новое!
                 putString("PHOTO_PATH", currentPhotoPath)
                 putDouble("LAT", startLat)
                 putDouble("LON", startLon)
             }
 
-            // Переход на экран уточнения точки на карте
             findNavController().navigate(R.id.action_addPoint_to_refineLocation, bundle)
         }
+    }
+
+    // --- Вспомогательные методы ---
+
+    private fun showDatePicker() {
+        val calendar = Calendar.getInstance()
+        calendar.timeInMillis = selectedDate
+
+        val datePicker = DatePickerDialog(
+            requireContext(),
+            { _, year, month, dayOfMonth ->
+                val newCalendar = Calendar.getInstance()
+                newCalendar.set(year, month, dayOfMonth)
+                selectedDate = newCalendar.timeInMillis
+                updateDateText(selectedDate)
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        )
+        datePicker.show()
+    }
+
+    private fun updateDateText(timestamp: Long) {
+        val sdf = SimpleDateFormat("dd MMMM yyyy", Locale("ru"))
+        binding.etFishingDate.setText(sdf.format(timestamp))
+    }
+
+    private fun formatDate(timestamp: Long): String {
+        val sdf = SimpleDateFormat("dd.MM.yyyy", Locale("ru"))
+        return sdf.format(timestamp)
     }
 
     override fun onDestroyView() {

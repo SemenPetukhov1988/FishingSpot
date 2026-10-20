@@ -11,13 +11,9 @@ import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import ru.semen.fishingspot.adapter.FeedAdapter
 import ru.semen.fishingspot.databinding.FragmentFeedBinding
-
 import ru.semen.fishingspot.utils.UserSessionManager
 import ru.semen.fishingspot.viewmodel.FeedViewModel
 import ru.semen.fishingspot.viewmodel.SpotViewModel
-// Примечание: если у тебя есть FeedViewModel, оставь этот импорт.
-// Если его нет или он вызывает ошибки, скажи, и мы переведем ленту на SpotViewModel.
-
 
 class FeedFragment : Fragment() {
 
@@ -53,7 +49,7 @@ class FeedFragment : Fragment() {
                     return@FeedAdapter
                 }
 
-                // ✅ ИСПРАВЛЕНО: используем localSpots вместо allSpots
+                // 2. Проверка: а может, я уже сохранял эту чужую точку ранее?
                 val currentLocalSpots = spotViewModel.localSpots.value ?: emptyList()
                 val isAlreadySaved = currentLocalSpots.any { localSpot ->
                     localSpot.name == spot.name &&
@@ -66,17 +62,18 @@ class FeedFragment : Fragment() {
                     return@FeedAdapter
                 }
 
-                // 3. Сохраняем в Room
+                // 3. Сохраняем в Room как ЛИЧНУЮ точку
                 spotViewModel.addFullSpot(
                     lat = spot.latitude,
                     lon = spot.longitude,
                     name = spot.name,
                     description = spot.description,
                     weight = spot.catchWeight,
-                    isPublic = false,
+                    visibility = "private", // ✅ ИСПРАВЛЕНО: было isPublic = false
                     photoPath = null,
-                    fishType = spot.fishType, // ✅ Передаем тип рыбы
-                    isVerified = true
+                    fishType = spot.fishType,
+                    isVerified = true,
+                    createdAt = spot.createdAt // ✅ Сохраняем оригинальную дату создания
                 )
 
                 Toast.makeText(requireContext(), "✅ Точка '${spot.name}' добавлена в дневник!", Toast.LENGTH_SHORT).show()

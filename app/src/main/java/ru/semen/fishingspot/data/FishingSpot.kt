@@ -12,15 +12,14 @@ data class FishingSpot(
     val description: String = "",
     val catchWeight: Double = 0.0,
 
-    // ✅ НОВЫЕ ПОЛЯ
-    val fishType: String? = null,       // Вид рыбы (окунь, щука и т.д.)
-    val photoPath: String? = null,      // Локальный путь к фото (для оффлайна)
-    val photoUrl: String? = null,       // Ссылка на фото в Appwrite Storage
+    val fishType: String? = null,
+    val photoPath: String? = null,
+    val photoUrl: String? = null,
+
     val isVerified: Boolean = false,
     val authorId: String = "",
-    val visibility: String = "private", // "private", "friends", "public"
+    val authorName: String = "Рыбак", // ✅ НОВОЕ ПОЛЕ для отображения ника
+    val visibility: String = "private",
+    val isPublicOnMap: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
-) {
-    // Удобное свойство для быстрой проверки
-    val isPublic: Boolean get() = visibility == "public"
-}
+)

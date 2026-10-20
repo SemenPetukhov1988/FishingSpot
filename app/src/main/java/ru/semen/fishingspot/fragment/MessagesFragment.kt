@@ -70,15 +70,18 @@ class MessagesFragment : Fragment() {
                 deleteMessage(message.id)
             },
             onTakeSpotClick = { message ->
+                // ✅ ИСПРАВЛЕНО: Обновленная сигнатура addFullSpot
                 spotViewModel.addFullSpot(
                     lat = message.spotLat,
                     lon = message.spotLon,
                     name = message.spotName,
                     description = "Получено от ${message.senderName}",
                     weight = 0.0,
-                    isPublic = false,
+                    visibility = "private", // ✅ Было isPublic = false
                     photoPath = null,
+                    fishType = null,
                     isVerified = false,
+                    createdAt = message.spotCreatedAt ?: System.currentTimeMillis(), // ✅ Сохраняем дату
                     authorId = message.senderId
                 )
                 Toast.makeText(requireContext(), "Точка '${message.spotName}' сохранена!", Toast.LENGTH_LONG).show()
@@ -95,8 +98,6 @@ class MessagesFragment : Fragment() {
                 Toast.makeText(requireContext(), "Запрос отклонен", Toast.LENGTH_SHORT).show()
                 deleteMessage(message.id)
             },
-            // ✅ ФИНАЛЬНОЕ: Открываем красивую шторку-превью с заглушками карты и фото
-            // ✅ Открываем шторку-превью с возможностью отклонить и удалить сообщение
             onViewFriendSpotClick = { message ->
                 SpotPreviewBottomSheet(
                     spotViewModel = spotViewModel,
@@ -108,8 +109,8 @@ class MessagesFragment : Fragment() {
                     spotLon = message.spotLon,
                     spotWeight = message.spotWeight,
                     spotCreatedAt = message.spotCreatedAt,
-                    messageId = message.id, // ✅ Передаем ID
-                    onDeclineAndDelete = {  // ✅ Передаем логику удаления
+                    messageId = message.id,
+                    onDeclineAndDelete = {
                         deleteMessage(message.id)
                     }
                 ).show(childFragmentManager, "spot_preview_sheet")
