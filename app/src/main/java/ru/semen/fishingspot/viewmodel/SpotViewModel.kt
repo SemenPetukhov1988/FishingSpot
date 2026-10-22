@@ -153,16 +153,27 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
     // Это не кэш: просто состояние UI, чтобы карта перерисовалась сразу.
 
     private fun upsertInLists(spot: FishingSpot) {
+        Log.d("SPOT_SERVER", "📊 upsertInLists: добавляем точку ${spot.documentId} в списки")
+
         val my = (_mySpots.value ?: emptyList()).filter { it.documentId != spot.documentId }
         _mySpots.value = listOf(spot) + my
+        Log.d("SPOT_SERVER", "📊 _mySpots обновлён, теперь содержит: ${_mySpots.value?.size} точек")
 
         val pub = (_publicSpots.value ?: emptyList()).filter { it.documentId != spot.documentId }
         _publicSpots.value = if (spot.visibility == "public") listOf(spot) + pub else pub
+        Log.d("SPOT_SERVER", "📊 _publicSpots обновлён, теперь содержит: ${_publicSpots.value?.size} точек")
+
+        Log.d("SPOT_SERVER", "📊 Текущий режим карты: ${_mapMode.value}")
     }
 
     private fun removeFromLists(documentId: String) {
+        Log.d("SPOT_SERVER", "📊 removeFromLists: удаляем точку $documentId из списков")
+
         _mySpots.value = (_mySpots.value ?: emptyList()).filter { it.documentId != documentId }
+        Log.d("SPOT_SERVER", "📊 _mySpots обновлён, теперь содержит: ${_mySpots.value?.size} точек")
+
         _publicSpots.value = (_publicSpots.value ?: emptyList()).filter { it.documentId != documentId }
+        Log.d("SPOT_SERVER", "📊 _publicSpots обновлён, теперь содержит: ${_publicSpots.value?.size} точек")
     }
 
     // ================= СОЗДАНИЕ =================
@@ -276,12 +287,13 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            // ✅ ТЕПЕРЬ ПЕРЕДАЕМ ВЕСЬ ОБЪЕКТ SPOT
             val result = favorites.saveSpot(userId = userId, spot = spot)
 
             if (result.isSuccess) {
                 _isSpotSaved.value = true
                 _errorMessage.value = null
+                // ✅ ПЕРЕЗАГРУЖАЕМ "МОИ ТОЧКИ", ЧТОБЫ ВКЛЮЧИЛИ ИЗБРАННЫЕ
+                loadMySpots()
                 Log.d("SPOT_SERVER", "✅ Добавлено в избранное: ${spot.documentId}")
             } else {
                 _errorMessage.value = "Ошибка добавления в избранное: ${result.exceptionOrNull()?.message}"
@@ -296,8 +308,11 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
             if (result.isSuccess) {
                 _isSpotSaved.value = false
                 _errorMessage.value = null
+                // ✅ ПЕРЕЗАГРУЖАЕМ "МОИ ТОЧКИ", ЧТОБЫ УБРАЛИ ИЗБРАННЫЕ
+                loadMySpots()
+                Log.d("SPOT_SERVER", "✅ Убрано из избранного: ${spot.documentId}")
             } else {
-                _errorMessage.value = "Ошибка удаления из избранного"
+                _errorMessage.value = "Ошибка удаления из избранного: ${result.exceptionOrNull()?.message}"
             }
         }
     }

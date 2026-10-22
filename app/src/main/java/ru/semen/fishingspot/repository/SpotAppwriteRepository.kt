@@ -64,7 +64,22 @@ class SpotAppwriteRepository(private val context: Context) {
 
     suspend fun getMySpots(userId: String): Result<List<FishingSpot>> {
         return try {
-            val response = AppwriteManager.databases.listDocuments(
+            // 1. Получаем список избранных spotId
+            val savedResponse = AppwriteManager.databases.listDocuments(
+                databaseId = "6ad5021a0029a2c88786",
+                collectionId = "6ada41db002ea68773d9", // saved_spots
+                queries = listOf(
+                    Query.equal("userId", userId),
+                    Query.limit(500)
+                )
+            )
+            val savedSpotIds = savedResponse.documents.mapNotNull { doc ->
+                doc.data["spotId"] as? String
+            }
+            Log.d(TAG, "📊 Найдено избранных точек: ${savedSpotIds.size}")
+
+            // 2. Получаем твои созданные точки
+            val myResponse = AppwriteManager.databases.listDocuments(
                 databaseId = databaseId,
                 collectionId = spotsCollectionId,
                 queries = listOf(
@@ -72,9 +87,29 @@ class SpotAppwriteRepository(private val context: Context) {
                     Query.limit(500)
                 )
             )
-            val spots = response.documents.map { toSpot(it.id, it.data) }
-            Log.d(TAG, "✅ моих с сервера: ${spots.size}")
-            Result.success(spots)
+            val mySpots = myResponse.documents.map { toSpot(it.id, it.data) }
+            Log.d(TAG, "📊 Найдено моих созданных точек: ${mySpots.size}")
+
+            // 3. Получаем избранные точки (если они есть)
+            val savedSpots = if (savedSpotIds.isNotEmpty()) {
+                val savedResponse2 = AppwriteManager.databases.listDocuments(
+                    databaseId = databaseId,
+                    collectionId = spotsCollectionId,
+                    queries = listOf(
+                        Query.equal("\$id", savedSpotIds),
+                        Query.limit(500)
+                    )
+                )
+                savedResponse2.documents.map { toSpot(it.id, it.data) }
+            } else {
+                emptyList()
+            }
+            Log.d(TAG, "📊 Загружено избранных точек: ${savedSpots.size}")
+
+            // 4. Объединяем (без дубликатов)
+            val allSpots = (mySpots + savedSpots).distinctBy { it.documentId }
+            Log.d(TAG, "✅ моих с сервера (созданные + избранные): ${allSpots.size}")
+            Result.success(allSpots)
         } catch (e: Exception) {
             Log.e(TAG, "❌ getMySpots", e)
             Result.failure(e)

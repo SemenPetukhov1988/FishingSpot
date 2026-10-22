@@ -136,10 +136,28 @@ class SpotDetailsFragment : Fragment() {
         val spot = currentSpot
         val me = UserSessionManager.getCurrentUserId(requireContext()) ?: ""
         val isAuthor = spot != null && me.isNotEmpty() && me == spot.authorId
-        val show = spot != null && !isAuthor &&
-                networkMonitor.value == true && spotViewModel.isSpotSaved.value != true
+        val isSaved = spotViewModel.isSpotSaved.value == true
 
-        binding.btnSaveToLocal.visibility = if (show) View.VISIBLE else View.GONE
+        // Скрываем кнопку для автора своей точки или если нет интернета
+        if (spot == null || isAuthor || networkMonitor.value != true) {
+            binding.btnSaveToLocal.visibility = View.GONE
+            return
+        }
+
+        // ✅ МЕНЯЕМ ТЕКСТ КНОПКИ В ЗАВИСИМОСТИ ОТ СОСТОЯНИЯ
+        if (isSaved) {
+            binding.btnSaveToLocal.text = "⭐ Убрать из избранного"
+            binding.btnSaveToLocal.visibility = View.VISIBLE
+            binding.btnSaveToLocal.setOnClickListener {
+                spotViewModel.unsaveFromFavorites(spot)
+            }
+        } else {
+            binding.btnSaveToLocal.text = "💾 Сохранить в избранное"
+            binding.btnSaveToLocal.visibility = View.VISIBLE
+            binding.btnSaveToLocal.setOnClickListener {
+                spotViewModel.saveToFavorites(spot)
+            }
+        }
     }
 
     private fun setupClickListeners() {
