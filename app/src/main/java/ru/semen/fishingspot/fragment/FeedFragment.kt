@@ -49,34 +49,14 @@ class FeedFragment : Fragment() {
                     return@FeedAdapter
                 }
 
-                // 2. Проверка: а может, я уже сохранял эту чужую точку ранее?
-                val currentLocalSpots = spotViewModel.localSpots.value ?: emptyList()
-                val isAlreadySaved = currentLocalSpots.any { localSpot ->
-                    localSpot.name == spot.name &&
-                            localSpot.latitude == spot.latitude &&
-                            localSpot.longitude == spot.longitude
-                }
+                // 2. НОВАЯ ЛОГИКА: Вместо создания копии (addFullSpot), мы добавляем её в избранное (saved_spots)
+                // Это соответствует нашей новой архитектуре и предотвращает дублирование точек на сервере.
+                spotViewModel.saveToFavorites(spot)
 
-                if (isAlreadySaved) {
-                    Toast.makeText(requireContext(), "✅ Эта точка уже сохранена в вашем дневнике!", Toast.LENGTH_SHORT).show()
-                    return@FeedAdapter
-                }
+                Toast.makeText(requireContext(), "✅ Точка '${spot.name}' добавлена в избранное!", Toast.LENGTH_SHORT).show()
 
-                // 3. Сохраняем в Room как ЛИЧНУЮ точку
-                spotViewModel.addFullSpot(
-                    lat = spot.latitude,
-                    lon = spot.longitude,
-                    name = spot.name,
-                    description = spot.description,
-                    weight = spot.catchWeight,
-                    visibility = "private", // ✅ ИСПРАВЛЕНО: было isPublic = false
-                    photoPath = null,
-                    fishType = spot.fishType,
-                    isVerified = true,
-                    createdAt = spot.createdAt // ✅ Сохраняем оригинальную дату создания
-                )
-
-                Toast.makeText(requireContext(), "✅ Точка '${spot.name}' добавлена в дневник!", Toast.LENGTH_SHORT).show()
+                // Опционально: здесь можно обновить UI конкретной карточки, чтобы кнопка поменялась на "Убрать"
+                // Но для простоты пока оставим Toast.
             },
             onCommentClick = { spot ->
                 Toast.makeText(requireContext(), "💬 Комментарии скоро будут", Toast.LENGTH_SHORT).show()

@@ -22,6 +22,7 @@ import org.osmdroid.views.overlay.CopyrightOverlay
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentRefineLocationBinding
+import ru.semen.fishingspot.utils.NetworkMonitor
 import ru.semen.fishingspot.viewmodel.SpotViewModel
 import kotlin.math.*
 
@@ -30,16 +31,21 @@ class RefineLocationFragment : Fragment() {
     private var _binding: FragmentRefineLocationBinding? = null
     private val binding get() = _binding!!
 
-    // ✅ Добавлены новые переменные
+    // ✅ Данные точки
     private var spotName: String = ""
     private var spotDesc: String = ""
     private var spotWeight: Double = 0.0
-    private var spotVisibility: String = "private" // Новое
-    private var spotCreatedAt: Long = System.currentTimeMillis() // Новое
-    private var fishType: String? = null // Новое
+    private var spotVisibility: String = "private"
+    private var spotCreatedAt: Long = System.currentTimeMillis()
+    private var fishType: String? = null
     private var photoPath: String? = null
 
+    // ✅ Данные автора
+    private var authorName: String = "Рыбак"
+    private var authorId: String = "unknown_user"
+
     private val spotViewModel: SpotViewModel by activityViewModels()
+    private lateinit var networkMonitor: NetworkMonitor
     private val TAG = "FISHING_DEBUG"
 
     private var lastUserLocation: IGeoPoint? = null
@@ -60,8 +66,9 @@ class RefineLocationFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        networkMonitor = NetworkMonitor.getInstance(requireContext())
 
-        // ✅ Читаем все данные, включая новые
+        // ✅ Читаем все данные из Bundle
         spotName = arguments?.getString("NAME") ?: "Без названия"
         spotDesc = arguments?.getString("DESC") ?: ""
         spotWeight = arguments?.getDouble("WEIGHT") ?: 0.0
@@ -69,6 +76,9 @@ class RefineLocationFragment : Fragment() {
         spotCreatedAt = arguments?.getLong("CREATED_AT") ?: System.currentTimeMillis()
         fishType = arguments?.getString("FISH_TYPE")
         photoPath = arguments?.getString("PHOTO_PATH")
+
+        authorName = arguments?.getString("AUTHOR_NAME") ?: "Рыбак"
+        authorId = arguments?.getString("AUTHOR_ID") ?: "unknown_user"
 
         val mapView = binding.refineMapView
         mapView.setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
@@ -163,18 +173,29 @@ class RefineLocationFragment : Fragment() {
     }
 
     // =========================================================================
-    // ✅ ТВОЯ ХИТРАЯ ЛОГИКА МОДЕРАЦИИ (НЕ ТРОНУТА, ТОЛЬКО ОБНОВЛЕНЫ ВЫЗОВЫ СОХРАНЕНИЯ)
+    // ✅ ЛОГИКА МОДЕРАЦИИ И СОХРАНЕНИЯ
     // =========================================================================
     private fun checkWaterLocalAndSave(point: IGeoPoint) {
         lifecycleScope.launch {
             if (_binding == null) return@launch
 
+            // ✅ БЕЗОПАСНАЯ ПРОВЕРКА: явно сравниваем с true
+            val isOnline = networkMonitor.value == true
+            Log.d("DEBUG_REFINE", "🌐 Проверка сети: isOnline = $isOnline (сырое значение: ${networkMonitor.value})")
+
+            if (!isOnline) {
+                Toast.makeText(requireContext(), "⚠️ Для создания точки требуется интернет (статус: ${networkMonitor.value})", Toast.LENGTH_LONG).show()
+                binding.btnDone.isEnabled = true
+                binding.btnDone.text = "Готово"
+                return@launch
+            }
+
             binding.btnDone.isEnabled = false
             binding.btnDone.text = "Проверка..."
 
-            // Если точка не публичная, сохраняем сразу без проверок
+            // Если точка не публичная, сохраняем сразу
             if (spotVisibility != "public") {
-                saveToRoomOnly(point)
+                saveSpot(point, isVerified = false)
                 return@launch
             }
 
@@ -185,7 +206,7 @@ class RefineLocationFragment : Fragment() {
             when {
                 isWaterInDb && distance < MAX_DISTANCE_METERS -> {
                     Log.d(TAG, "[VERIFIED] Вода в БД + GPS совпал")
-                    saveToRoomAndCloud(point, isVerified = true)
+                    saveSpot(point, isVerified = true)
                 }
                 !isWaterInDb && distance < MAX_DISTANCE_METERS -> {
                     Log.w(TAG, "[SUSPICIOUS] GPS совпал, но воды нет в БД")
@@ -212,7 +233,7 @@ class RefineLocationFragment : Fragment() {
             .setPositiveButton("Сохранить как сомнительную") { dialog, _ ->
                 dialog.dismiss()
                 if (isAdded && _binding != null) {
-                    saveToRoomAndCloud(point, isVerified = false)
+                    saveSpot(point, isVerified = false)
                 }
             }
             .setNegativeButton("Отмена") { dialog, _ ->
@@ -234,7 +255,10 @@ class RefineLocationFragment : Fragment() {
             .setMessage("Расстояние > 250м. Сохранить как ЛИЧНУЮ точку?")
             .setPositiveButton("Сохранить как личную") { d, _ ->
                 d.dismiss()
-                if (isAdded && _binding != null) saveToRoomOnly(point)
+                if (isAdded && _binding != null) {
+                    spotVisibility = "private" // Принудительно делаем личным
+                    saveSpot(point, isVerified = false)
+                }
             }
             .setNegativeButton("Отмена") { d, _ ->
                 d.dismiss()
@@ -246,25 +270,24 @@ class RefineLocationFragment : Fragment() {
             .create().show()
     }
 
-    // ✅ Обновленные методы сохранения с передачей всех новых полей
-    private fun saveToRoomOnly(point: IGeoPoint) {
-        spotViewModel.addFullSpot(
-            lat = point.latitude, lon = point.longitude, name = spotName,
-            description = spotDesc, weight = spotWeight,
-            visibility = spotVisibility, // Используем новый параметр
-            photoPath = photoPath, fishType = fishType,
-            isVerified = false, createdAt = spotCreatedAt
-        )
-        navigateBack()
-    }
+    // ✅ ЕДИНЫЙ МЕТОД СОХРАНЕНИЯ (ViewModel сама решит: Appwrite -> Room)
+    private fun saveSpot(point: IGeoPoint, isVerified: Boolean) {
+        android.util.Log.d("DEBUG_REFINE", "💾 Отправка точки на сохранение. Автор: $authorName, ID: $authorId")
 
-    private fun saveToRoomAndCloud(point: IGeoPoint, isVerified: Boolean) {
         spotViewModel.addFullSpot(
-            lat = point.latitude, lon = point.longitude, name = spotName,
-            description = spotDesc, weight = spotWeight,
+            lat = point.latitude,
+            lon = point.longitude,
+            name = spotName,
+            description = spotDesc,
+            weight = spotWeight,
             visibility = spotVisibility,
-            photoPath = photoPath, fishType = fishType,
-            isVerified = isVerified, createdAt = spotCreatedAt
+            photoPath = photoPath,
+            photoUrl = null, // ✅ ДОБАВЛЕНО: соответствие новой сигнатуре
+            fishType = fishType,
+            isVerified = isVerified,
+            createdAt = spotCreatedAt,
+            authorId = authorId,
+            authorName = authorName
         )
         navigateBack()
     }

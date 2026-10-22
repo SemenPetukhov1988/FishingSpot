@@ -8,20 +8,26 @@ class FishingSpotRepository(private val dao: FishingSpotDao) {
 
     val allSpots: LiveData<List<FishingSpot>> = dao.getAllSpots()
 
-    // ✅ Возвращаем Long, так как DAO теперь возвращает ID вставленной записи
-    suspend fun insert(spot: FishingSpot): Long {
+    // ✅ УМНАЯ ВСТАВКА: предотвращает дубликаты
+    suspend fun insertOrUpdate(spot: FishingSpot): Long {
+        if (spot.documentId.isNotEmpty()) {
+            // Если точка с таким documentId уже есть, удаляем её перед вставкой новой
+            dao.deleteByDocumentId(spot.documentId)
+        }
         return dao.insert(spot)
     }
 
-    // ✅ НОВОЕ: Получение точки по ID (нужно для обновления видимости)
-    suspend fun getSpotById(id: Long): FishingSpot? {
-        return dao.getSpotById(id)
+    suspend fun getSpotById(id: Long): FishingSpot? = dao.getSpotById(id)
+
+    // ✅ УДАЛЕНИЕ ПО СЕРВЕРНОМУ ID (чище и надежнее)
+    suspend fun deleteSpotByDocumentId(documentId: String): Int {
+        return dao.deleteByDocumentId(documentId)
     }
 
-    // ✅ НОВОЕ: Удаление точки по ID
-    suspend fun deleteSpot(id: Long) {
-        dao.deleteSpot(id)
+    suspend fun clearAllSpots() = dao.clearAllSpots()
+
+
+    suspend fun deleteSpotById(id: Long): Int {
+        return dao.deleteSpot(id)
     }
-
-
 }

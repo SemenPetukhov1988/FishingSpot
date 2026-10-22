@@ -11,6 +11,7 @@ import androidx.navigation.fragment.findNavController
 import com.google.android.material.chip.Chip
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentAddPointBinding
+import ru.semen.fishingspot.utils.UserSessionManager
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -23,7 +24,7 @@ class AddPointFragment : Fragment() {
     private var selectedFish: String = "Не указано"
     private var currentPhotoPath: String? = null
 
-    // ✅ Новые переменные для расширенной информации
+    // ✅ Переменные для расширенной информации
     private var selectedDate: Long = System.currentTimeMillis()
     private var selectedLocation: String = "С берега"
     private var selectedTackle: String = "Не указано"
@@ -53,7 +54,7 @@ class AddPointFragment : Fragment() {
             showDatePicker()
         }
 
-        // ✅ 3. ПЕРЕКЛЮЧАТЕЛЬ ВИДИМОСТИ
+        // ✅ 3. ПЕРЕКЛЮЧАТЕЛЬ ВИДИМОСТИ (Личная / Друзья / Публичная)
         binding.toggleGroupVisibility.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
                 selectedVisibility = when (checkedId) {
@@ -160,20 +161,36 @@ class AddPointFragment : Fragment() {
                 return@setOnClickListener
             }
 
-            // ✅ Передаем ВСЕ новые данные в RefineLocationFragment
+            // ✅ ПОЛУЧАЕМ ДАННЫЕ АВТОРА
+            val currentAuthorName = UserSessionManager.getCurrentNickname(requireContext())
+            val currentAuthorId = UserSessionManager.getCurrentUserId(requireContext())
+
+            // ✅ ЗАЩИТА: Если ID нет, значит сессия слетела. Не даем создать точку.
+            if (currentAuthorId.isNullOrEmpty()) {
+                Toast.makeText(requireContext(), "⚠️ Ошибка сессии. Пожалуйста, перезайдите в приложение.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+
+            // Лог для отладки (оставляем, он полезен)
+            android.util.Log.d("DEBUG_ADD_POINT", "👤 ПЕРЕД СОХРАНЕНИЕМ -> ID: '$currentAuthorId', Ник: '$currentAuthorName'")
+
             val bundle = Bundle().apply {
                 putString("NAME", name)
                 putString("DESC", finalDescription)
                 putDouble("WEIGHT", weightValue)
-                putString("VISIBILITY", selectedVisibility) // Новое!
-                putLong("CREATED_AT", selectedDate)         // Новое!
-                putString("FISH_TYPE", finalFishName)       // Новое!
+                putString("VISIBILITY", selectedVisibility)
+                putLong("CREATED_AT", selectedDate)
+                putString("FISH_TYPE", finalFishName)
                 putString("PHOTO_PATH", currentPhotoPath)
                 putDouble("LAT", startLat)
                 putDouble("LON", startLon)
+
+                // ✅ ИСПРАВЛЕНО: Убрали "Рыбак". Теперь либо реальный ник, либо "Неизвестно"
+                putString("AUTHOR_NAME", currentAuthorName ?: "Неизвестно")
+                putString("AUTHOR_ID", currentAuthorId)
             }
 
-            findNavController().navigate(R.id.action_addPoint_to_refineLocation, bundle)
+            findNavController().navigate(R.id.refineLocationFragment, bundle)
         }
     }
 

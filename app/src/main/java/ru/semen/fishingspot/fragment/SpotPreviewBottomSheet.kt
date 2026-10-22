@@ -22,8 +22,8 @@ class SpotPreviewBottomSheet(
     private val spotLon: Double,
     private val spotWeight: Double,
     private val spotCreatedAt: Long,
-    private val messageId: String,          // ✅ ID сообщения для удаления
-    private val onDeclineAndDelete: () -> Unit // ✅ Функция обратного вызова
+    private val messageId: String,
+    private val onDeclineAndDelete: () -> Unit
 ) : BottomSheetDialogFragment() {
 
     private var _binding: BottomSheetSpotPreviewBinding? = null
@@ -45,26 +45,30 @@ class SpotPreviewBottomSheet(
 
         // Кнопка "Сохранить"
         binding.btnPreviewSave.setOnClickListener {
+            // ✅ ИСПРАВЛЕНО: Добавлены photoUrl и authorName для соответствия новой сигнатуре
             spotViewModel.addFullSpot(
                 lat = spotLat,
                 lon = spotLon,
                 name = spotName,
                 description = "Получено от $senderName: $spotDesc",
                 weight = spotWeight,
-                visibility = "private", // ✅ ИСПРАВЛЕНО: было isPublic = false
+                visibility = "private",
                 photoPath = null,
-                fishType = null,        // ✅ ДОБАВЛЕНО
+                photoUrl = null,          // ✅ ДОБАВЛЕНО
+                fishType = null,
                 isVerified = false,
-                createdAt = spotCreatedAt ?: System.currentTimeMillis(), // ✅ ДОБАВЛЕНО: сохраняем оригинальную дату
-                authorId = senderId
+                createdAt = spotCreatedAt ?: System.currentTimeMillis(),
+                authorId = senderId,
+                authorName = senderName   // ✅ ДОБАВЛЕНО (чтобы не было "Рыбака")
             )
-            // Обычно здесь идет dismiss() или закрытие шторки
+            Toast.makeText(requireContext(), "✅ Точка '${spotName}' сохранена в дневник!", Toast.LENGTH_SHORT).show()
+            onDeclineAndDelete() // Удаляем сообщение, так как точка принята
             dismiss()
         }
 
-        // ✅ Кнопка "Отклонить" (вместо "Позже")
+        // Кнопка "Отклонить"
         binding.btnPreviewCancel.setOnClickListener {
-            Toast.makeText(requireContext(), "Сообщение удалено", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Сообщение отклонено и удалено", Toast.LENGTH_SHORT).show()
             onDeclineAndDelete() // Вызываем удаление из Firebase
             dismiss()            // Закрываем шторку
         }

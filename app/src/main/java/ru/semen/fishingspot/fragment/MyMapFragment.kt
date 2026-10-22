@@ -8,6 +8,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -93,17 +94,25 @@ class MyMapFragment : Fragment() {
                 .navigate(R.id.action_mainTabs_to_addPoint, bundle)
         }
 
-        // ✅ ИЗМЕНЕНИЕ: слушаем currentSpots вместо allSpots.
-        // Теперь этот поток сам переключается между Room и Appwrite!
+        // ✅ 1. СЛУШАЕМ СПИСОК ТОЧЕК (теперь он приходит чисто с сервера)
         spotViewModel.currentSpots.observe(viewLifecycleOwner) { spots ->
             Log.d(TAG, "LiveData update: ${spots.size} spots (Режим: ${spotViewModel.mapMode.value})")
             drawMarkers(spots)
         }
+
+        // ✅ 2. СЛУШАЕМ ОШИБКИ (например, "Нет интернета")
+        spotViewModel.errorMessage.observe(viewLifecycleOwner) { message ->
+            if (_binding == null || message.isNullOrBlank()) return@observe
+            Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+        }
     }
 
-    override fun onStart() {
-        super.onStart()
+    override fun onResume() {
+        super.onResume()
         binding.mapView.onResume()
+
+        // ✅ 3. ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ ДАННЫХ ПРИ ВОЗВРАТЕ НА ЭКРАН
+        spotViewModel.refreshMap()
 
         if (lastUserLocation != null && !isLocationAlreadyShown) {
             Log.d(TAG, "Мгновенный переход на сохраненную позицию")
@@ -130,8 +139,6 @@ class MyMapFragment : Fragment() {
         if (_binding == null) return
         showLoading()
 
-        // 🌟 ГЛАВНОЕ ИСПРАВЛЕНИЕ: Включаем отслеживание локации ТОЛЬКО тогда,
-        // когда разрешение железно предоставлено. Движок OSMDroid успешно свяжется с GPS.
         locationOverlay?.enableMyLocation()
 
         // 1. Сразу показываем дефолтную точку, чтобы экран не был пустым
@@ -160,7 +167,7 @@ class MyMapFragment : Fragment() {
 
                         lastUserLocation = newLocation
                         if (!isLocationAlreadyShown) {
-                            // 🌟 Плавная анимация центрирования (выглядит профессионально)
+                            // 🌟 Плавная анимация центрирования
                             binding.mapView.controller.animateTo(lastUserLocation)
                             binding.mapView.controller.setZoom(CITY_ZOOM)
                             isLocationAlreadyShown = true
@@ -210,18 +217,11 @@ class MyMapFragment : Fragment() {
             marker.position = point
             marker.setIcon(ContextCompat.getDrawable(requireContext(), R.drawable.metka4567))
 
+            // ✅ 4. УПРОЩЕННЫЙ КЛИК: передаем ТОЛЬКО document_id (String)
             marker.setOnMarkerClickListener { _, _ ->
-                Log.d(TAG, "КЛИК! ID: ${spot.id}")
+                Log.d(TAG, "КЛИК! documentId: ${spot.documentId}")
                 val detailsBundle = Bundle().apply {
-                    putLong("spot_id", spot.id)
-                    putString("spot_name", spot.name)
-                    putString("spot_desc", spot.description)
-                    putDouble("spot_weight", spot.catchWeight)
-                    putLong("spot_created", spot.createdAt)
-                    putDouble("spot_lat", spot.latitude)
-                    putDouble("spot_lon", spot.longitude)
-                    putString("spot_author", spot.authorId)
-                    putBoolean("spot_is_verified", spot.isVerified)
+                    putString("document_id", spot.documentId)
                     putInt("source_tab", R.id.nav_my_places)
                 }
                 findNavController().navigate(R.id.action_map_to_details, detailsBundle)

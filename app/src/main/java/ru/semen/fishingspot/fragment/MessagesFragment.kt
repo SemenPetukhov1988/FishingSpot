@@ -70,21 +70,23 @@ class MessagesFragment : Fragment() {
                 deleteMessage(message.id)
             },
             onTakeSpotClick = { message ->
-                // ✅ ИСПРАВЛЕНО: Обновленная сигнатура addFullSpot
+                // ✅ ИСПРАВЛЕНО: Добавлены параметры photoUrl и authorName для соответствия новой сигнатуре
                 spotViewModel.addFullSpot(
                     lat = message.spotLat,
                     lon = message.spotLon,
                     name = message.spotName,
                     description = "Получено от ${message.senderName}",
                     weight = 0.0,
-                    visibility = "private", // ✅ Было isPublic = false
+                    visibility = "private",
                     photoPath = null,
+                    photoUrl = null,          // ✅ ДОБАВЛЕНО
                     fishType = null,
                     isVerified = false,
-                    createdAt = message.spotCreatedAt ?: System.currentTimeMillis(), // ✅ Сохраняем дату
-                    authorId = message.senderId
+                    createdAt = message.spotCreatedAt ?: System.currentTimeMillis(),
+                    authorId = message.senderId,
+                    authorName = message.senderName // ✅ ДОБАВЛЕНО для корректного отображения
                 )
-                Toast.makeText(requireContext(), "Точка '${message.spotName}' сохранена!", Toast.LENGTH_LONG).show()
+                Toast.makeText(requireContext(), "Точка '${message.spotName}' сохранена в дневник!", Toast.LENGTH_LONG).show()
                 deleteMessage(message.id)
             },
             onAcceptFriendClick = { message ->
