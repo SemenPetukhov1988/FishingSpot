@@ -15,7 +15,8 @@ import java.util.Date
 import java.util.Locale
 
 class FeedAdapter(
-    private val onMapClick: (FishingSpot) -> Unit // ✅ ЕДИНЫЙ CALLBACK ДЛЯ КАРТЫ
+    private val onMapClick: (FishingSpot) -> Unit,
+    private val onCommentsClick: (String) -> Unit // ✅ НОВЫЙ CALLBACK ДЛЯ КОММЕНТАРИЕВ
 ) : RecyclerView.Adapter<FeedAdapter.FeedViewHolder>() {
 
     private var items: List<FishingSpot> = emptyList()
@@ -41,6 +42,7 @@ class FeedAdapter(
         val btnViewOnMap: View = view.findViewById(R.id.btnViewOnMap)
         val layoutLike: View = view.findViewById(R.id.layoutFeedLike)
         val btnComments: View = view.findViewById(R.id.btnFeedComments)
+        val tvCommentsCount: TextView = view.findViewById(R.id.tvFeedCommentsCount) // ✅ НАШЛИ СЧЕТЧИК
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FeedViewHolder {
@@ -52,16 +54,13 @@ class FeedAdapter(
     override fun onBindViewHolder(holder: FeedViewHolder, position: Int) {
         val spot = items[position]
 
-        // Заполняем шапку
+        // Шапка
         holder.tvAuthorName.text = spot.authorName.ifEmpty { "Рыбак" }
-
-        // ✅ ИСПРАВЛЕННОЕ ФОРМАТИРОВАНИЕ ДАТЫ
         val dateFormat = SimpleDateFormat("d MMM yyyy", Locale("ru"))
         holder.tvDate.text = "📅 ${dateFormat.format(Date(spot.createdAt))}"
-
         holder.tvSpotName.text = spot.name
 
-        // Заполняем описание
+        // Описание
         holder.tvWeight.text = when {
             spot.catchWeight <= 0.0 -> "⚖️ Улов не указан"
             spot.catchWeight <= 1.0 -> "⚖️ До 1 кг"
@@ -71,14 +70,13 @@ class FeedAdapter(
         holder.tvFish.text = if (!spot.fishType.isNullOrEmpty()) "🐟 ${spot.fishType}" else "🐟 Не указана"
         holder.tvCoordinates.text = "📍 %.4f, %.4f".format(spot.latitude, spot.longitude)
 
-        // ✅ ЗАГРУЗКА ФОТО ЧЕРЕЗ GLIDE
+        // Фото
         if (!spot.photoUrl.isNullOrEmpty()) {
             holder.ivPhoto.visibility = View.VISIBLE
             holder.ivPhotoPlaceholder.visibility = View.GONE
-
             Glide.with(holder.itemView.context)
                 .load(spot.photoUrl)
-                .centerCrop() // Для ленты лучше смотрится заполнение области
+                .centerCrop()
                 .placeholder(R.drawable.add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_)
                 .error(R.drawable.add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_)
                 .into(holder.ivPhoto)
@@ -87,14 +85,16 @@ class FeedAdapter(
             holder.ivPhotoPlaceholder.visibility = View.VISIBLE
         }
 
-        // ✅ ОБРАБОТЧИК КЛИКА ПО КНОПКЕ "НА КАРТЕ"
-        holder.btnViewOnMap.setOnClickListener {
-            onMapClick(spot)
+        // ✅ КЛИКИ
+        holder.btnViewOnMap.setOnClickListener { onMapClick(spot) }
+
+        // Открываем шторку комментариев по ID точки
+        holder.btnComments.setOnClickListener {
+            onCommentsClick(spot.documentId)
         }
 
-        // Заглушки для лайков и комментариев
+        // Заглушка для лайков
         holder.layoutLike.setOnClickListener { /* TODO */ }
-        holder.btnComments.setOnClickListener { /* TODO */ }
     }
 
     override fun getItemCount() = items.size

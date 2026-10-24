@@ -35,13 +35,21 @@ class FeedFragment : Fragment() {
         binding.rvFeed.layoutManager = LinearLayoutManager(requireContext())
 
         // ✅ СОЗДАЁМ АДАПТЕР ТОЛЬКО С ОДНИМ CALLBACK'ОМ - ОТКРЫТИЕ КАРТЫ
-        adapter = FeedAdapter(onMapClick = { spot ->
-            SpotMapPreviewDialog.newInstance(
-                lat = spot.latitude,
-                lon = spot.longitude,
-                spotName = spot.name
-            ).show(childFragmentManager, "map_preview")
-        })
+        // В onViewCreated, при создании адаптера:
+        adapter = FeedAdapter(
+            onMapClick = { spot ->
+                SpotMapPreviewDialog.newInstance(
+                    lat = spot.latitude,
+                    lon = spot.longitude,
+                    spotName = spot.name
+                ).show(childFragmentManager, "map_preview")
+            },
+            // ✅ НОВАЯ ЛОГИКА ОТКРЫТИЯ КОММЕНТАРИЕВ
+            onCommentsClick = { spotId ->
+                CommentsBottomSheetDialogFragment.newInstance(spotId)
+                    .show(childFragmentManager, "comments")
+            }
+        )
 
         binding.rvFeed.adapter = adapter
 
