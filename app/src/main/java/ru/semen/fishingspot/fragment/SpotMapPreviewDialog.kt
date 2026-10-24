@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Observer
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
@@ -15,6 +16,7 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import ru.semen.fishingspot.R
+import ru.semen.fishingspot.data.FishingSpot
 import ru.semen.fishingspot.databinding.DialogSpotMapPreviewBinding
 import ru.semen.fishingspot.viewmodel.SpotViewModel
 
@@ -23,23 +25,22 @@ class SpotMapPreviewDialog : BottomSheetDialogFragment() {
     private var _binding: DialogSpotMapPreviewBinding? = null
     private val binding get() = _binding!!
 
-    // ✅ ПОЛУЧАЕМ ОБЩИЙ VIEWMODEL ДЛЯ СОХРАНЕНИЯ
+    // ✅ ИСПОЛЬЗУЕМ ТОТ ЖЕ VIEWMODEL, ЧТО И ВЕСЬ ОСТАЛЬНОЙ APP
     private val spotViewModel: SpotViewModel by activityViewModels()
 
     private var mapView: MapView? = null
-    private var currentSpotName: String = ""
+    private var currentSpot: FishingSpot? = null
 
     companion object {
-        private const val ARG_LATITUDE = "latitude"
-        private const val ARG_LONGITUDE = "longitude"
-        private const val ARG_SPOT_NAME = "spot_name"
+        private const val ARG_DOCUMENT_ID = "document_id"
 
-        fun newInstance(lat: Double, lon: Double, spotName: String): SpotMapPreviewDialog {
+        /**
+         * ✅ БЕЗОПАСНО: передаём ТОЛЬКО ID
+         */
+        fun newInstance(documentId: String): SpotMapPreviewDialog {
             return SpotMapPreviewDialog().apply {
                 arguments = Bundle().apply {
-                    putDouble(ARG_LATITUDE, lat)
-                    putDouble(ARG_LONGITUDE, lon)
-                    putString(ARG_SPOT_NAME, spotName)
+                    putString(ARG_DOCUMENT_ID, documentId)
                 }
             }
         }
@@ -55,54 +56,67 @@ class SpotMapPreviewDialog : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val latitude = arguments?.getDouble(ARG_LATITUDE) ?: 0.0
-        val longitude = arguments?.getDouble(ARG_LONGITUDE) ?: 0.0
-        currentSpotName = arguments?.getString(ARG_SPOT_NAME) ?: "Точка"
-
-        binding.tvMapDialogTitle.text = "📍 $currentSpotName"
-
-        // Инициализация карты
-        mapView = MapView(requireContext()).apply {
-            setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
-            setBackgroundColor(Color.parseColor("#EAEFF5"))
-            controller.setCenter(GeoPoint(latitude, longitude))
-            controller.setZoom(15.0)
+        val documentId = arguments?.getString(ARG_DOCUMENT_ID) ?: run {
+            dismiss()
+            return
         }
 
-        binding.mapContainer.addView(mapView, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        // ✅ ЗАПУСКАЕМ СУЩЕСТВУЮЩИЙ МЕТОД ЗАГРУЗКИ ИЗ VIEWMODEL
+        spotViewModel.loadSpotDetails(documentId)
 
-        // Маркер точки
+        // ✅ НАБЛЮДАЕМ ЗА РЕЗУЛЬТАТОМ (как в SpotDetailsFragment)
+        spotViewModel.currentSpotDetails.observe(viewLifecycleOwner, Observer { spot ->
+            if (spot != null && spot.documentId == documentId) {
+                currentSpot = spot
+                initMapAndUI(spot)
+            }
+        })
+
+        // Обработка ошибок загрузки
+        spotViewModel.errorMessage.observe(viewLifecycleOwner, Observer { msg ->
+            if (!msg.isNullOrBlank()) {
+                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+                // Не закрываем диалог сразу, даём пользователю прочитать ошибку
+            }
+        })
+    }
+
+    private fun initMapAndUI(spot: FishingSpot) {
+        // Если карта уже создана - обновляем данные, иначе создаём
+        if (mapView == null) {
+            mapView = MapView(requireContext()).apply {
+                setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
+                setMultiTouchControls(true)
+                setBackgroundColor(Color.parseColor("#EAEFF5"))
+            }
+            binding.mapContainer.addView(mapView, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+
+            // Кнопки создаём один раз
+            binding.btnCancelMapPreview.setOnClickListener { dismiss() }
+
+            binding.btnConfirmSaveFromMap.setOnClickListener {
+                currentSpot?.let {
+                    spotViewModel.saveToFavorites(it) // ✅ ИСПОЛЬЗУЕМ ГОТОВЫЙ МЕТОД
+                    Toast.makeText(requireContext(), "✅ '${it.name}' сохранена!", Toast.LENGTH_SHORT).show()
+                }
+                dismiss()
+            }
+        }
+
+        // Обновляем состояние карты
+        binding.tvMapDialogTitle.text = "📍 ${spot.name}"
+        mapView?.controller?.setCenter(GeoPoint(spot.latitude, spot.longitude))
+        mapView?.controller?.setZoom(15.0)
+
+        // Очищаем старые маркеры и ставим новый
+        mapView?.overlays?.removeAll { it is Marker }
         val marker = Marker(mapView).apply {
-            position = GeoPoint(latitude, longitude)
+            position = GeoPoint(spot.latitude, spot.longitude)
             setIcon(resources.getDrawable(R.drawable.metka4567, null))
-            title = currentSpotName
+            title = spot.name
         }
         mapView?.overlays?.add(marker)
-
-        // Кнопка "Закрыть"
-        binding.btnCancelMapPreview.setOnClickListener { dismiss() }
-
-        // ✅ РЕАЛЬНАЯ ЛОГИКА СОХРАНЕНИЯ
-        binding.btnConfirmSaveFromMap.setOnClickListener {
-            // Создаем временный объект FishingSpot для передачи в ViewModel
-            // В будущем можно передавать весь объект через Parcelable/Serializable
-            val tempSpot = ru.semen.fishingspot.data.FishingSpot(
-                documentId = "", // ID будет сгенерирован или найден при сохранении
-                name = currentSpotName,
-                latitude = latitude,
-                longitude = longitude,
-                authorId = "",
-                authorName = "",
-                visibility = "public",
-                createdAt = System.currentTimeMillis()
-            )
-
-            spotViewModel.saveToFavorites(tempSpot)
-
-            Toast.makeText(requireContext(), "✅ Точка '$currentSpotName' сохранена!", Toast.LENGTH_SHORT).show()
-            dismiss()
-        }
+        mapView?.invalidate()
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {

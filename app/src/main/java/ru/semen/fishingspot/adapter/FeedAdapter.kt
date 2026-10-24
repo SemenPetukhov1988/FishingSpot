@@ -15,8 +15,8 @@ import java.util.Date
 import java.util.Locale
 
 class FeedAdapter(
-    private val onMapClick: (FishingSpot) -> Unit,
-    private val onCommentsClick: (String) -> Unit // ✅ НОВЫЙ CALLBACK ДЛЯ КОММЕНТАРИЕВ
+    private val onMapClick: (String) -> Unit, // ✅ ТЕПЕРЬ ПРИНИМАЕТ ТОЛЬКО ID
+    private val onCommentsClick: (String) -> Unit
 ) : RecyclerView.Adapter<FeedAdapter.FeedViewHolder>() {
 
     private var items: List<FishingSpot> = emptyList()
@@ -42,7 +42,6 @@ class FeedAdapter(
         val btnViewOnMap: View = view.findViewById(R.id.btnViewOnMap)
         val layoutLike: View = view.findViewById(R.id.layoutFeedLike)
         val btnComments: View = view.findViewById(R.id.btnFeedComments)
-        val tvCommentsCount: TextView = view.findViewById(R.id.tvFeedCommentsCount) // ✅ НАШЛИ СЧЕТЧИК
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FeedViewHolder {
@@ -63,14 +62,14 @@ class FeedAdapter(
         // Описание
         holder.tvWeight.text = when {
             spot.catchWeight <= 0.0 -> "⚖️ Улов не указан"
-            spot.catchWeight <= 1.0 -> "⚖️ До 1 кг"
+            spot.catchWeight <= 1.0 -> "️ До 1 кг"
             spot.catchWeight <= 5.0 -> "⚖️ 1–5 кг"
-            else -> "⚖️ Больше 5 кг"
+            else -> "️ Больше 5 кг"
         }
         holder.tvFish.text = if (!spot.fishType.isNullOrEmpty()) "🐟 ${spot.fishType}" else "🐟 Не указана"
         holder.tvCoordinates.text = "📍 %.4f, %.4f".format(spot.latitude, spot.longitude)
 
-        // Фото
+        // Фото через Glide
         if (!spot.photoUrl.isNullOrEmpty()) {
             holder.ivPhoto.visibility = View.VISIBLE
             holder.ivPhotoPlaceholder.visibility = View.GONE
@@ -85,16 +84,10 @@ class FeedAdapter(
             holder.ivPhotoPlaceholder.visibility = View.VISIBLE
         }
 
-        // ✅ КЛИКИ
-        holder.btnViewOnMap.setOnClickListener { onMapClick(spot) }
-
-        // Открываем шторку комментариев по ID точки
-        holder.btnComments.setOnClickListener {
-            onCommentsClick(spot.documentId)
-        }
-
-        // Заглушка для лайков
-        holder.layoutLike.setOnClickListener { /* TODO */ }
+        // ✅ КЛИКИ: ПЕРЕДАЁМ ТОЛЬКО СТРОКОВЫЙ ID
+        holder.btnViewOnMap.setOnClickListener { onMapClick(spot.documentId) }
+        holder.btnComments.setOnClickListener { onCommentsClick(spot.documentId) }
+        holder.layoutLike.setOnClickListener { /* TODO: Лайки */ }
     }
 
     override fun getItemCount() = items.size
