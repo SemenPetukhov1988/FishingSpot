@@ -13,6 +13,7 @@ import ru.semen.fishingspot.data.FishingSpot
 import ru.semen.fishingspot.data.WaterChecker
 import ru.semen.fishingspot.repository.SavedSpotsRepository
 import ru.semen.fishingspot.repository.SpotAppwriteRepository
+import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.NetworkMonitor
 import ru.semen.fishingspot.utils.UserSessionManager
 
@@ -255,14 +256,33 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteSpot(documentId: String) {
         viewModelScope.launch {
-            Log.d("SPOT_SERVER", "🗑️ удаление documentId=$documentId")
+            Log.d("SPOT_SERVER", "🗑️ Удаление documentId=$documentId")
+
             if (!hasNetwork()) return@launch
 
+            // ✅ 1. СНАЧАЛА УДАЛЯЕМ ФОТО ИЗ STORAGE (если есть URL)
+            val spot = currentSpots.value?.find { it.documentId == documentId }
+            spot?.photoUrl?.let { url ->
+                try {
+                    val fileId = url.substringAfter("/files/").substringBefore("/")
+                    AppwriteManager.storage.deleteFile(
+                        bucketId = "6ada43f9003aa9f4d6a2",
+                        fileId = fileId
+                    )
+                    Log.d("SPOT_SERVER", "✅ Файл $fileId удален из Storage")
+                } catch (e: Exception) {
+                    Log.e("SPOT_SERVER", "⚠️ Не удалось удалить файл: ${e.message}")
+                    // Не прерываем удаление точки, если файл не удалился
+                }
+            }
+
+            // ✅ 2. ТЕПЕРЬ УДАЛЯЕМ ЗАПИСЬ ИЗ БАЗЫ
             val result = server.deleteSpotByDocumentId(documentId)
+
             if (result.isSuccess) {
                 removeFromLists(documentId)
                 _errorMessage.value = null
-                Log.d("SPOT_SERVER", "✅ удалена с сервера и убрана из списков")
+                Log.d("SPOT_SERVER", "✅ Точка удалена с сервера и убрана из списков")
             } else {
                 _errorMessage.value = "Ошибка удаления: ${result.exceptionOrNull()?.message}"
             }

@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F8FAFC"
+    android:background="#EAEFF5"
     android:fillViewport="true">
 
     <LinearLayout
@@ -46,7 +46,7 @@
                 android:layout_height="48dp" />
         </LinearLayout>
 
-        <!-- ✅ 2. БЛОК ФОТО (Стиль VK/Telegram) -->
+        <!-- ✅ 2. БЛОК ФОТО (Исправленный: показывает фото целиком) -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardPhoto"
             android:layout_width="match_parent"
@@ -61,50 +61,63 @@
             android:focusable="true"
             android:foreground="?attr/selectableItemBackground">
 
-            <LinearLayout
+            <!-- УБРАЛИ ФИКСИРОВАННУЮ ВЫСОТУ 160dp! Теперь высота зависит от контента -->
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="160dp"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:padding="16dp">
+                android:layout_height="wrap_content"
+                android:minHeight="160dp">
 
-                <ImageView
-                    android:id="@+id/ivPhotoIcon"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_"
-                    app:tint="#0288D1"
-                    android:layout_marginBottom="8dp" />
+                <!-- Плейсхолдер (иконка + текст) -->
+                <LinearLayout
+                    android:id="@+id/layoutPhotoPlaceholder"
+                    android:layout_width="match_parent"
+                    android:layout_height="160dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="16dp">
 
-                <TextView
-                    android:id="@+id/tvPhotoHint"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Добавить фото (Камера или Галерея)"
-                    android:textSize="15sp"
-                    android:textColor="#64748B"
-                    android:fontFamily="sans-serif-medium" />
+                    <ImageView
+                        android:id="@+id/ivPhotoIcon"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_"
+                        app:tint="#0288D1"
+                        android:layout_marginBottom="8dp" />
 
+                    <TextView
+                        android:id="@+id/tvPhotoHint"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Добавить фото (Камера или Галерея)"
+                        android:textSize="15sp"
+                        android:textColor="#64748B"
+                        android:fontFamily="sans-serif-medium" />
+                </LinearLayout>
+
+                <!-- Превью фото: теперь оно адаптивное! -->
                 <ImageView
                     android:id="@+id/ivPhotoPreview"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:scaleType="centerCrop"
-                    android:visibility="gone" />
+                    android:layout_height="wrap_content"
+                    android:adjustViewBounds="true"
+                    android:scaleType="fitCenter"
+                    android:visibility="gone"
+                    android:maxHeight="400dp" />
 
+                <!-- Кнопка удаления: позиционируется поверх фото -->
                 <ImageButton
                     android:id="@+id/btnRemovePhoto"
                     android:layout_width="36dp"
                     android:layout_height="36dp"
 
-
+                    android:src="@drawable/no_accounts_24dp_000000_fill0_wght400_grad0_opsz24"
                     android:contentDescription="Удалить фото"
                     android:layout_gravity="top|end"
-                    android:layout_marginTop="-140dp"
-                    android:layout_marginEnd="10dp"
+                    android:layout_margin="12dp"
                     android:visibility="gone"
-                    app:tint="#FFFFFF" />
-            </LinearLayout>
+                    app:tint="#EF4444" />
+
+            </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
 
         <!-- ✅ 3. ВИДИМОСТЬ ТОЧКИ (Современный Toggle) -->

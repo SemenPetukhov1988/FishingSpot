@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- ⚠️ РАЗРЕШАЕМ HTTP И САМОПОДПИСАННЫЕ СЕРТИФИКАТЫ ТОЛЬКО ДЛЯ ЛОКАЛЬНОГО СЕРВЕРА -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">153.76.168.237</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" /> <!-- Для самоподписанного SSL твоего сервера -->
+        </trust-anchors>
+    </domain-config>
+
+    <!-- ✅ ВСЕ ОСТАЛЬНЫЕ ДОМЕНЫ РАБОТАЮТ ПО СТАНДАРТНОЙ БЕЗОПАСНОСТИ -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

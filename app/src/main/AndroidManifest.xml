@@ -2,7 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Разрешения для GPS и работы карт -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -23,9 +22,20 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FishingSpot"
         tools:targetApi="31"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"> <!-- ✅ РАЗРЕШАЕМ HTTP ДЛЯ РАЗРАБОТКИ -->
 
-        <!-- ✅ MainActivity - точка входа в приложение -->
+        <!-- ❌ УБРАЛИ networkSecurityConfig -->
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -34,10 +44,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
     </application>
 
-    <!-- ✅ ОБЯЗАТЕЛЬНО ДЛЯ ANDROID 11+: Разрешаем приложению "видеть" карты -->
     <queries>
         <package android:name="ru.yandex.yandexmaps" />
         <package android:name="com.google.android.apps.maps" />

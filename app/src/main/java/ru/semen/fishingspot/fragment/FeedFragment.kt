@@ -4,16 +4,12 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import ru.semen.fishingspot.adapter.FeedAdapter
 import ru.semen.fishingspot.databinding.FragmentFeedBinding
-import ru.semen.fishingspot.utils.UserSessionManager
 import ru.semen.fishingspot.viewmodel.FeedViewModel
-import ru.semen.fishingspot.viewmodel.SpotViewModel
 
 class FeedFragment : Fragment() {
 
@@ -21,8 +17,6 @@ class FeedFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val feedViewModel: FeedViewModel by viewModels()
-    private val spotViewModel: SpotViewModel by activityViewModels()
-
     private lateinit var adapter: FeedAdapter
 
     override fun onCreateView(
@@ -37,40 +31,24 @@ class FeedFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // Настраиваем RecyclerView
         binding.rvFeed.layoutManager = LinearLayoutManager(requireContext())
 
-        adapter = FeedAdapter(
-            onSaveClick = { spot ->
-                val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: "unknown_user"
-
-                // 1. Проверка: это моя собственная точка?
-                if (spot.authorId == currentUserId) {
-                    Toast.makeText(requireContext(), "⚠️ Это уже ваша точка! Она в вашем дневнике.", Toast.LENGTH_SHORT).show()
-                    return@FeedAdapter
-                }
-
-                // 2. НОВАЯ ЛОГИКА: Вместо создания копии (addFullSpot), мы добавляем её в избранное (saved_spots)
-                // Это соответствует нашей новой архитектуре и предотвращает дублирование точек на сервере.
-                spotViewModel.saveToFavorites(spot)
-
-                Toast.makeText(requireContext(), "✅ Точка '${spot.name}' добавлена в избранное!", Toast.LENGTH_SHORT).show()
-
-                // Опционально: здесь можно обновить UI конкретной карточки, чтобы кнопка поменялась на "Убрать"
-                // Но для простоты пока оставим Toast.
-            },
-            onCommentClick = { spot ->
-                Toast.makeText(requireContext(), "💬 Комментарии скоро будут", Toast.LENGTH_SHORT).show()
-            },
-            onConfirmClick = { spot ->
-                Toast.makeText(requireContext(), "✅ Спасибо за проверку!", Toast.LENGTH_SHORT).show()
-            },
-            onDisputeClick = { spot ->
-                Toast.makeText(requireContext(), "⚠️ Жалоба отправлена", Toast.LENGTH_SHORT).show()
-            }
-        )
+        // ✅ СОЗДАЁМ АДАПТЕР ТОЛЬКО С ОДНИМ CALLBACK'ОМ - ОТКРЫТИЕ КАРТЫ
+        adapter = FeedAdapter(onMapClick = { spot ->
+            SpotMapPreviewDialog.newInstance(
+                lat = spot.latitude,
+                lon = spot.longitude,
+                spotName = spot.name
+            ).show(childFragmentManager, "map_preview")
+        })
 
         binding.rvFeed.adapter = adapter
 
+        // ✅ ЗАГРУЖАЕМ ПУБЛИЧНЫЕ ТОЧКИ ИЗ APPWRITE (ВМЕСТО FIREBASE LISTENING)
+        feedViewModel.loadFeed()
+
+        // Наблюдаем за данными ленты
         feedViewModel.spots.observe(viewLifecycleOwner) { spots ->
             if (spots.isEmpty()) {
                 binding.progressFeed.visibility = View.GONE
@@ -85,15 +63,8 @@ class FeedFragment : Fragment() {
         }
     }
 
-    override fun onStart() {
-        super.onStart()
-        feedViewModel.startListening()
-    }
-
-    override fun onStop() {
-        super.onStop()
-        feedViewModel.stopListening()
-    }
+    // ✅ УДАЛЕНЫ onStart() И onStop() — ОНИ БОЛЬШЕ НЕ НУЖНЫ ДЛЯ APPWRITE
+    // Загрузка происходит один раз при открытии фрагмента через loadFeed()
 
     override fun onDestroyView() {
         super.onDestroyView()

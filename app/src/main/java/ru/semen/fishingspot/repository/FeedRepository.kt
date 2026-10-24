@@ -1,73 +1,77 @@
-package ru.semen.fishingspot.repository // ⚠️ Проверь, что пакет совпадает с реальной папкой файла!
+package ru.semen.fishingspot.repository
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import com.google.firebase.Timestamp
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.Query
-import ru.semen.fishingspot.data.FishingSpot // ✅ Импортируем нашу единую модель
+import io.appwrite.Query
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import ru.semen.fishingspot.data.FishingSpot
+import ru.semen.fishingspot.utils.AppwriteManager
 
-/**
- * Отвечает за получение публичных точек для ленты.
- * Временно использует Firebase. Позже мы переключим его на Appwrite.
- */
 class FeedRepository {
 
-    private val firestore = FirebaseFirestore.getInstance()
-    private val collection = firestore.collection("public_spots")
+    // ⚠️ ЗАМЕНИ НА СВОИ РЕАЛЬНЫЕ ID ИЗ APPWRITE CONSOLE
+    private val DATABASE_ID = "6ad5021a0029a2c88786"
+    private val COLLECTION_ID = "6ad524e3001c9a28c3e5"
 
-    // ✅ Используем FishingSpot вместо PublicSpot
     private val _spots = MutableLiveData<List<FishingSpot>>()
     val spots: LiveData<List<FishingSpot>> = _spots
 
-    private var listener: ListenerRegistration? = null
-
     /**
-     * Подписываемся на обновления коллекции в реальном времени.
-     * Сортировка: новые сверху (по createdAt DESC).
+     * Загружает ТОЛЬКО публичные точки из Appwrite
      */
-    fun startListening() {
-        if (listener != null) return // защита от дублирования подписки
+    fun loadPublicSpots() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                android.util.Log.d("FEED_REPO", "🔄 Начало загрузки публичных точек...")
+                android.util.Log.d("FEED_REPO", "   DB: $DATABASE_ID | Collection: $COLLECTION_ID")
 
-        listener = collection
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    // Если Firebase просит создать индекс — в логе будет ссылка.
-                    return@addSnapshotListener
-                }
+                val result = AppwriteManager.databases.listDocuments(
+                    databaseId = DATABASE_ID,
+                    collectionId = COLLECTION_ID,
+                    queries = listOf(
+                        Query.equal("visibility", "public"), // ✅ Фильтр по видимости
+                        Query.orderDesc("createdAt"),         // ✅ Новые сверху
+                        Query.limit(50)                       // ✅ Пагинация
+                    )
+                )
 
-                val list = mutableListOf<FishingSpot>()
-                for (doc in snapshot!!) {
+                android.util.Log.d("FEED_REPO", "✅ Сервер вернул документов: ${result.documents.size}")
+
+                val list = result.documents.map { doc ->
                     val data = doc.data
-                    val timestamp = (data["createdAt"] as? Timestamp)?.toDate()?.time
-                        ?: System.currentTimeMillis()
+                    // Логируем каждую точку для отладки
+                    android.util.Log.d("FEED_REPO", "   📍 Точка: ${data["name"]} (vis: ${data["visibility"]})")
 
-                    list.add(
-                        FishingSpot(
-                            id = 0, // ID для Room (если точку сохранят локально, Room сгенерирует свой)
-                            latitude = (data["latitude"] as? Double) ?: 0.0,
-                            longitude = (data["longitude"] as? Double) ?: 0.0,
-                            name = (data["name"] as? String) ?: "Без названия",
-                            description = (data["description"] as? String) ?: "",
-                            catchWeight = (data["catchWeight"] as? Double) ?: 0.0,
-                            isVerified = (data["isVerified"] as? Boolean) ?: false,
-                            authorId = (data["authorId"] as? String) ?: "unknown",
-                            visibility = "public", // ✅ Явно указываем, что это публичная точка
-                            createdAt = timestamp
-                        )
+                    FishingSpot(
+                        documentId = doc.id,
+                        name = (data["name"] as? String) ?: "",
+                        description = (data["description"] as? String) ?: "",
+                        latitude = (data["latitude"] as? Double) ?: 0.0,
+                        longitude = (data["longitude"] as? Double) ?: 0.0,
+                        photoUrl = data["photoUrl"] as? String,
+                        authorId = (data["authorId"] as? String) ?: "",
+                        authorName = (data["authorName"] as? String) ?: "Рыбак",
+                        visibility = (data["visibility"] as? String) ?: "private",
+                        catchWeight = (data["catchWeight"] as? Double) ?: 0.0,
+                        fishType = (data["fishType"] as? String),
+                        createdAt = (data["createdAt"] as? Long) ?: 0L
                     )
                 }
-                _spots.value = list
-            }
-    }
 
-    /**
-     * Отписываемся — экономим батарею и трафик.
-     */
-    fun stopListening() {
-        listener?.remove()
-        listener = null
+                withContext(Dispatchers.Main) {
+                    _spots.value = list
+                    android.util.Log.d("FEED_REPO", " UI обновлен. Всего точек в ленте: ${list.size}")
+                }
+
+            } catch (e: Exception) {
+                android.util.Log.e("FEED_REPO", "❌ КРИТИЧЕСКАЯ ОШИБКА: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    _spots.value = emptyList()
+                }
+            }
+        }
     }
 }

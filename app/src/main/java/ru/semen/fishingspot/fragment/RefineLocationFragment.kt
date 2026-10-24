@@ -2,6 +2,7 @@ package ru.semen.fishingspot.fragment
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -14,6 +15,8 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.findNavController
+import io.appwrite.ID
+import io.appwrite.models.InputFile
 import kotlinx.coroutines.launch
 import org.osmdroid.api.IGeoPoint
 import org.osmdroid.util.GeoPoint
@@ -22,6 +25,8 @@ import org.osmdroid.views.overlay.CopyrightOverlay
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentRefineLocationBinding
+import ru.semen.fishingspot.utils.AppwriteManager
+import ru.semen.fishingspot.utils.ImageUtils
 import ru.semen.fishingspot.utils.NetworkMonitor
 import ru.semen.fishingspot.viewmodel.SpotViewModel
 import kotlin.math.*
@@ -271,27 +276,66 @@ class RefineLocationFragment : Fragment() {
     }
 
     // ✅ ЕДИНЫЙ МЕТОД СОХРАНЕНИЯ (ViewModel сама решит: Appwrite -> Room)
+    // ✅ ЕДИНЫЙ МЕТОД СОХРАНЕНИЯ
     private fun saveSpot(point: IGeoPoint, isVerified: Boolean) {
-        android.util.Log.d("DEBUG_REFINE", "💾 Отправка точки на сохранение. Автор: $authorName, ID: $authorId")
+        lifecycleScope.launch {
+            if (_binding == null) return@launch
 
-        spotViewModel.addFullSpot(
-            lat = point.latitude,
-            lon = point.longitude,
-            name = spotName,
-            description = spotDesc,
-            weight = spotWeight,
-            visibility = spotVisibility,
-            photoPath = photoPath,
-            photoUrl = null, // ✅ ДОБАВЛЕНО: соответствие новой сигнатуре
-            fishType = fishType,
-            isVerified = isVerified,
-            createdAt = spotCreatedAt,
-            authorId = authorId,
-            authorName = authorName
-        )
-        navigateBack()
+            binding.btnDone.isEnabled = false
+            binding.btnDone.text = "Загрузка фото..."
+
+            var photoUrl: String? = null
+
+            val photoUriString = arguments?.getString("PHOTO_URI")
+            if (!photoUriString.isNullOrEmpty()) {
+                try {
+                    val photoUri = Uri.parse(photoUriString)
+                    val imageBytes = ImageUtils.compressImage(requireContext(), photoUri)
+
+                    if (imageBytes != null) {
+                        val fileName = "spot_${System.currentTimeMillis()}.jpg"
+                        val fileId = ID.unique()
+
+                        val inputFile = InputFile.fromBytes(imageBytes, fileName, "image/jpeg")
+
+                        // 1. Создаем файл в бакете
+                        val file = AppwriteManager.storage.createFile(
+                            bucketId = "6ada43f9003aa9f4d6a2",
+                            fileId = fileId,
+                            file = inputFile
+                        )
+
+                        Log.d("REFINE_DEBUG", " Файл создан. File ID: ${file.id}")
+
+                        // ✅ ВРЕМЕННЫЙ АДРЕС ДЛЯ РАЗРАБОТКИ (HTTP + ПОРТ 8080)
+                        val serverIp = "153.76.168.237"
+                        val bucketId = "6ada43f9003aa9f4d6a2"
+                        val projectId = "6acfd94b00107a8657d8"
+
+                        // ВАЖНО: http:// и :8080
+                        photoUrl = "http://$serverIp:8080/v1/storage/buckets/$bucketId/files/${file.id}/view?project=$projectId"
+
+                        Log.d("REFINE_DEBUG", "✅ Сформирован временный URL: $photoUrl")
+                    }
+                } catch (e: Exception) {
+                    Log.e("REFINE_DEBUG", "❌ Ошибка загрузки фото", e)
+                    Toast.makeText(requireContext(), "Не удалось загрузить фото", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            binding.btnDone.text = "Сохранение точки..."
+
+            spotViewModel.addFullSpot(
+                lat = point.latitude, lon = point.longitude, name = spotName,
+                description = spotDesc, weight = spotWeight, visibility = spotVisibility,
+                photoPath = null, photoUrl = photoUrl, fishType = fishType,
+                isVerified = isVerified, createdAt = spotCreatedAt,
+                authorId = authorId, authorName = authorName
+            )
+
+            navigateBack()
+        }
     }
-
     private fun navigateBack() {
         try {
             requireActivity().findNavController(R.id.fragmentContainer).navigate(R.id.action_refine_to_tabs)
