@@ -1,7 +1,7 @@
 package ru.semen.fishingspot.viewmodel
 
-import android.app.Application // ✅ Добавлен импорт
-import androidx.lifecycle.AndroidViewModel // ✅ Изменено с ViewModel на AndroidViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
@@ -10,7 +10,6 @@ import ru.semen.fishingspot.data.Friend
 import ru.semen.fishingspot.data.FriendsRepository
 import ru.semen.fishingspot.data.User
 
-// ✅ Теперь принимаем Application в конструкторе
 class FriendsViewModel(application: Application) : AndroidViewModel(application) {
 
     // ✅ Передаём контекст приложения в репозиторий
@@ -22,24 +21,29 @@ class FriendsViewModel(application: Application) : AndroidViewModel(application)
     private val _message = MutableLiveData<String>()
     val message: LiveData<String> = _message
 
-    init {
-        observeFriends()
-    }
+    // ✅ Убрали init блок. Загрузка теперь происходит явно по запросу из Fragment
 
-    private fun observeFriends() {
+    /**
+     * Загружает список друзей из Appwrite
+     */
+    fun loadFriends() {
         viewModelScope.launch {
-            repository.getFriendsFlow().collect { friendsList ->
-                _friends.value = friendsList
-            }
+            val list = repository.getFriends()
+            _friends.value = list
         }
     }
 
+    /**
+     * Отправляет запрос в друзья через коллекцию messages
+     */
     fun sendFriendRequest(friendId: String, friendName: String) {
         viewModelScope.launch {
             val result = repository.sendFriendRequest(friendId, friendName)
 
             result.onSuccess {
                 _message.value = "✅ Запрос в друзья отправлен!"
+                // Опционально: можно перезагрузить список, если нужно обновить статусы
+                // loadFriends()
             }
             result.onFailure { error ->
                 _message.value = "❌ Ошибка: ${error.message}"
@@ -47,45 +51,44 @@ class FriendsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * Поиск пользователей по никнейму через индекс Appwrite
+     */
     suspend fun searchUsers(query: String): List<User> {
         return repository.searchUsers(query)
     }
 
-    fun sendSpotRequest(friendId: String, friendName: String, customMessage: String) {
+    /**
+     * Принятие заявки в друзья (для фрагмента сообщений)
+     */
+    fun acceptFriendRequest(friendId: String, messageId: String) { // ✅ Убрали friendName из параметров
         viewModelScope.launch {
-            val result = repository.sendSpotRequest(friendId, friendName, customMessage)
-            result.onFailure { error ->
-                _message.value = "❌ Ошибка отправки: ${error.message}"
-            }
-        }
-    }
+            val result = repository.acceptFriendRequest(friendId, messageId) // ✅ Передаем только 2 аргумента
 
-    fun sendSharedSpot(
-        requesterId: String,
-        requesterName: String,
-        spot: ru.semen.fishingspot.data.FishingSpot,
-        originalMessageId: String
-    ) {
-        viewModelScope.launch {
-            val result = repository.sendSharedSpot(requesterId, requesterName, spot, originalMessageId)
-            result.onSuccess {
-                _message.value = "✅ Точка успешно отправлена!"
-            }
-            result.onFailure { error ->
-                _message.value = "❌ Ошибка отправки: ${error.message}"
-            }
-        }
-    }
-
-    fun acceptFriendRequest(friendId: String, friendName: String, messageId: String) {
-        viewModelScope.launch {
-            val result = repository.acceptFriendRequest(friendId, friendName, messageId)
             result.onSuccess {
                 _message.value = "✅ Теперь вы друзья!"
+                loadFriends() // Обновляем список друзей после принятия
             }
             result.onFailure { error ->
                 _message.value = "❌ Ошибка: ${error.message}"
             }
         }
     }
+
+    fun removeFriend(friendId: String, friendName: String) {
+        viewModelScope.launch {
+            val result = repository.removeFriend(friendId)
+
+            result.onSuccess {
+                _message.value = "❌ $friendName удален из друзей"
+                // ✅ ОБЯЗАТЕЛЬНО перезагружаем список после удаления
+                loadFriends()
+            }
+            result.onFailure { error ->
+                _message.value = "❌ Ошибка удаления: ${error.message}"
+            }
+        }
+    }
+
+    // ❌ Методы sendSpotRequest, sendSharedSpot удалены, так как логика точек убрана из этого экрана
 }

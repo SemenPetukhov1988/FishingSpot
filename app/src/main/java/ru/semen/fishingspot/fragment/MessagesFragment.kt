@@ -7,12 +7,15 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
+import io.appwrite.Query
+
+import kotlinx.coroutines.launch
 import ru.semen.fishingspot.adapter.MessagesAdapter
 import ru.semen.fishingspot.data.AppMessage
 import ru.semen.fishingspot.databinding.FragmentMessagesBinding
+import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.UserSessionManager
 import ru.semen.fishingspot.viewmodel.FriendsViewModel
 import ru.semen.fishingspot.viewmodel.SpotViewModel
@@ -22,12 +25,14 @@ class MessagesFragment : Fragment() {
     private var _binding: FragmentMessagesBinding? = null
     private val binding get() = _binding!!
 
-    private val firestore = FirebaseFirestore.getInstance()
-    private lateinit var adapter: MessagesAdapter
-    private var messagesListener: ListenerRegistration? = null
+    // ⚠️ ЗАМЕНИ НА СВОЙ ID КОЛЛЕКЦИИ MESSAGES ИЗ APPWRITE CONSOLE
+    private val MESSAGES_COL_ID = "6aeb4c1600142e707a69"
+    private val DB_ID = "6ad5021a0029a2c88786"
 
     private val spotViewModel: SpotViewModel by viewModels()
     private val friendsViewModel: FriendsViewModel by viewModels()
+
+    private lateinit var adapter: MessagesAdapter
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -39,6 +44,11 @@ class MessagesFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        setupAdapter()
+        loadMessages()
+    }
+
+    private fun setupAdapter() {
         adapter = MessagesAdapter(
             onSenderClick = { message ->
                 Toast.makeText(requireContext(), "Профиль: ${message.senderName}", Toast.LENGTH_SHORT).show()
@@ -46,130 +56,144 @@ class MessagesFragment : Fragment() {
             onMessageClick = { message ->
                 Toast.makeText(requireContext(), "Открываем: ${message.spotName}", Toast.LENGTH_SHORT).show()
             },
-            onShareRequestClick = { message ->
-                val myUserId = UserSessionManager.getCurrentUserId(requireContext())
-                if (myUserId == null) {
-                    Toast.makeText(requireContext(), "Ошибка: не авторизован", Toast.LENGTH_SHORT).show()
-                    return@MessagesAdapter
-                }
-                SelectSpotBottomSheet(
-                    spotViewModel = spotViewModel,
-                    requesterName = message.senderName,
-                    myUserId = myUserId
-                ) { selectedSpot ->
-                    friendsViewModel.sendSharedSpot(
-                        requesterId = message.senderId,
-                        requesterName = message.senderName,
-                        spot = selectedSpot,
-                        originalMessageId = message.id
-                    )
-                }.show(childFragmentManager, "select_spot_sheet")
-            },
+            // ✅ УБРАН onShareRequestClick, так как sendSharedSpot удален из ViewModel
+            // Если эта фича нужна позже - вернем через отдельный метод
             onDeclineRequestClick = { message ->
-                Toast.makeText(requireContext(), "Запрос отклонен", Toast.LENGTH_SHORT).show()
                 deleteMessage(message.id)
+                Toast.makeText(requireContext(), "Запрос отклонен", Toast.LENGTH_SHORT).show()
             },
             onTakeSpotClick = { message ->
-                // ✅ ИСПРАВЛЕНО: Добавлены параметры photoUrl и authorName для соответствия новой сигнатуре
                 spotViewModel.addFullSpot(
-                    lat = message.spotLat,
-                    lon = message.spotLon,
-                    name = message.spotName,
+                    lat = message.spotLat ?: 0.0,
+                    lon = message.spotLon ?: 0.0,
+                    name = message.spotName ?: "Без названия",
                     description = "Получено от ${message.senderName}",
-                    weight = 0.0,
+                    weight = message.spotWeight ?: 0.0,
                     visibility = "private",
                     photoPath = null,
-                    photoUrl = null,          // ✅ ДОБАВЛЕНО
+                    photoUrl = null,
                     fishType = null,
                     isVerified = false,
                     createdAt = message.spotCreatedAt ?: System.currentTimeMillis(),
                     authorId = message.senderId,
-                    authorName = message.senderName // ✅ ДОБАВЛЕНО для корректного отображения
+                    authorName = message.senderName
                 )
-                Toast.makeText(requireContext(), "Точка '${message.spotName}' сохранена в дневник!", Toast.LENGTH_LONG).show()
                 deleteMessage(message.id)
+                Toast.makeText(requireContext(), "Точка '${message.spotName}' сохранена!", Toast.LENGTH_LONG).show()
             },
             onAcceptFriendClick = { message ->
+                // ✅ ИСПРАВЛЕНО: Передаем только 2 параметра, как требует новый ViewModel
                 friendsViewModel.acceptFriendRequest(
                     friendId = message.senderId,
-                    friendName = message.senderName,
                     messageId = message.id
                 )
+                deleteMessage(message.id)
             },
             onDeclineFriendClick = { message ->
-                Toast.makeText(requireContext(), "Запрос отклонен", Toast.LENGTH_SHORT).show()
                 deleteMessage(message.id)
+                Toast.makeText(requireContext(), "Запрос отклонен", Toast.LENGTH_SHORT).show()
             },
             onViewFriendSpotClick = { message ->
                 SpotPreviewBottomSheet(
                     spotViewModel = spotViewModel,
-                    senderName = message.senderName,
+                    senderName = message.senderName ?: "",
                     senderId = message.senderId,
-                    spotName = message.spotName,
-                    spotDesc = message.spotDescription,
-                    spotLat = message.spotLat,
-                    spotLon = message.spotLon,
-                    spotWeight = message.spotWeight,
+                    spotName = message.spotName ?: "",
+                    spotDesc = message.spotDescription ?: "",
+                    spotLat = message.spotLat ?: 0.0,
+                    spotLon = message.spotLon ?: 0.0,
+                    spotWeight = message.spotWeight ?: 0.0,
                     spotCreatedAt = message.spotCreatedAt,
                     messageId = message.id,
-                    onDeclineAndDelete = {
-                        deleteMessage(message.id)
-                    }
+                    onDeclineAndDelete = { deleteMessage(message.id) }
                 ).show(childFragmentManager, "spot_preview_sheet")
             }
         )
 
         binding.rvMessages.layoutManager = LinearLayoutManager(requireContext())
         binding.rvMessages.adapter = adapter
-
-        subscribeToMessages()
     }
 
-    private fun subscribeToMessages() {
-        val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: return
-        android.util.Log.d("DEBUG_SPOT", "👂 Подписка на сообщения для: $currentUserId")
+    private fun loadMessages() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: return@launch
 
-        messagesListener = firestore.collection("messages")
-            .whereEqualTo("recipientId", currentUserId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    android.util.Log.e("DEBUG_SPOT", "❌ Ошибка подписки", error)
-                    return@addSnapshotListener
+            try {
+                val result = AppwriteManager.databases.listDocuments(
+                    databaseId = DB_ID,
+                    collectionId = MESSAGES_COL_ID,
+                    queries = listOf(
+                        Query.equal("recipientId", currentUserId),
+                        Query.orderDesc("timestamp"),
+                        Query.limit(50)
+                    )
+                )
+
+                val messages = result.documents.mapNotNull { doc ->
+                    val data = doc.data
+                    AppMessage(
+                        id = doc.id,
+                        messageId = doc.id, // ✅ Дублируем ID для операций удаления/принятия
+
+                        senderId = data["senderId"] as? String ?: "",
+                        senderName = data["senderName"] as? String ?: "Рыбак",
+                        recipientId = data["recipientId"] as? String ?: "",
+
+                        type = data["type"] as? String ?: "SYSTEM",
+
+                        spotId = data["spotId"] as? String ?: "", // ✅ Исправлено: String? → String с дефолтом
+                        spotName = data["spotName"] as? String ?: "",
+
+                        spotLat = data["spotLat"] as? Double ?: 0.0,
+                        spotLon = data["spotLon"] as? Double ?: 0.0,
+
+                        contentText = data["contentText"] as? String ?: "",
+                        customMessage = data["customMessage"] as? String ?: "",
+
+                        spotDescription = data["spotDescription"] as? String ?: "",
+                        spotWeight = data["spotWeight"] as? Double ?: 0.0,
+                        spotCreatedAt = (data["spotCreatedAt"] as? Number)?.toLong() ?: 0L,
+                        spotIsVerified = data["spotIsVerified"] as? Boolean ?: false,
+                        spotPhotoPath = data["spotPhotoPath"] as? String, // Nullable поле оставляем как есть
+
+                        isRead = data["isRead"] as? Boolean ?: false,
+                        timestamp = (data["timestamp"] as? Number)?.toLong() ?: 0L
+                    )
                 }
 
-                if (snapshot != null) {
-                    val messages = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(AppMessage::class.java)?.copy(id = doc.id)
-                    }
-                    val sortedMessages = messages.sortedByDescending { it.timestamp }
+                adapter.submitList(messages)
 
-                    adapter.submitList(sortedMessages)
-
-                    if (sortedMessages.isEmpty()) {
-                        binding.layoutEmptyState.visibility = View.VISIBLE
-                        binding.rvMessages.visibility = View.GONE
-                    } else {
-                        binding.layoutEmptyState.visibility = View.GONE
-                        binding.rvMessages.visibility = View.VISIBLE
-                    }
+                if (messages.isEmpty()) {
+                    binding.layoutEmptyState.visibility = View.VISIBLE
+                    binding.rvMessages.visibility = View.GONE
+                } else {
+                    binding.layoutEmptyState.visibility = View.GONE
+                    binding.rvMessages.visibility = View.VISIBLE
                 }
+
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "Ошибка загрузки сообщений: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+        }
     }
 
     private fun deleteMessage(messageId: String) {
-        firestore.collection("messages").document(messageId)
-            .delete()
-            .addOnSuccessListener {
-                android.util.Log.d("DEBUG_SPOT", "✅ Сообщение удалено")
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                AppwriteManager.databases.deleteDocument(
+                    databaseId = DB_ID,
+                    collectionId = MESSAGES_COL_ID,
+                    documentId = messageId
+                )
+                // Перезагружаем список после удаления
+                loadMessages()
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "Ошибка удаления", Toast.LENGTH_SHORT).show()
             }
-            .addOnFailureListener { e ->
-                android.util.Log.e("DEBUG_SPOT", "❌ Ошибка удаления", e)
-            }
+        }
     }
 
     override fun onDestroyView() {
-        messagesListener?.remove()
-        messagesListener = null
         _binding = null
         super.onDestroyView()
     }

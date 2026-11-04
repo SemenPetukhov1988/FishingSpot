@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.fragment
+package ru.semen.fishingspot.adapter
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -9,9 +9,9 @@ import ru.semen.fishingspot.data.Friend
 import ru.semen.fishingspot.databinding.ItemFriendBinding
 
 class FriendAdapter(
-
     private val onRequestClick: (Friend) -> Unit,
-    private val onRemoveClick: (Friend) -> Unit
+    private val onRemoveClick: (Friend) -> Unit,
+    private val onItemClick: (Friend) -> Unit // ✅ Новый колбэк для клика по карточке
 ) : ListAdapter<Friend, FriendAdapter.FriendViewHolder>(FriendDiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FriendViewHolder {
@@ -24,7 +24,6 @@ class FriendAdapter(
     }
 
     inner class FriendViewHolder(private val binding: ItemFriendBinding) : RecyclerView.ViewHolder(binding.root) {
-
         fun bind(friend: Friend) {
             binding.tvFriendName.text = friend.name
             binding.tvFriendStatus.text = friend.status
@@ -37,8 +36,10 @@ class FriendAdapter(
             }
             binding.tvAvatarLetter.text = firstLetter
 
-            // Клики по кнопкам
+            // ✅ Клик по всей карточке - проверка дружбы
+            binding.root.setOnClickListener { onItemClick(friend) }
 
+            // Кнопки действий
             binding.btnRequestSpot.setOnClickListener { onRequestClick(friend) }
             binding.btnRemoveFriend.setOnClickListener { onRemoveClick(friend) }
         }

@@ -8,7 +8,7 @@ import ru.semen.fishingspot.databinding.ItemMessageBinding
 import ru.semen.fishingspot.databinding.ItemSpotRequestBinding
 import ru.semen.fishingspot.databinding.ItemSpotSharedBinding
 import ru.semen.fishingspot.databinding.ItemFriendRequestBinding
-import ru.semen.fishingspot.databinding.ItemFriendSpotBinding // ✅ Новый импорт
+import ru.semen.fishingspot.databinding.ItemFriendSpotBinding
 import ru.semen.fishingspot.data.AppMessage
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -23,7 +23,7 @@ class MessagesAdapter(
     private val onTakeSpotClick: ((AppMessage) -> Unit)? = null,
     private val onAcceptFriendClick: ((AppMessage) -> Unit)? = null,
     private val onDeclineFriendClick: ((AppMessage) -> Unit)? = null,
-    private val onViewFriendSpotClick: ((AppMessage) -> Unit)? = null // ✅ Новый колбэк
+    private val onViewFriendSpotClick: ((AppMessage) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private var items: List<AppMessage> = emptyList()
@@ -34,7 +34,8 @@ class MessagesAdapter(
         const val VIEW_TYPE_SPOT_SHARED = 2
         const val VIEW_TYPE_NEW_FRIEND = 3
         const val VIEW_TYPE_SYSTEM = 4
-        const val VIEW_TYPE_FRIEND_SPOT = 5 // ✅ Новый тип
+        const val VIEW_TYPE_FRIEND_SPOT = 5
+        const val VIEW_TYPE_FRIEND_ACCEPTED = 6 // ✅ Новый тип для уведомления о принятии
     }
 
     fun submitList(newList: List<AppMessage>) {
@@ -49,7 +50,8 @@ class MessagesAdapter(
             typeStr == "SPOT_REQUEST" || typeStr == "REQUEST_SPOT" -> VIEW_TYPE_SPOT_REQUEST
             typeStr == "SPOT_SHARED" -> VIEW_TYPE_SPOT_SHARED
             typeStr == "NEW_FRIEND" -> VIEW_TYPE_NEW_FRIEND
-            typeStr == "FRIEND_SPOT" -> VIEW_TYPE_FRIEND_SPOT // ✅
+            typeStr == "FRIEND_SPOT" -> VIEW_TYPE_FRIEND_SPOT
+            typeStr == "FRIEND_ACCEPTED" -> VIEW_TYPE_FRIEND_ACCEPTED // ✅
             typeStr == "SYSTEM" -> VIEW_TYPE_SYSTEM
             else -> VIEW_TYPE_NEW_REVIEW
         }
@@ -73,9 +75,13 @@ class MessagesAdapter(
                 val binding = ItemFriendRequestBinding.inflate(LayoutInflater.from(parent.context), parent, false)
                 FriendRequestViewHolder(binding)
             }
-            VIEW_TYPE_FRIEND_SPOT -> { // ✅
+            VIEW_TYPE_FRIEND_SPOT -> {
                 val binding = ItemFriendSpotBinding.inflate(LayoutInflater.from(parent.context), parent, false)
                 FriendSpotViewHolder(binding)
+            }
+            VIEW_TYPE_FRIEND_ACCEPTED -> { // ✅ Создаём ViewHolder для уведомления
+                val binding = ItemMessageBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+                FriendAcceptedViewHolder(binding)
             }
             else -> throw IllegalArgumentException("Unknown view type: $viewType")
         }
@@ -88,7 +94,8 @@ class MessagesAdapter(
             is SpotRequestViewHolder -> holder.bind(message)
             is SpotSharedViewHolder -> holder.bind(message)
             is FriendRequestViewHolder -> holder.bind(message)
-            is FriendSpotViewHolder -> holder.bind(message) // ✅
+            is FriendSpotViewHolder -> holder.bind(message)
+            is FriendAcceptedViewHolder -> holder.bind(message) // ✅
         }
     }
 
@@ -145,19 +152,33 @@ class MessagesAdapter(
         }
     }
 
-    // ✅ НОВЫЙ ViewHolder для уведомления о рыбалке друга
     inner class FriendSpotViewHolder(private val binding: ItemFriendSpotBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(message: AppMessage) {
             val authorName = message.senderName.ifEmpty { "Рыбак" }
             binding.tvFriendSpotAuthorName.text = authorName
             binding.tvFriendSpotAvatar.text = authorName.firstOrNull()?.uppercase() ?: "?"
             binding.tvFriendSpotTime.text = getTimeAgo(message.timestamp)
-
             binding.tvFriendSpotName.text = message.spotName
             binding.tvFriendSpotDescription.text = message.spotDescription.ifEmpty { "Без описания" }
-
             binding.tvFriendSpotAuthorName.setOnClickListener { onSenderClick(message) }
             binding.btnViewSpot.setOnClickListener { onViewFriendSpotClick?.invoke(message) }
+        }
+    }
+
+    // ✅ НОВЫЙ ViewHolder для уведомления о принятии заявки в друзья
+    inner class FriendAcceptedViewHolder(private val binding: ItemMessageBinding) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(message: AppMessage) {
+            val authorName = message.senderName.ifEmpty { "Рыбак" }
+            binding.tvSenderName.text = authorName
+            binding.tvMessageAction.text = "принял вашу заявку"
+            binding.tvMessagePreview.text = message.contentText.ifEmpty { "Теперь вы друзья!" }
+            binding.tvMessageTime.text = getTimeAgo(message.timestamp)
+
+            // Скрываем индикатор непрочитанного, так как это системное уведомление
+            binding.viewUnreadIndicator.visibility = View.GONE
+
+            binding.tvSenderName.setOnClickListener { onSenderClick(message) }
+            binding.root.setOnClickListener { onMessageClick(message) }
         }
     }
 

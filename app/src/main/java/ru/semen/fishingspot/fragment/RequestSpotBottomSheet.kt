@@ -18,6 +18,7 @@ class RequestSpotBottomSheet(
     private var _binding: BottomSheetRequestSpotBinding? = null
     private val binding get() = _binding!!
 
+    // ✅ ViewModel оставлен на случай, если захочешь быстро добавить логику позже
     private val viewModel: FriendsViewModel by activityViewModels()
 
     override fun onCreateView(
@@ -30,7 +31,8 @@ class RequestSpotBottomSheet(
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.tvFriendName.text = "Для: $friendName"
+        binding.tvFriendName.text = "Рекомендация для: $friendName"
+        binding.etRequestMessage.hint = "Опиши, какую точку порекомендовать..."
 
         binding.btnSendRequest.setOnClickListener {
             val messageText = binding.etRequestMessage.text.toString().trim()
@@ -40,11 +42,16 @@ class RequestSpotBottomSheet(
                 return@setOnClickListener
             }
 
-            // Вызываем метод ViewModel для отправки
-            viewModel.sendSpotRequest(friendId, friendName, messageText)
+            // ✅ ЗАГЛУШКА: Пока просто уведомляем пользователя
+            // Позже здесь будет вызов viewModel.sendFishingRecommendation(...)
+            Toast.makeText(
+                requireContext(),
+                "🚧 Функция рекомендаций точек скоро будет доступна!",
+                Toast.LENGTH_LONG
+            ).show()
 
-            Toast.makeText(requireContext(), "Запрос отправлен!", Toast.LENGTH_SHORT).show()
-            dismiss()
+            // Опционально: можно закрыть шторку после клика
+            // dismiss()
         }
     }
 
