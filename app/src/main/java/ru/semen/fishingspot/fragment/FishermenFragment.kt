@@ -11,6 +11,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import kotlinx.coroutines.launch
+import ru.semen.fishingspot.R
 import ru.semen.fishingspot.adapter.FriendAdapter
 import ru.semen.fishingspot.databinding.FragmentUserBinding
 import ru.semen.fishingspot.utils.AppwriteManager
@@ -22,9 +23,8 @@ class FishermenFragment : Fragment() {
     private var _binding: FragmentUserBinding? = null
     private val binding get() = _binding!!
 
-    // ⚠️ ЗАМЕНИ НА СВОИ РЕАЛЬНЫЕ ID ИЗ APPWRITE CONSOLE
-    private  val DB_ID = "6ad5021a0029a2c88786"
-    private  val USERS_COL_ID = "6ad5022b003770d2864c"
+    private val DB_ID = "6ad5021a0029a2c88786"
+    private val USERS_COL_ID = "6ad5022b003770d2864c"
 
     private val viewModel: FriendsViewModel by viewModels()
     private lateinit var adapter: FriendAdapter
@@ -38,19 +38,15 @@ class FishermenFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setupRecyclerView()
         observeData()
         setupFab()
         setupSwipeRefresh()
-
         viewModel.loadFriends()
     }
 
     private fun setupSwipeRefresh() {
-        binding.swipeRefresh.setOnRefreshListener {
-            viewModel.loadFriends()
-        }
+        binding.swipeRefresh.setOnRefreshListener { viewModel.loadFriends() }
     }
 
     private fun setupRecyclerView() {
@@ -69,57 +65,50 @@ class FishermenFragment : Fragment() {
                     .setNegativeButton("Отмена", null)
                     .show()
             },
-            onItemClick = { friend ->
-                checkIfStillFriend(friend)
-            }
+            onItemClick = { friend -> checkIfStillFriend(friend) }
         )
-
         binding.rvFriends.layoutManager = LinearLayoutManager(requireContext())
         binding.rvFriends.adapter = adapter
     }
 
-    /**
-     * Проверяет СЕРВЕРНОЕ состояние дружбы перед открытием шторки.
-     * Смотрит, есть ли МОЙ ID в списке друзей того, на кого кликнули.
-     */
     private fun checkIfStillFriend(friend: ru.semen.fishingspot.data.Friend) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val myId = UserSessionManager.getCurrentUserId(requireContext())
-                    ?: return@launch
-
-                // ✅ Запрашиваем документ ДРУГА с сервера
+                val myId = UserSessionManager.getCurrentUserId(requireContext()) ?: return@launch
                 val friendDoc = AppwriteManager.databases.getDocument(
                     databaseId = DB_ID,
                     collectionId = USERS_COL_ID,
                     documentId = friend.id
                 )
-
                 val friendFriendsList = friendDoc.data["friends"] as? List<String> ?: emptyList()
-
-                // ✅ Проверяем: есть ли я всё ещё в ЕГО списке друзей?
                 val isStillFriend = friendFriendsList.contains(myId)
 
                 if (!isStillFriend) {
-                    Toast.makeText(
-                        requireContext(),
-                        "${friend.name} удалил(а) вас из друзей",
-                        Toast.LENGTH_LONG
-                    ).show()
-
-                    // Удаляем из локального списка мгновенно
+                    Toast.makeText(requireContext(), "${friend.name} удалил(а) вас из друзей", Toast.LENGTH_LONG).show()
                     val currentList = viewModel.friends.value?.filter { it.id != friend.id } ?: emptyList()
                     adapter.submitList(currentList)
-
-                    // Обновляем данные с сервера в фоне
                     viewModel.loadFriends()
                 } else {
-                    // Всё ок, открываем шторку запроса точки
-                    RequestSpotBottomSheet(friend.id, friend.name)
-                        .show(childFragmentManager, "request_spot_sheet")
+                    // ✅ ОТКРЫТИЕ КАРТЫ ЧЕРЕЗ CHILD FRAGMENT MANAGER ТАБОВ
+                    val mapFragment = FriendMapFragment().apply {
+                        arguments = Bundle().apply {
+                            putString("arg_friend_id", friend.id)
+                            putString("arg_friend_name", friend.name)
+                        }
+                    }
+
+                    parentFragmentManager.beginTransaction()
+                        .setCustomAnimations(
+                            R.anim.slide_in_right,
+                            R.anim.slide_out_left,
+                            R.anim.slide_in_left,
+                            R.anim.slide_out_right
+                        )
+                        .replace(R.id.fragmentContainer, mapFragment)
+                        .addToBackStack("friend_map")
+                        .commit()
                 }
             } catch (e: Exception) {
-                // Если сеть недоступна или ошибка - просто открываем шторку, не блокируем UX
                 android.util.Log.e("FRIEND_CHECK", "Ошибка проверки дружбы: ${e.message}")
                 RequestSpotBottomSheet(friend.id, friend.name)
                     .show(childFragmentManager, "request_spot_sheet")
@@ -132,11 +121,8 @@ class FishermenFragment : Fragment() {
             showFriends(friendsList)
             binding.swipeRefresh.isRefreshing = false
         }
-
         viewModel.message.observe(viewLifecycleOwner) { msg ->
-            if (!msg.isNullOrEmpty()) {
-                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
-            }
+            if (!msg.isNullOrEmpty()) Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
         }
     }
 
