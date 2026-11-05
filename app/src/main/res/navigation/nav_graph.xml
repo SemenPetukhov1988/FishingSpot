@@ -47,6 +47,16 @@
             app:popUpToInclusive="false" />
     </fragment>
 
+    <!-- ✅ КАРТА ДРУГА С СОБСТВЕННЫМ ЭКШЕНОМ К ДЕТАЛЯМ -->
+    <fragment
+        android:id="@+id/friendMapFragment"
+        android:name="ru.semen.fishingspot.fragment.FriendMapFragment"
+        android:label="FriendMapFragment">
+        <action
+            android:id="@+id/action_friend_map_to_details"
+            app:destination="@id/spotDetailsFragment" />
+    </fragment>
+
     <fragment
         android:id="@+id/spotDetailsFragment"
         android:name="ru.semen.fishingspot.fragment.SpotDetailsFragment"

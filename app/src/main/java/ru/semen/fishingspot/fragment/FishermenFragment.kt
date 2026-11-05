@@ -9,6 +9,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.R
@@ -89,24 +90,12 @@ class FishermenFragment : Fragment() {
                     adapter.submitList(currentList)
                     viewModel.loadFriends()
                 } else {
-                    // ✅ ОТКРЫТИЕ КАРТЫ ЧЕРЕЗ CHILD FRAGMENT MANAGER ТАБОВ
-                    val mapFragment = FriendMapFragment().apply {
-                        arguments = Bundle().apply {
-                            putString("arg_friend_id", friend.id)
-                            putString("arg_friend_name", friend.name)
-                        }
+                    // ✅ ЕДИНЫЙ СТАНДАРТ: Навигация через NavController
+                    val bundle = Bundle().apply {
+                        putString("arg_friend_id", friend.id)
+                        putString("arg_friend_name", friend.name)
                     }
-
-                    parentFragmentManager.beginTransaction()
-                        .setCustomAnimations(
-                            R.anim.slide_in_right,
-                            R.anim.slide_out_left,
-                            R.anim.slide_in_left,
-                            R.anim.slide_out_right
-                        )
-                        .replace(R.id.fragmentContainer, mapFragment)
-                        .addToBackStack("friend_map")
-                        .commit()
+                    findNavController().navigate(R.id.friendMapFragment, bundle)
                 }
             } catch (e: Exception) {
                 android.util.Log.e("FRIEND_CHECK", "Ошибка проверки дружбы: ${e.message}")

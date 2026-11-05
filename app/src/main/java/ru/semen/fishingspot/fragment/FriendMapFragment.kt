@@ -1,159 +1,229 @@
-package ru.semen.fishingspot.fragment
+    package ru.semen.fishingspot.fragment
 
-import android.graphics.Color
-import android.os.Bundle
-import android.util.Log
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.Toast
-import androidx.core.content.ContextCompat
-import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
-import androidx.navigation.findNavController
-import io.appwrite.models.Document
-import kotlinx.coroutines.launch
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
-import ru.semen.fishingspot.R
-import ru.semen.fishingspot.databinding.FragmentFriendMapBinding
-import ru.semen.fishingspot.utils.AppwriteManager
+    import android.graphics.Color
+    import android.os.Bundle
+    import android.util.Log
+    import android.view.LayoutInflater
+    import android.view.View
+    import android.view.ViewGroup
+    import android.widget.Toast
+    import androidx.core.content.ContextCompat
+    import androidx.fragment.app.Fragment
+    import androidx.lifecycle.lifecycleScope
+    import androidx.navigation.NavOptions
+    import androidx.navigation.fragment.findNavController
+    import io.appwrite.models.Document
+    import kotlinx.coroutines.launch
+    import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+    import org.osmdroid.util.GeoPoint
+    import org.osmdroid.views.MapView
+    import org.osmdroid.views.overlay.Marker
+    import ru.semen.fishingspot.R
+    import ru.semen.fishingspot.databinding.FragmentFriendMapBinding
+    import ru.semen.fishingspot.utils.AppwriteManager
 
-class FriendMapFragment : Fragment() {
+    class FriendMapFragment : Fragment() {
 
-    private var _binding: FragmentFriendMapBinding? = null
-    private val binding get() = _binding!!
+        private var _binding: FragmentFriendMapBinding? = null
+        private val binding get() = _binding!!
 
-    // ⚠️ ЗАМЕНИ НА СВОИ РЕАЛЬНЫЕ ID ИЗ APPWRITE CONSOLE
-    private  val DB_ID = "6ad5021a0029a2c88786"
-    private  val SPOTS_COL_ID = "6ad524e3001c9a28c3e5"
+        private val DB_ID = "6ad5021a0029a2c88786"
+        private val SPOTS_COL_ID = "6ad524e3001c9a28c3e5"
+        private val DEFAULT_ZOOM = 10.0
+        private val FALLBACK_RETURN_ZOOM = 14.0
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View {
-        _binding = FragmentFriendMapBinding.inflate(inflater, container, false)
-        return binding.root
-    }
+        // Флаг: нужно ли восстановить камеру (защита от гонки с загрузкой точек)
+        private var needsRestore = false
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-        val friendId = arguments?.getString("arg_friend_id") ?: return
-        val friendName = arguments?.getString("arg_friend_name", "Друг") ?: "Друг"
-
-        binding.tvTitle.text = "Точки $friendName"
-
-        // 1. Настройка карты
-        val mapView = binding.mapView
-        mapView.setTileSource(TileSourceFactory.MAPNIK)
-        mapView.setMultiTouchControls(true)
-        mapView.controller.setZoom(10.0)
-        mapView.setBackgroundColor(Color.parseColor("#E8E8E8"))
-
-        // Дефолтная позиция, чтобы не улететь в океан при пустом ответе
-        val defaultLocation = GeoPoint(55.7558, 37.6173)
-        mapView.controller.setCenter(defaultLocation)
-
-        // ✅ ВОЗВРАЩАЕМ КНОПКУ НАЗАД
-        binding.btnBack.setOnClickListener {
-            parentFragmentManager.popBackStack()
+        companion object {
+            var returnLat: Double? = null
+            var returnLon: Double? = null
+            var returnZoom: Double? = null   // живой зум пользователя
         }
 
-        // 2. Загрузка точек друга
-        loadFriendSpots(friendId, friendName, mapView)
-    }
+        override fun onCreateView(
+            inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+        ): View {
+            _binding = FragmentFriendMapBinding.inflate(inflater, container, false)
+            return binding.root
+        }
 
-    private fun loadFriendSpots(friendId: String, friendName: String, mapView: MapView) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val result = AppwriteManager.databases.listDocuments(
-                    databaseId = DB_ID,
-                    collectionId = SPOTS_COL_ID,
-                    queries = listOf(
-                        io.appwrite.Query.equal("authorId", friendId),
-                        io.appwrite.Query.equal("visibility", "friends")
+        override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+            super.onViewCreated(view, savedInstanceState)
+
+            val friendId = arguments?.getString("arg_friend_id") ?: return
+            val friendName = arguments?.getString("arg_friend_name", "Друг") ?: "Друг"
+
+            binding.tvTitle.text = "Точки $friendName"
+
+            val mapView = binding.mapView
+            mapView.setTileSource(TileSourceFactory.MAPNIK)
+            mapView.setMultiTouchControls(true)
+            mapView.setBackgroundColor(Color.parseColor("#E8E8E8"))
+
+            // Запоминаем, что идёт восстановление — ДО запуска загрузки
+            needsRestore = returnLat != null
+
+            if (needsRestore) {
+                // Черновое применение (без очистки statics!): финально применим после загрузки
+                val lat = returnLat
+                val lon = returnLon
+                if (lat != null && lon != null) {
+                    mapView.controller.setZoom(returnZoom ?: FALLBACK_RETURN_ZOOM)
+                    mapView.controller.setCenter(GeoPoint(lat, lon))
+                }
+            } else {
+                mapView.controller.setCenter(GeoPoint(55.7558, 37.6173))
+                mapView.controller.setZoom(DEFAULT_ZOOM)
+            }
+
+            binding.btnBack.setOnClickListener {
+                findNavController().popBackStack()
+            }
+
+            loadFriendSpots(friendId, friendName, mapView)
+        }
+
+        // Применяем сохранённую камеру и ТОЛЬКО здесь очищаем statics
+        private fun applySavedCamera(mapView: MapView) {
+            val lat = returnLat
+            val lon = returnLon
+            if (lat == null || lon == null) return
+
+            mapView.controller.setZoom(returnZoom ?: FALLBACK_RETURN_ZOOM)
+            mapView.controller.setCenter(GeoPoint(lat, lon))
+            mapView.invalidate()
+
+            returnLat = null
+            returnLon = null
+            returnZoom = null
+        }
+
+        private fun loadFriendSpots(friendId: String, friendName: String, mapView: MapView) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    val result = AppwriteManager.databases.listDocuments(
+                        databaseId = DB_ID,
+                        collectionId = SPOTS_COL_ID,
+                        queries = listOf(
+                            io.appwrite.Query.equal("authorId", friendId),
+                            io.appwrite.Query.equal("visibility", "friends")
+                        )
                     )
-                )
 
-                val spots: List<Document<Map<String, Any>>> = result.documents
+                    // Если вью уже уничтожено — рисовать некуда, выходим
+                    val safeBinding = _binding ?: return@launch
+                    val safeMap = safeBinding.mapView
 
-                if (spots.isEmpty()) {
-                    Toast.makeText(
-                        requireContext(),
-                        "У $friendName пока нет точек для друзей 🎣",
-                        Toast.LENGTH_LONG
-                    ).show()
-                } else {
-                    Log.d("FRIEND_MAP", "Загружено ${spots.size} точек друга")
-                    drawMarkers(spots, mapView)
+                    val spots: List<Document<Map<String, Any>>> = result.documents
 
-                    val firstLat = spots.first().data["latitude"] as? Double ?: 0.0
-                    val firstLon = spots.first().data["longitude"] as? Double ?: 0.0
-                    if (firstLat != 0.0 && firstLon != 0.0) {
-                        mapView.controller.animateTo(GeoPoint(firstLat, firstLon))
-                        mapView.controller.setZoom(12.0)
+                    if (spots.isEmpty()) {
+                        Toast.makeText(
+                            requireContext(),
+                            "У $friendName пока нет точек 🎣",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        // Даже без точек возвращаем камеру, если пользователь пришёл из деталей
+                        if (needsRestore) {
+                            safeMap.post {
+                                if (needsRestore && _binding != null) applySavedCamera(
+                                    safeMap
+                                )
+                            }
+                        }
+                    } else {
+                        drawMarkers(spots, safeMap)
+
+                        if (needsRestore) {
+                            // Восстановление камеры ПОСЛЕ отрисовки маркеров —
+                            // сеть гарантированно пришла после layout'а, зум не затрётся
+                            safeMap.post {
+                                if (needsRestore && _binding != null) applySavedCamera(
+                                    safeMap
+                                )
+                            }
+                        } else {
+                            // Обычный вход: центруемся на первой точке
+                            val firstLat = spots.first().data["latitude"] as? Double ?: 0.0
+                            val firstLon = spots.first().data["longitude"] as? Double ?: 0.0
+                            if (firstLat != 0.0 && firstLon != 0.0) {
+                                safeMap.controller.setCenter(GeoPoint(firstLat, firstLon))
+                                safeMap.controller.setZoom(13.0)
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("FRIEND_MAP", "Ошибка: ${e.message}")
+                    // При ошибке сети всё равно пробуем вернуть камеру
+                    _binding?.mapView?.let { map ->
+                        if (needsRestore) {
+                            map.post { if (needsRestore && _binding != null) applySavedCamera(map) }
+                        }
                     }
                 }
-            } catch (e: Exception) {
-                Log.e("FRIEND_MAP", "Ошибка загрузки точек: ${e.message}")
-                Toast.makeText(requireContext(), "Не удалось загрузить точки", Toast.LENGTH_SHORT).show()
             }
         }
-    }
 
-    private fun drawMarkers(documents: List<Document<Map<String, Any>>>, mapView: MapView) {
-        mapView.overlays.removeAll { it is Marker }
+        private fun drawMarkers(documents: List<Document<Map<String, Any>>>, mapView: MapView) {
+            mapView.overlays.removeAll { it is Marker }
 
-        documents.forEach { doc ->
-            val lat = doc.data["latitude"] as? Double ?: return@forEach
-            val lon = doc.data["longitude"] as? Double ?: return@forEach
+            documents.forEach { doc ->
+                val lat = doc.data["latitude"] as? Double ?: return@forEach
+                val lon = doc.data["longitude"] as? Double ?: return@forEach
 
-            val point = GeoPoint(lat, lon)
-            val marker = Marker(mapView)
-            marker.position = point
+                val point = GeoPoint(lat, lon)
+                val marker = Marker(mapView)
+                marker.position = point
+                marker.setIcon(ContextCompat.getDrawable(requireContext(), R.drawable.metka4567))
+                marker.title = doc.data["catchWeight"]?.toString() ?: "Точка"
 
-            // ✅ УБРАЛИ colorFilter! Используем родную иконку без изменений
-            marker.setIcon(ContextCompat.getDrawable(requireContext(), R.drawable.metka4567))
+                marker.setOnMarkerClickListener { _, _ ->
+                    returnLat = lat
+                    returnLon = lon
+                    // Перехватываем живой зум пользователя в момент клика
+                    returnZoom = mapView.zoomLevelDouble
 
-            marker.title = doc.data["catchWeight"]?.toString() ?: "Точка"
+                    val bundle = Bundle().apply {
+                        putString("document_id", doc.id)
+                        putInt("source_tab", R.id.nav_fishermen)
+                    }
 
-            // ✅ ВОЗВРАЩАЕМ ЛОГИКУ КЛИКА КАК В MYMAPFRAGMENT
-            marker.setOnMarkerClickListener { _, _ ->
-                val documentId = doc.id // или doc.data["\$id"] если используется другое поле
-                val detailsBundle = Bundle().apply {
-                    putString("document_id", documentId)
-                    // Можно добавить флаг источника, если нужно
-                    putInt("source_tab", R.id.nav_fishermen)
+                    val navOptions = NavOptions.Builder()
+                        .setEnterAnim(R.anim.slide_in_right)
+                        .setExitAnim(R.anim.slide_out_left)
+                        .setPopEnterAnim(R.anim.slide_in_left)
+                        .setPopExitAnim(R.anim.slide_out_right)
+                        .build()
+
+                    findNavController().navigate(R.id.action_friend_map_to_details, bundle, navOptions)
+                    true
                 }
 
-                // Навигация к деталям точки
-                requireActivity().findNavController(R.id.fragmentContainer)
-                    .navigate(R.id.action_map_to_details, detailsBundle)
-
-                true
+                mapView.overlays.add(marker)
             }
-
-            mapView.overlays.add(marker)
+            mapView.invalidate()
         }
 
-        mapView.invalidate()
-    }
+        override fun onResume() {
+            super.onResume()
+            // Вью может быть уже уничтожено (фрагмент в бэкстеке) — проверяем перед обращением
+            _binding?.let { it.mapView.onResume() }
+        }
 
-    override fun onResume() {
-        super.onResume()
-        binding.mapView.onResume()
-    }
+        override fun onPause() {
+            super.onPause()
+            _binding?.let { bind ->
+                bind.mapView.onPause()
+                // Страховка: если точка уже выбрана, но зум не записался — берём текущий
+                if (returnLat != null && returnLon != null) {
+                    returnZoom = bind.mapView.zoomLevelDouble
+                }
+            }
+        }
 
-    override fun onPause() {
-        super.onPause()
-        binding.mapView.onPause()
+        override fun onDestroyView() {
+            _binding?.let { it.mapView.onDetach() }
+            _binding = null
+            super.onDestroyView()
+        }
     }
-
-    override fun onDestroyView() {
-        binding.mapView.onDetach()
-        _binding = null
-        super.onDestroyView()
-    }
-}
