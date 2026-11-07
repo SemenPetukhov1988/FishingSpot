@@ -18,13 +18,15 @@ class SpotAppwriteRepository(private val context: Context) {
         private const val TAG = "SPOT_SERVER"
     }
 
-    // Appwrite может вернуть Int или Double — приводим через Number, а не as? Double
     private fun asDouble(value: Any?): Double = (value as? Number)?.toDouble() ?: 0.0
     private fun asLong(value: Any?): Long = (value as? Number)?.toLong() ?: 0L
 
+    // ✅ ИСПРАВЛЕНИЕ: Добавлено чтение postText
     private fun toSpot(documentId: String, data: Map<String, Any?>): FishingSpot {
+        val rawPost = data["postText"]
+        Log.d("SPOT_REPO", "🔍 Маппинг $documentId: postText=$rawPost")
         return FishingSpot(
-            id = 0, // поле оставлено для совместимости, НИГДЕ не используется
+            id = 0,
             documentId = documentId,
             latitude = asDouble(data["latitude"]),
             longitude = asDouble(data["longitude"]),
@@ -39,7 +41,8 @@ class SpotAppwriteRepository(private val context: Context) {
             authorName = data["authorName"] as? String ?: "Неизвестно",
             visibility = data["visibility"] as? String ?: "private",
             isPublicOnMap = data["isPublicOnMap"] as? Boolean ?: false,
-            createdAt = asLong(data["createdAt"])
+            createdAt = asLong(data["createdAt"]),
+            postText = data["postText"] as? String ?: ""
         )
     }
 
@@ -64,10 +67,9 @@ class SpotAppwriteRepository(private val context: Context) {
 
     suspend fun getMySpots(userId: String): Result<List<FishingSpot>> {
         return try {
-            // 1. Получаем список избранных spotId
             val savedResponse = AppwriteManager.databases.listDocuments(
                 databaseId = "6ad5021a0029a2c88786",
-                collectionId = "6ada41db002ea68773d9", // saved_spots
+                collectionId = "6ada41db002ea68773d9",
                 queries = listOf(
                     Query.equal("userId", userId),
                     Query.limit(500)
@@ -78,7 +80,6 @@ class SpotAppwriteRepository(private val context: Context) {
             }
             Log.d(TAG, "📊 Найдено избранных точек: ${savedSpotIds.size}")
 
-            // 2. Получаем твои созданные точки
             val myResponse = AppwriteManager.databases.listDocuments(
                 databaseId = databaseId,
                 collectionId = spotsCollectionId,
@@ -90,7 +91,6 @@ class SpotAppwriteRepository(private val context: Context) {
             val mySpots = myResponse.documents.map { toSpot(it.id, it.data) }
             Log.d(TAG, "📊 Найдено моих созданных точек: ${mySpots.size}")
 
-            // 3. Получаем избранные точки (если они есть)
             val savedSpots = if (savedSpotIds.isNotEmpty()) {
                 val savedResponse2 = AppwriteManager.databases.listDocuments(
                     databaseId = databaseId,
@@ -106,7 +106,6 @@ class SpotAppwriteRepository(private val context: Context) {
             }
             Log.d(TAG, "📊 Загружено избранных точек: ${savedSpots.size}")
 
-            // 4. Объединяем (без дубликатов)
             val allSpots = (mySpots + savedSpots).distinctBy { it.documentId }
             Log.d(TAG, "✅ моих с сервера (созданные + избранные): ${allSpots.size}")
             Result.success(allSpots)
@@ -140,6 +139,7 @@ class SpotAppwriteRepository(private val context: Context) {
                 "catchWeight" to spot.catchWeight,
                 "fishType" to spot.fishType,
                 "photoUrl" to spot.photoUrl,
+                "postText" to spot.postText, // ✅ Тут уже было верно
                 "isVerified" to spot.isVerified,
                 "authorId" to spot.authorId,
                 "authorName" to spot.authorName,
@@ -156,7 +156,6 @@ class SpotAppwriteRepository(private val context: Context) {
             if (spot.visibility == "public") {
                 permissions.add(Permission.read(Role.any()))
             }
-            // friends: доступ друзьям подключим отдельно, сейчас такую точку видит только автор
 
             val doc = AppwriteManager.databases.createDocument(
                 databaseId = databaseId,
@@ -174,7 +173,6 @@ class SpotAppwriteRepository(private val context: Context) {
         }
     }
 
-    // Только documentId. Никаких authorId + createdAt.
     suspend fun updateSpotVisibility(documentId: String, newVisibility: String): Result<Unit> {
         return try {
             AppwriteManager.databases.updateDocument(
@@ -194,7 +192,6 @@ class SpotAppwriteRepository(private val context: Context) {
         }
     }
 
-    // Только documentId. Прямоe удаление, без поиска.
     suspend fun deleteSpotByDocumentId(documentId: String): Result<Unit> {
         return try {
             AppwriteManager.databases.deleteDocument(

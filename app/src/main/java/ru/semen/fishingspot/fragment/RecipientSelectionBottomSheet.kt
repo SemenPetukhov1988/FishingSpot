@@ -18,7 +18,9 @@ import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.UserSessionManager
 
 class RecipientSelectionBottomSheet(
-    private val signalType: String
+    private val signalType: String,
+    private val senderName: String = "Рыбак", // ✅ Новое поле с дефолтным значением
+    private val senderId: String = ""         // ✅ Новое поле с дефолтным значением
 ) : BottomSheetDialogFragment() {
 
     private var _binding: BottomSheetRecipientSelectionBinding? = null
@@ -26,9 +28,8 @@ class RecipientSelectionBottomSheet(
 
     private lateinit var adapter: FriendRecipientAdapter
 
-    // ⚠️ ID КОЛЛЕКЦИИ ПОЛЬЗОВАТЕЛЕЙ (где хранится поле friends)
-    private  val USERS_COL_ID = "6ad5022b003770d2864c" // ЗАМЕНИ НА СВОЙ ID ИЗ СКРИНШОТА
-    private  val DB_ID = "6ad5021a0029a2c88786"
+    private val USERS_COL_ID = "6ad5022b003770d2864c"
+    private val DB_ID = "6ad5021a0029a2c88786"
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -40,7 +41,6 @@ class RecipientSelectionBottomSheet(
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // ✅ Инициализация адаптера
         adapter = FriendRecipientAdapter { friendId ->
             dismiss()
             openMapForSignal(friendId)
@@ -49,13 +49,11 @@ class RecipientSelectionBottomSheet(
         binding.rvFriends.layoutManager = LinearLayoutManager(requireContext())
         binding.rvFriends.adapter = adapter
 
-        // Клик "Всем друзьям"
         binding.btnAllFriends.setOnClickListener {
             dismiss()
             openMapForSignal("all")
         }
 
-        // Загрузка списка друзей
         loadFriends()
     }
 
@@ -64,7 +62,6 @@ class RecipientSelectionBottomSheet(
             try {
                 val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: return@launch
 
-                // 1. Получаем текущего пользователя
                 val userDoc = AppwriteManager.databases.getDocument(
                     databaseId = DB_ID,
                     collectionId = USERS_COL_ID,
@@ -78,8 +75,6 @@ class RecipientSelectionBottomSheet(
                     return@launch
                 }
 
-                // 2. Загружаем документы друзей параллельно, чтобы получить их ники
-                // ⚠️ В продакшене лучше сделать один запрос с Query.or(), но для шторки это ок
                 val friendsWithNames = friendIds.mapNotNull { id ->
                     try {
                         val doc = AppwriteManager.databases.getDocument(
@@ -90,11 +85,10 @@ class RecipientSelectionBottomSheet(
                         val nickname = doc.data["nickname"] as? String ?: "Рыбак"
                         FriendItem(id = id, name = nickname)
                     } catch (e: Exception) {
-                        null // Если друг удален или ошибка - пропускаем
+                        null
                     }
                 }
 
-                // 3. Отдаем в адаптер красивые объекты
                 adapter.submitList(friendsWithNames)
 
             } catch (e: Exception) {
@@ -104,9 +98,12 @@ class RecipientSelectionBottomSheet(
     }
 
     private fun openMapForSignal(receiverId: String) {
+        // ✅ ПЕРЕДАЕМ ИМЯ ОТПРАВИТЕЛЯ В СЛЕДУЮЩИЙ ФРАГМЕНТ
         val bundle = Bundle().apply {
             putString("signal_type", signalType)
             putString("receiver_id", receiverId)
+            putString("sender_name", senderName)   // ✅ Добавлено
+            putString("sender_id", senderId)       // ✅ Добавлено
         }
         findNavController().navigate(R.id.sendFishingSignalFragment, bundle)
     }

@@ -67,13 +67,11 @@ class AddPointFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Инициализация даты и состояния поля
         updateDateText(selectedDate)
         updateDateFieldState()
 
         binding.btnBack.setOnClickListener { findNavController().navigateUp() }
 
-        // Клик по дате (сработает только если поле активно)
         binding.layoutFishingDate.setEndIconOnClickListener {
             if (selectedVisibility == "public") return@setEndIconOnClickListener
             showDatePicker()
@@ -83,7 +81,6 @@ class AddPointFragment : Fragment() {
             showDatePicker()
         }
 
-        // Переключатели видимости
         binding.toggleGroupVisibility.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
                 selectedVisibility = when (checkedId) {
@@ -93,19 +90,15 @@ class AddPointFragment : Fragment() {
                     else -> "private"
                 }
 
-                // ✅ АВТОМАТИЧЕСКАЯ ДАТА ДЛЯ ПУБЛИЧНЫХ ТОЧЕК
                 if (selectedVisibility == "public") {
                     selectedDate = System.currentTimeMillis()
                     updateDateText(selectedDate)
                 }
-
-                // Обновляем состояние поля даты
                 updateDateFieldState()
             }
         }
         binding.btnVisibilityPrivate.isChecked = true
 
-        // Остальные переключатели без изменений
         binding.toggleGroupLocation.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) selectedLocation = if (checkedId == R.id.btnLocationShore) "С берега" else "С лодки"
         }
@@ -126,7 +119,6 @@ class AddPointFragment : Fragment() {
             }
         }
 
-        // Логика выбора фото
         binding.cardPhoto.setOnClickListener {
             when (selectedVisibility) {
                 "public" -> openCamera()
@@ -159,11 +151,18 @@ class AddPointFragment : Fragment() {
                 R.id.btnWeight1 -> 0.5; R.id.btnWeight2 -> 3.0; R.id.btnWeight3 -> 6.0; else -> 0.0
             }
 
-            val desc = buildString {
-                append(" Дата: ${formatDate(selectedDate)}\n📍 Место: $selectedLocation\n")
-                append("🎣 Снасть: $selectedTackle | 🪱 Наживка: $selectedBait\n🐟 В улове: $finalFishName\n\n")
-                append(binding.etDescription.text.toString().trim())
+            // ✅ РАЗДЕЛЯЕМ ДАННЫЕ ПЕРЕД ОТПРАВКОЙ
+
+            // 1. Мета-информация (технические данные для шапки ленты)
+            val metaInfo = buildString {
+                append("📅 Дата: ${formatDate(selectedDate)}\n")
+                append("📍 Место: $selectedLocation\n")
+                append("🎣 Снасть: $selectedTackle | 🪱 Наживка: $selectedBait\n")
+                append("🐟 В улове: $finalFishName")
             }
+
+            // 2. Текст поста от пользователя (чистый текст без технических данных)
+            val userPostText = binding.etDescription.text.toString().trim()
 
             val lat = arguments?.getDouble("LAT") ?: 0.0
             val lon = arguments?.getDouble("LON") ?: 0.0
@@ -177,19 +176,25 @@ class AddPointFragment : Fragment() {
                 Toast.makeText(requireContext(), "Ошибка сессии", Toast.LENGTH_LONG).show(); return@setOnClickListener
             }
 
+            // ✅ ПЕРЕДАЕМ МЕТА И ТЕКСТ ПОСТА ОТДЕЛЬНО
             val bundle = Bundle().apply {
-                putString("NAME", name); putString("DESC", desc); putDouble("WEIGHT", weightValue)
-                putString("VISIBILITY", selectedVisibility); putLong("CREATED_AT", selectedDate)
+                putString("NAME", name)
+                putString("META_INFO", metaInfo)      // Для поля description
+                putString("POST_TEXT", userPostText)   // Для поля postText
+                putDouble("WEIGHT", weightValue)
+                putString("VISIBILITY", selectedVisibility)
+                putLong("CREATED_AT", selectedDate)
                 putString("FISH_TYPE", finalFishName)
                 putString("PHOTO_URI", selectedPhotoUri?.toString())
-                putDouble("LAT", lat); putDouble("LON", lon)
-                putString("AUTHOR_NAME", authorName ?: "Неизвестно"); putString("AUTHOR_ID", authorId)
+                putDouble("LAT", lat)
+                putDouble("LON", lon)
+                putString("AUTHOR_NAME", authorName ?: "Неизвестно")
+                putString("AUTHOR_ID", authorId)
             }
             findNavController().navigate(R.id.refineLocationFragment, bundle)
         }
     }
 
-    // ✅ ОТКРЫТИЕ КАМЕРЫ
     private fun openCamera() {
         try {
             val photoFile = File.createTempFile(
@@ -206,7 +211,6 @@ class AddPointFragment : Fragment() {
         }
     }
 
-    // ✅ ДИАЛОГ ВЫБОРА ИСТОЧНИКА
     private fun showPhotoSourceDialog() {
         val options = arrayOf("📷 Камера", "🖼️ Галерея")
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
@@ -227,25 +231,18 @@ class AddPointFragment : Fragment() {
         Glide.with(this).load(uri).fitCenter().into(binding.ivPhotoPreview)
     }
 
-    // ✅ НОВЫЙ МЕТОД: Управление состоянием поля даты
-    // ✅ УПРАВЛЕНИЕ СОСТОЯНИЕМ ПОЛЯ ДАТЫ
     private fun updateDateFieldState() {
         val isPublic = selectedVisibility == "public"
-
-        // Блокируем/разблокируем поле
         binding.etFishingDate.isEnabled = !isPublic
         binding.etFishingDate.isFocusable = !isPublic
         binding.etFishingDate.isClickable = !isPublic
 
-        // Меняем подсказку для наглядности
         binding.layoutFishingDate.hint = if (isPublic)
             "Дата устанавливается автоматически"
         else
             "Дата рыбалки"
 
-        // Визуально показываем блокировку серым цветом
-        // Или возвращаем фирменный синий #0288D1
-        val activeColor = 0xFF0288D1.toInt() // Твой основной синий
+        val activeColor = 0xFF0288D1.toInt()
         val disabledColor = android.graphics.Color.GRAY
 
         if (isPublic) {
@@ -257,7 +254,6 @@ class AddPointFragment : Fragment() {
         }
     }
 
-    // ✅ ПОКАЗ КАЛЕНДАРЯ (с защитой от вызова для публичных точек)
     private fun showDatePicker() {
         if (selectedVisibility == "public") return
 

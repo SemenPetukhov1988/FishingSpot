@@ -10,7 +10,6 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import io.appwrite.Query
-
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.adapter.MessagesAdapter
 import ru.semen.fishingspot.data.AppMessage
@@ -19,14 +18,15 @@ import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.UserSessionManager
 import ru.semen.fishingspot.viewmodel.FriendsViewModel
 import ru.semen.fishingspot.viewmodel.SpotViewModel
+import java.time.Instant
 
 class MessagesFragment : Fragment() {
 
     private var _binding: FragmentMessagesBinding? = null
     private val binding get() = _binding!!
 
-    // ⚠️ ЗАМЕНИ НА СВОЙ ID КОЛЛЕКЦИИ MESSAGES ИЗ APPWRITE CONSOLE
     private val MESSAGES_COL_ID = "6aeb4c1600142e707a69"
+    private val NOTIFICATIONS_COL_ID = "6aef1b7300251aa8ce5b" // ✅ ID КОЛЛЕКЦИИ УВЕДОМЛЕНИЙ
     private val DB_ID = "6ad5021a0029a2c88786"
 
     private val spotViewModel: SpotViewModel by viewModels()
@@ -43,9 +43,8 @@ class MessagesFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setupAdapter()
-        loadMessages()
+        loadMessagesAndSignals() // ✅ ОБНОВЛЕННОЕ НАЗВАНИЕ МЕТОДА
 
         binding.fabAddMessage.setOnClickListener {
             SignalTypeBottomSheet().show(childFragmentManager, "signal_type_sheet")
@@ -60,25 +59,24 @@ class MessagesFragment : Fragment() {
             onMessageClick = { message ->
                 Toast.makeText(requireContext(), "Открываем: ${message.spotName}", Toast.LENGTH_SHORT).show()
             },
-            // ✅ УБРАН onShareRequestClick, так как sendSharedSpot удален из ViewModel
-            // Если эта фича нужна позже - вернем через отдельный метод
             onDeclineRequestClick = { message ->
                 deleteMessage(message.id)
                 Toast.makeText(requireContext(), "Запрос отклонен", Toast.LENGTH_SHORT).show()
             },
             onTakeSpotClick = { message ->
                 spotViewModel.addFullSpot(
-                    lat = message.spotLat ?: 0.0,
-                    lon = message.spotLon ?: 0.0,
-                    name = message.spotName ?: "Без названия",
+                    lat = message.spotLat,
+                    lon = message.spotLon,
+                    name = message.spotName.ifEmpty { "Без названия" },
                     description = "Получено от ${message.senderName}",
-                    weight = message.spotWeight ?: 0.0,
+                    postText = "",
+                    weight = message.spotWeight,
                     visibility = "private",
                     photoPath = null,
                     photoUrl = null,
                     fishType = null,
                     isVerified = false,
-                    createdAt = message.spotCreatedAt ?: System.currentTimeMillis(),
+                    createdAt = message.spotCreatedAt.takeIf { it > 0 } ?: System.currentTimeMillis(),
                     authorId = message.senderId,
                     authorName = message.senderName
                 )
@@ -86,7 +84,6 @@ class MessagesFragment : Fragment() {
                 Toast.makeText(requireContext(), "Точка '${message.spotName}' сохранена!", Toast.LENGTH_LONG).show()
             },
             onAcceptFriendClick = { message ->
-                // ✅ ИСПРАВЛЕНО: Передаем только 2 параметра, как требует новый ViewModel
                 friendsViewModel.acceptFriendRequest(
                     friendId = message.senderId,
                     messageId = message.id
@@ -100,13 +97,13 @@ class MessagesFragment : Fragment() {
             onViewFriendSpotClick = { message ->
                 SpotPreviewBottomSheet(
                     spotViewModel = spotViewModel,
-                    senderName = message.senderName ?: "",
+                    senderName = message.senderName,
                     senderId = message.senderId,
-                    spotName = message.spotName ?: "",
-                    spotDesc = message.spotDescription ?: "",
-                    spotLat = message.spotLat ?: 0.0,
-                    spotLon = message.spotLon ?: 0.0,
-                    spotWeight = message.spotWeight ?: 0.0,
+                    spotName = message.spotName,
+                    spotDesc = message.spotDescription,
+                    spotLat = message.spotLat,
+                    spotLon = message.spotLon,
+                    spotWeight = message.spotWeight,
                     spotCreatedAt = message.spotCreatedAt,
                     messageId = message.id,
                     onDeclineAndDelete = { deleteMessage(message.id) }
@@ -118,15 +115,16 @@ class MessagesFragment : Fragment() {
         binding.rvMessages.adapter = adapter
     }
 
-    private fun loadMessages() {
+    // ✅ ОБЪЕДИНЕННАЯ ЗАГРУЗКА СООБЩЕНИЙ И СИГНАЛОВ
+    private fun loadMessagesAndSignals() {
         viewLifecycleOwner.lifecycleScope.launch {
-            // ✅ ПРОВЕРКА 1: Если фрагмент уже уничтожен или не добавлен — выходим сразу
             if (_binding == null || !isAdded) return@launch
 
             val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: return@launch
 
             try {
-                val result = AppwriteManager.databases.listDocuments(
+                // 1. Загружаем обычные сообщения
+                val messagesResult = AppwriteManager.databases.listDocuments(
                     databaseId = DB_ID,
                     collectionId = MESSAGES_COL_ID,
                     queries = listOf(
@@ -136,12 +134,25 @@ class MessagesFragment : Fragment() {
                     )
                 )
 
-                // ✅ ПРОВЕРКА 2: После сетевого запроса снова проверяем состояние фрагмента
+                // 2. ✅ Загружаем сигналы "Я на рыбалке"
+                val signalsResult = AppwriteManager.databases.listDocuments(
+                    databaseId = DB_ID,
+                    collectionId = NOTIFICATIONS_COL_ID,
+                    queries = listOf(
+                        Query.equal("receiverId", currentUserId),
+                        Query.orderDesc("createdAt"),
+                        Query.limit(50)
+                    )
+                )
+
                 if (_binding == null || !isAdded) return@launch
 
-                val messages = result.documents.mapNotNull { doc ->
+                val allItems = mutableListOf<AppMessage>()
+
+                // Маппим сообщения
+                messagesResult.documents.forEach { doc ->
                     val data = doc.data
-                    AppMessage(
+                    allItems.add(AppMessage(
                         id = doc.id,
                         messageId = doc.id,
                         senderId = data["senderId"] as? String ?: "",
@@ -161,15 +172,35 @@ class MessagesFragment : Fragment() {
                         spotPhotoPath = data["spotPhotoPath"] as? String,
                         isRead = data["isRead"] as? Boolean ?: false,
                         timestamp = (data["timestamp"] as? Number)?.toLong() ?: 0L
-                    )
+                    ))
                 }
 
-                // ✅ ПРОВЕРКА 3: Перед обновлением UI убеждаемся, что binding жив
+                // ✅ Маппим сигналы
+                signalsResult.documents.forEach { doc ->
+                    val data = doc.data
+                    allItems.add(AppMessage(
+                        id = doc.id,
+                        messageId = doc.id,
+                        senderId = data["senderId"] as? String ?: "",
+                        senderName = data["senderName"] as? String ?: "Рыбак",
+                        recipientId = data["receiverId"] as? String ?: "",
+                        type = "on_fishing", // Явно задаем тип
+                        spotLat = (data["lat"] as? Number)?.toDouble() ?: 0.0,
+                        spotLon = (data["lon"] as? Number)?.toDouble() ?: 0.0,
+                        timestamp = try {
+                            Instant.parse(data["createdAt"] as? String ?: "").toEpochMilli()
+                        } catch (e: Exception) { System.currentTimeMillis() }
+                    ))
+                }
+
+                // Сортируем всё вместе по времени (новые сверху)
+                allItems.sortByDescending { it.timestamp }
+
                 if (_binding == null || !isAdded) return@launch
 
-                adapter.submitList(messages)
+                adapter.submitList(allItems)
 
-                if (messages.isEmpty()) {
+                if (allItems.isEmpty()) {
                     binding.layoutEmptyState.visibility = View.VISIBLE
                     binding.rvMessages.visibility = View.GONE
                 } else {
@@ -178,9 +209,8 @@ class MessagesFragment : Fragment() {
                 }
 
             } catch (e: Exception) {
-                // ✅ БЕЗОПАСНЫЙ ТОСТ: только если фрагмент всё ещё активен
                 if (_binding != null && isAdded) {
-                    Toast.makeText(requireContext(), "Ошибка загрузки сообщений: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "Ошибка загрузки: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -194,8 +224,7 @@ class MessagesFragment : Fragment() {
                     collectionId = MESSAGES_COL_ID,
                     documentId = messageId
                 )
-                // Перезагружаем список после удаления
-                loadMessages()
+                loadMessagesAndSignals()
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "Ошибка удаления", Toast.LENGTH_SHORT).show()
             }

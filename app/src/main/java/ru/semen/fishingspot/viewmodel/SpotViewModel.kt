@@ -28,9 +28,10 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
     private val userId = UserSessionManager.getCurrentUserId(application) ?: ""
     private val userName = UserSessionManager.getCurrentNickname(application) ?: "Неизвестно"
 
+    private val TAG = "SPOT_VIEWMODEL"
+
     enum class MapMode { MY_SPOTS, PUBLIC_SPOTS }
 
-    // ✅ ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ ДЛЯ ТАБОВ (переживает пересоздание UI)
     var selectedTabId: Int = R.id.nav_my_places
 
     private val _mapMode = MutableLiveData(MapMode.MY_SPOTS)
@@ -93,11 +94,23 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             if (!hasNetwork()) return@launch
+
             _isLoading.value = true
             val result = server.getMySpots(userId)
             _isLoading.value = false
+
             if (result.isSuccess) {
-                _mySpots.value = result.getOrNull() ?: emptyList()
+                val spots = result.getOrNull() ?: emptyList()
+
+                // ✅ ДИАГНОСТИКА: Проверяем список ПЕРЕД отправкой в UI
+                val spotWithText = spots.find { it.postText.isNotEmpty() }
+                Log.d(TAG, "📊 Загружено точек: ${spots.size}")
+                Log.d(TAG, "📝 Точка с текстом найдена: ${spotWithText != null}")
+                if (spotWithText != null) {
+                    Log.d(TAG, "💬 Текст первой точки с постом: '${spotWithText.postText.take(30)}...'")
+                }
+
+                _mySpots.value = spots
                 _errorMessage.value = null
             } else {
                 _mySpots.value = emptyList()
@@ -145,7 +158,7 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun upsertInLists(spot: FishingSpot) {
-        Log.d("SPOT_SERVER", "📊 upsertInLists: ${spot.documentId}")
+        Log.d("SPOT_SERVER", "📊 upsertInLists: ${spot.documentId} | postText='${spot.postText}'")
         val my = (_mySpots.value ?: emptyList()).filter { it.documentId != spot.documentId }
         _mySpots.value = listOf(spot) + my
 
@@ -160,20 +173,31 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addFullSpot(
-        lat: Double, lon: Double, name: String, description: String, weight: Double,
-        visibility: String, photoPath: String?, photoUrl: String?, fishType: String? = null,
-        isVerified: Boolean = false, createdAt: Long = System.currentTimeMillis(),
-        authorId: String? = null, authorName: String? = null
+        lat: Double, lon: Double, name: String,
+        description: String,
+        postText: String,
+        weight: Double,
+        visibility: String,
+        photoPath: String?,
+        photoUrl: String?,
+        fishType: String? = null,
+        isVerified: Boolean = false,
+        createdAt: Long = System.currentTimeMillis(),
+        authorId: String? = null,
+        authorName: String? = null
     ) {
         viewModelScope.launch {
             if (!hasNetwork()) return@launch
+
             val finalAuthorId = authorId?.takeIf { it.isNotEmpty() && it != "unknown_user" } ?: userId
             val finalAuthorName = if (finalAuthorId == userId) userName
             else authorName?.takeIf { it.isNotEmpty() && it != "Рыбак" } ?: "Неизвестно"
 
             val spot = FishingSpot(
                 id = 0, documentId = "", latitude = lat, longitude = lon, name = name,
-                description = description, catchWeight = weight, fishType = fishType,
+                description = description,
+                postText = postText,
+                catchWeight = weight, fishType = fishType,
                 photoPath = photoPath, photoUrl = photoUrl, isVerified = isVerified,
                 visibility = visibility, isPublicOnMap = visibility == "public",
                 createdAt = createdAt, authorId = finalAuthorId, authorName = finalAuthorName
@@ -182,6 +206,7 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
             val result = server.createSpot(spot)
             if (result.isSuccess) {
                 val created = result.getOrNull() ?: return@launch
+                Log.d(TAG, "✅ Создана точка с текстом: '${created.postText.take(20)}...'")
                 upsertInLists(created)
                 _errorMessage.value = null
             } else {

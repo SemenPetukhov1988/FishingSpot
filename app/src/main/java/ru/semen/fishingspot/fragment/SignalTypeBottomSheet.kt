@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import ru.semen.fishingspot.databinding.BottomSheetSignalTypeBinding
+import ru.semen.fishingspot.utils.UserSessionManager
 
 class SignalTypeBottomSheet : BottomSheetDialogFragment() {
 
@@ -22,22 +23,36 @@ class SignalTypeBottomSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // ✅ ПОЛУЧАЕМ РЕАЛЬНОЕ ИМЯ ПОЛЬЗОВАТЕЛЯ ПРЯМО ЗДЕСЬ
+        val senderName = UserSessionManager.getCurrentNickname(requireContext()) ?: "Рыбак"
+        val senderId = UserSessionManager.getCurrentUserId(requireContext()) ?: ""
+
         binding.btnOnFishing.setOnClickListener {
             dismiss()
-            // TODO: Открываем выбор получателя для "Я на рыбалке"
-            RecipientSelectionBottomSheet("on_fishing").show(parentFragmentManager, "recipient_sheet")
+            // ✅ ПЕРЕДАЕМ ИМЯ И ID В СЛЕДУЮЩИЙ ШЕЙТ
+            RecipientSelectionBottomSheet(
+                signalType = "on_fishing",
+                senderName = senderName,
+                senderId = senderId
+            ).show(parentFragmentManager, "recipient_sheet")
         }
 
         binding.btnGoingFishing.setOnClickListener {
             dismiss()
-            // TODO: Выбор получателя для "Собираюсь на рыбалку"
-            RecipientSelectionBottomSheet("going_fishing").show(parentFragmentManager, "recipient_sheet")
+            RecipientSelectionBottomSheet(
+                signalType = "going_fishing",
+                senderName = senderName,
+                senderId = senderId
+            ).show(parentFragmentManager, "recipient_sheet")
         }
 
         binding.btnRequestSpot.setOnClickListener {
             dismiss()
-            // TODO: Выбор получателя для запроса точки
-            RecipientSelectionBottomSheet("request_spot").show(parentFragmentManager, "recipient_sheet")
+            RecipientSelectionBottomSheet(
+                signalType = "request_spot",
+                senderName = senderName,
+                senderId = senderId
+            ).show(parentFragmentManager, "recipient_sheet")
         }
     }
 

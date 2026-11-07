@@ -121,7 +121,18 @@ class SpotDetailsFragment : Fragment() {
         val isAuthor = me.isNotEmpty() && me == spot.authorId
 
         binding.tvSpotName.text = spot.name
+
+        // ✅ БИНДИНГ ТЕКСТА ПОСТА (Под фото, над панелью действий)
+        if (!spot.postText.isNullOrEmpty()) {
+            binding.tvPostText.visibility = View.VISIBLE
+            binding.tvPostText.text = spot.postText
+        } else {
+            binding.tvPostText.visibility = View.GONE
+        }
+
+        // Техническое описание (снасти/мета-инфо) остается ниже
         binding.tvDescription.text = spot.description.ifEmpty { "Нет описания" }
+
         binding.tvCatchWeight.text = weightText(spot.catchWeight)
         binding.tvAuthorName.text = if (isAuthor) "Вы (Автор)" else spot.authorName
         binding.tvFishingDate.text = "📅 Рыбалка: " +

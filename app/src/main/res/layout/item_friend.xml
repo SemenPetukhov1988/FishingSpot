@@ -1,114 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="8dp"
-    android:layout_marginVertical="4dp"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="1dp"
-    app:strokeWidth="0dp">
+    android:orientation="vertical"
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    android:layout_marginBottom="12dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:background="?attr/selectableItemBackground">
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="12dp">
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical">
 
-        <!-- Аватар (заглушка) -->
-        <FrameLayout
-            android:id="@+id/avatarContainer"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent">
+        <!-- Аватар с первой буквой -->
+        <TextView
+            android:id="@+id/tvAvatarLetter"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_avatar_circle"
+            android:gravity="center"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            tools:text="А" />
 
-            <View
-                android:id="@+id/avatarCircle"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/bg_avatar_circle" />
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="12dp">
 
             <TextView
-                android:id="@+id/tvAvatarLetter"
+                android:id="@+id/tvFriendName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="#222222"
+                android:maxLines="1"
+                android:ellipsize="end"
+                tools:text="Анна Мухина" />
+
+            <!-- ✅ УБРАЛИ СИНЮЮ НАДПИСЬ. ТЕПЕРЬ ТУТ ПУСТО ИЛИ СТАТУС "В сети" -->
+            <View
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:text="А"
-                android:textColor="@android:color/white"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:layout_height="8dp" />
+        </LinearLayout>
 
-        </FrameLayout>
-
-        <!-- Имя друга -->
-        <TextView
-            android:id="@+id/tvFriendName"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="8dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="Анна Мухина"
-            android:textColor="#000000"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:layout_constraintEnd_toStartOf="@+id/btnRemoveFriend"
-            app:layout_constraintStart_toEndOf="@id/avatarContainer"
-            app:layout_constraintTop_toTopOf="@id/avatarContainer" />
-
-        <!-- Статус -->
-        <TextView
-            android:id="@+id/tvFriendStatus"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginTop="2dp"
-            android:layout_marginEnd="8dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="Добавлен недавно"
-            android:textColor="#8E8E93"
-            android:textSize="13sp"
-            app:layout_constraintEnd_toStartOf="@+id/btnRemoveFriend"
-            app:layout_constraintStart_toEndOf="@id/avatarContainer"
-            app:layout_constraintTop_toBottomOf="@id/tvFriendName" />
-
-        <!-- Кнопка удаления (крестик) -->
+        <!-- Кнопка удаления (не перекрывается основным кликом) -->
         <ImageButton
             android:id="@+id/btnRemoveFriend"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Удалить из друзей"
-            android:src="@android:drawable/ic_menu_close_clear_cancel"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:tint="#8E8E93" />
+            android:src="@drawable/no_accounts_24dp_000000_fill0_wght400_grad0_opsz24"
+            app:tint="#8E8E93"
+            android:padding="6dp"/>
 
-        <!-- Кнопка "Поделиться точкой" -->
+    </LinearLayout>
 
+    <!-- Разделитель -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E7E8EC"/>
 
-        <!-- Кнопка "Запросить точку" (ВМЕСТО "Написать") -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnRequestSpot"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="6dp"
-            android:layout_marginTop="12dp"
-            android:text="Попросить точку "
-            android:textAllCaps="false"
-            android:textColor="#4C9AFF"
-            android:textSize="13sp"
-            app:cornerRadius="8dp"
-            app:strokeColor="#4C9AFF"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_weight="1"
-
-            app:layout_constraintTop_toBottomOf="@id/avatarContainer" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-</com.google.android.material.card.MaterialCardView>
+</LinearLayout>

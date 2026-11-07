@@ -27,7 +27,6 @@
         android:gravity="center"
         android:visibility="gone" />
 
-    <!-- ✅ УБРАН paddingTop, НЕТ ПУСТОТЫ НАВЕРХУ -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -39,7 +38,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- 1. ШАПКА ПОСТА (АВТОР + ДАТА) -->
+            <!-- 1. ШАПКА ПОСТА -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -109,7 +108,6 @@
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
                 android:background="#FFFFFF">
 
                 <ImageView
@@ -132,7 +130,19 @@
                     android:visibility="visible"/>
             </FrameLayout>
 
-            <!-- 3. ПАНЕЛЬ ДЕЙСТВИЙ (ЛАЙК + КОММЕНТАРИИ) -->
+            <!-- ✅ 3. ТЕКСТ ПОСТА (НОВЫЙ БЛОК ПОД ФОТО) -->
+            <TextView
+                android:id="@+id/tvPostText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp"
+                android:textSize="15sp"
+                android:textColor="#222222"
+                android:lineSpacingExtra="4dp"
+                android:background="#FFFFFF"
+                android:visibility="gone" />
+
+            <!-- 4. ПАНЕЛЬ ДЕЙСТВИЙ (ЛАЙК + КОММЕНТАРИИ) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -207,7 +217,7 @@
                 android:background="#E7E8EC"
                 android:layout_marginBottom="16dp"/>
 
-            <!-- 4. ОПИСАНИЕ И ДЕТАЛИ УЛОВА (ОБЪЕДИНЕНЫ) -->
+            <!-- 5. ОПИСАНИЕ И ДЕТАЛИ УЛОВА (МЕТА-ИНФО) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -216,7 +226,7 @@
                 android:background="#FFFFFF"
                 android:layout_marginBottom="16dp">
 
-                <!-- Вес улова теперь здесь -->
+                <!-- Вес улова -->
                 <TextView
                     android:id="@+id/tvCatchWeight"
                     android:layout_width="wrap_content"
@@ -231,7 +241,7 @@
                     app:cornerRadius="8dp"
                     android:layout_marginBottom="12dp"/>
 
-                <!-- Описание места -->
+                <!-- Техническое описание (снасти/мета) -->
                 <TextView
                     android:id="@+id/tvDescription"
                     android:layout_width="match_parent"
@@ -242,7 +252,7 @@
                     android:lineSpacingExtra="4dp" />
             </LinearLayout>
 
-            <!-- 5. КНОПКИ УПРАВЛЕНИЯ ТОЧКОЙ -->
+            <!-- 6. КНОПКИ УПРАВЛЕНИЯ ТОЧКОЙ (БЕЗ ИЗМЕНЕНИЙ) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -250,7 +260,6 @@
                 android:paddingHorizontal="16dp"
                 android:paddingBottom="32dp">
 
-                <!-- Навигация (полная ширина) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnNavigate"
                     android:layout_width="match_parent"
@@ -265,7 +274,6 @@
                     app:cornerRadius="12dp"
                     android:layout_marginBottom="12dp" />
 
-                <!-- ✅ ГОРИЗОНТАЛЬНЫЕ КНОПКИ (ИСПРАВЛЕННАЯ ВЫСОТА) -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -306,7 +314,6 @@
                         android:visibility="gone"/>
                 </LinearLayout>
 
-                <!-- Избранное -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnSaveToLocal"
                     style="@style/Widget.MaterialComponents.Button.TextButton"
@@ -323,7 +330,6 @@
                     android:layout_marginBottom="16dp"
                     android:visibility="gone"/>
 
-                <!-- Удаление -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnDeleteSpot"
                     style="@style/Widget.MaterialComponents.Button.TextButton"

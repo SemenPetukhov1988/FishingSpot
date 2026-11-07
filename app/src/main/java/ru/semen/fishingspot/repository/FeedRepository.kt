@@ -40,15 +40,22 @@ class FeedRepository {
 
                 android.util.Log.d("FEED_REPO", "✅ Сервер вернул документов: ${result.documents.size}")
 
+                // В FeedRepository.kt, внутри loadPublicSpots()
+
                 val list = result.documents.map { doc ->
                     val data = doc.data
-                    // Логируем каждую точку для отладки
-                    android.util.Log.d("FEED_REPO", "   📍 Точка: ${data["name"]} (vis: ${data["visibility"]})")
+
+                    // Логируем для проверки
+                    android.util.Log.d("FEED_REPO", "   📍 Точка: ${data["name"]} | postText=${data["postText"]}")
 
                     FishingSpot(
                         documentId = doc.id,
                         name = (data["name"] as? String) ?: "",
                         description = (data["description"] as? String) ?: "",
+
+                        // ✅ ДОБАВЛЕНО: Чтение текста поста для ленты
+                        postText = (data["postText"] as? String) ?: "",
+
                         latitude = (data["latitude"] as? Double) ?: 0.0,
                         longitude = (data["longitude"] as? Double) ?: 0.0,
                         photoUrl = data["photoUrl"] as? String,

@@ -11,6 +11,7 @@ data class FishingSpot(
     val longitude: Double,
     val name: String,
     val description: String = "",
+    val postText: String = "",
     val catchWeight: Double = 0.0,
     val fishType: String? = null,
     val photoPath: String? = null,

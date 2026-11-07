@@ -51,6 +51,7 @@ class SpotPreviewBottomSheet(
                 lon = spotLon,
                 name = spotName,
                 description = "Получено от $senderName: $spotDesc",
+                postText = "",
                 weight = spotWeight,
                 visibility = "private",
                 photoPath = null,

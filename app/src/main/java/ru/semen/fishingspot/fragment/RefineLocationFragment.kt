@@ -36,9 +36,10 @@ class RefineLocationFragment : Fragment() {
     private var _binding: FragmentRefineLocationBinding? = null
     private val binding get() = _binding!!
 
-    // ✅ Данные точки
+    // ✅ Данные точки (разделенные)
     private var spotName: String = ""
-    private var spotDesc: String = ""
+    private var spotMetaInfo: String = ""   // Снасти, наживка, дата (для description)
+    private var spotPostText: String = ""   // Текст поста от пользователя (для postText)
     private var spotWeight: Double = 0.0
     private var spotVisibility: String = "private"
     private var spotCreatedAt: Long = System.currentTimeMillis()
@@ -73,9 +74,10 @@ class RefineLocationFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         networkMonitor = NetworkMonitor.getInstance(requireContext())
 
-        // ✅ Читаем все данные из Bundle
+        // ✅ ЧИТАЕМ РАЗДЕЛЕННЫЕ ДАННЫЕ ИЗ BUNDLE
         spotName = arguments?.getString("NAME") ?: "Без названия"
-        spotDesc = arguments?.getString("DESC") ?: ""
+        spotMetaInfo = arguments?.getString("META_INFO") ?: ""      // Было DESC
+        spotPostText = arguments?.getString("POST_TEXT") ?: ""      // Новое поле
         spotWeight = arguments?.getDouble("WEIGHT") ?: 0.0
         spotVisibility = arguments?.getString("VISIBILITY") ?: "private"
         spotCreatedAt = arguments?.getLong("CREATED_AT") ?: System.currentTimeMillis()
@@ -177,19 +179,15 @@ class RefineLocationFragment : Fragment() {
         }
     }
 
-    // =========================================================================
-    // ✅ ЛОГИКА МОДЕРАЦИИ И СОХРАНЕНИЯ
-    // =========================================================================
     private fun checkWaterLocalAndSave(point: IGeoPoint) {
         lifecycleScope.launch {
             if (_binding == null) return@launch
 
-            // ✅ БЕЗОПАСНАЯ ПРОВЕРКА: явно сравниваем с true
             val isOnline = networkMonitor.value == true
-            Log.d("DEBUG_REFINE", "🌐 Проверка сети: isOnline = $isOnline (сырое значение: ${networkMonitor.value})")
+            Log.d("DEBUG_REFINE", "🌐 Проверка сети: isOnline = $isOnline")
 
             if (!isOnline) {
-                Toast.makeText(requireContext(), "⚠️ Для создания точки требуется интернет (статус: ${networkMonitor.value})", Toast.LENGTH_LONG).show()
+                Toast.makeText(requireContext(), "⚠️ Для создания точки требуется интернет", Toast.LENGTH_LONG).show()
                 binding.btnDone.isEnabled = true
                 binding.btnDone.text = "Готово"
                 return@launch
@@ -198,7 +196,6 @@ class RefineLocationFragment : Fragment() {
             binding.btnDone.isEnabled = false
             binding.btnDone.text = "Проверка..."
 
-            // Если точка не публичная, сохраняем сразу
             if (spotVisibility != "public") {
                 saveSpot(point, isVerified = false)
                 return@launch
@@ -237,9 +234,7 @@ class RefineLocationFragment : Fragment() {
             .setMessage("Рядом с вами нет зарегистрированного водоема. Точка будет добавлена со статусом «Сомнительная».")
             .setPositiveButton("Сохранить как сомнительную") { dialog, _ ->
                 dialog.dismiss()
-                if (isAdded && _binding != null) {
-                    saveSpot(point, isVerified = false)
-                }
+                if (isAdded && _binding != null) saveSpot(point, isVerified = false)
             }
             .setNegativeButton("Отмена") { dialog, _ ->
                 dialog.dismiss()
@@ -261,7 +256,7 @@ class RefineLocationFragment : Fragment() {
             .setPositiveButton("Сохранить как личную") { d, _ ->
                 d.dismiss()
                 if (isAdded && _binding != null) {
-                    spotVisibility = "private" // Принудительно делаем личным
+                    spotVisibility = "private"
                     saveSpot(point, isVerified = false)
                 }
             }
@@ -275,8 +270,6 @@ class RefineLocationFragment : Fragment() {
             .create().show()
     }
 
-    // ✅ ЕДИНЫЙ МЕТОД СОХРАНЕНИЯ (ViewModel сама решит: Appwrite -> Room)
-    // ✅ ЕДИНЫЙ МЕТОД СОХРАНЕНИЯ
     private fun saveSpot(point: IGeoPoint, isVerified: Boolean) {
         lifecycleScope.launch {
             if (_binding == null) return@launch
@@ -295,27 +288,22 @@ class RefineLocationFragment : Fragment() {
                     if (imageBytes != null) {
                         val fileName = "spot_${System.currentTimeMillis()}.jpg"
                         val fileId = ID.unique()
-
                         val inputFile = InputFile.fromBytes(imageBytes, fileName, "image/jpeg")
 
-                        // 1. Создаем файл в бакете
                         val file = AppwriteManager.storage.createFile(
                             bucketId = "6ada43f9003aa9f4d6a2",
                             fileId = fileId,
                             file = inputFile
                         )
 
-                        Log.d("REFINE_DEBUG", " Файл создан. File ID: ${file.id}")
+                        Log.d("REFINE_DEBUG", "✅ Файл создан. File ID: ${file.id}")
 
-                        // ✅ ВРЕМЕННЫЙ АДРЕС ДЛЯ РАЗРАБОТКИ (HTTP + ПОРТ 8080)
                         val serverIp = "153.76.168.237"
                         val bucketId = "6ada43f9003aa9f4d6a2"
                         val projectId = "6acfd94b00107a8657d8"
 
-                        // ВАЖНО: http:// и :8080
                         photoUrl = "http://$serverIp:8080/v1/storage/buckets/$bucketId/files/${file.id}/view?project=$projectId"
-
-                        Log.d("REFINE_DEBUG", "✅ Сформирован временный URL: $photoUrl")
+                        Log.d("REFINE_DEBUG", "✅ URL: $photoUrl")
                     }
                 } catch (e: Exception) {
                     Log.e("REFINE_DEBUG", "❌ Ошибка загрузки фото", e)
@@ -325,17 +313,28 @@ class RefineLocationFragment : Fragment() {
 
             binding.btnDone.text = "Сохранение точки..."
 
+            // ✅ ПЕРЕДАЕМ РАЗДЕЛЕННЫЕ ДАННЫЕ В VIEWMODEL
             spotViewModel.addFullSpot(
-                lat = point.latitude, lon = point.longitude, name = spotName,
-                description = spotDesc, weight = spotWeight, visibility = spotVisibility,
-                photoPath = null, photoUrl = photoUrl, fishType = fishType,
-                isVerified = isVerified, createdAt = spotCreatedAt,
-                authorId = authorId, authorName = authorName
+                lat = point.latitude,
+                lon = point.longitude,
+                name = spotName,
+                description = spotMetaInfo,     // Мета-инфо (снасти/наживка) → в description
+                postText = spotPostText,        // Текст поста → в postText
+                weight = spotWeight,
+                visibility = spotVisibility,
+                photoPath = null,
+                photoUrl = photoUrl,
+                fishType = fishType,
+                isVerified = isVerified,
+                createdAt = spotCreatedAt,
+                authorId = authorId,
+                authorName = authorName
             )
 
             navigateBack()
         }
     }
+
     private fun navigateBack() {
         try {
             requireActivity().findNavController(R.id.fragmentContainer).navigate(R.id.action_refine_to_tabs)

@@ -43,8 +43,12 @@ class SendFishingSignalFragment : Fragment() {
 
     private var isZoomAdjusted = false
     private var locationOverlay: MyLocationNewOverlay? = null
+
+    // ✅ ДОБАВЛЕНЫ ПЕРЕМЕННЫЕ ДЛЯ ИМЕНИ ОТПРАВИТЕЛЯ
     private lateinit var signalType: String
     private lateinit var receiverId: String
+    private var senderName: String = "Рыбак"
+    private var senderId: String = ""
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -72,6 +76,10 @@ class SendFishingSignalFragment : Fragment() {
             return
         }
 
+        // ✅ СЧИТЫВАЕМ ИМЯ И ID ОТПРАВИТЕЛЯ ИЗ BUNDLE
+        senderName = arguments?.getString("sender_name") ?: UserSessionManager.getCurrentNickname(requireContext()) ?: "Рыбак"
+        senderId = arguments?.getString("sender_id") ?: UserSessionManager.getCurrentUserId(requireContext()) ?: ""
+
         val mapView = binding.mapView
         mapView.setTileSource(TileSourceFactory.MAPNIK)
         mapView.setMultiTouchControls(true)
@@ -83,7 +91,6 @@ class SendFishingSignalFragment : Fragment() {
 
         checkLocationPermission()
 
-        // ✅ ЕДИНЫЙ МЕТОД ВОЗВРАТА НА ВКЛАДКУ СООБЩЕНИЙ
         val navigateBackToMessages = Runnable {
             val bundle = Bundle().apply {
                 putInt("active_tab", R.id.nav_stats)
@@ -98,7 +105,6 @@ class SendFishingSignalFragment : Fragment() {
             findNavController().navigate(R.id.mainTabsFragment, bundle, navOptions)
         }
 
-        // Логика двойного клика
         binding.btnConfirm.setOnClickListener {
             val currentZoom = mapView.zoomLevel
 
@@ -109,7 +115,6 @@ class SendFishingSignalFragment : Fragment() {
                 return@setOnClickListener
             }
 
-            // Второй клик: фиксация и отправка
             val lat = mapView.mapCenter.latitude
             val lon = mapView.mapCenter.longitude
             val zoom = mapView.zoomLevelDouble
@@ -117,7 +122,6 @@ class SendFishingSignalFragment : Fragment() {
             sendSignalToAppwrite(signalType, receiverId, lat, lon, zoom, navigateBackToMessages)
         }
 
-        // ✅ СИСТЕМНАЯ КНОПКА НАЗАД: ИСПОЛЬЗУЕТ ТОТ ЖЕ МЕТОД ВОЗВРАТА
         requireActivity().onBackPressedDispatcher.addCallback(
             viewLifecycleOwner,
             object : OnBackPressedCallback(true) {
@@ -128,7 +132,6 @@ class SendFishingSignalFragment : Fragment() {
         )
     }
 
-    // ✅ ФУНКЦИЯ ОТПРАВКИ ПРИНИМАЕТ RUNNABLE ДЛЯ ВОЗВРАТА
     private fun sendSignalToAppwrite(
         type: String,
         receiverId: String,
@@ -141,17 +144,21 @@ class SendFishingSignalFragment : Fragment() {
             if (_binding == null || !isAdded) return@launch
 
             try {
-                val currentUserId = UserSessionManager.getCurrentUserId(requireContext())
-                    ?: throw Exception("Пользователь не авторизован")
+                // Используем senderId из Bundle, если он есть, иначе берем из сессии
+                val finalSenderId = senderId.ifEmpty {
+                    UserSessionManager.getCurrentUserId(requireContext())
+                        ?: throw Exception("Пользователь не авторизован")
+                }
 
-                Log.d(TAG, "📤 Отправка сигнала: $type -> $receiverId")
+                Log.d(TAG, "📤 Отправка сигнала: $type от $senderName -> $receiverId")
 
                 AppwriteManager.databases.createDocument(
                     databaseId = DB_ID,
                     collectionId = NOTIFICATIONS_COL_ID,
                     documentId = ID.unique(),
                     data = mapOf(
-                        "senderId" to currentUserId,
+                        "senderId" to finalSenderId,
+                        "senderName" to senderName, // ✅ СОХРАНЯЕМ ИМЯ В БАЗУ
                         "receiverId" to receiverId,
                         "type" to type,
                         "lat" to lat,
@@ -163,8 +170,6 @@ class SendFishingSignalFragment : Fragment() {
                 )
 
                 Toast.makeText(requireContext(), "Сигнал отправлен! 🎣", Toast.LENGTH_SHORT).show()
-
-                // ✅ ВЫЗЫВАЕМ ПЕРЕДАННЫЙ МЕТОД ВОЗВРАТА
                 onNavigateBack.run()
 
             } catch (e: Exception) {

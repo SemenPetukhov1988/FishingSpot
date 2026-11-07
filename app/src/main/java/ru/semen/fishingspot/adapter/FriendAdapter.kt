@@ -1,57 +1,54 @@
 package ru.semen.fishingspot.adapter
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
+import android.widget.ImageButton
+import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import ru.semen.fishingspot.R
 import ru.semen.fishingspot.data.Friend
-import ru.semen.fishingspot.databinding.ItemFriendBinding
 
 class FriendAdapter(
-    private val onRequestClick: (Friend) -> Unit,
-    private val onRemoveClick: (Friend) -> Unit,
-    private val onItemClick: (Friend) -> Unit // ✅ Новый колбэк для клика по карточке
-) : ListAdapter<Friend, FriendAdapter.FriendViewHolder>(FriendDiffCallback()) {
+    private val onFriendClick: (Friend) -> Unit,
+    private val onRemoveClick: (Friend) -> Unit
+) : RecyclerView.Adapter<FriendAdapter.FriendViewHolder>() {
+
+    private var items: List<Friend> = emptyList()
+
+    fun submitList(newList: List<Friend>) {
+        items = newList
+        notifyDataSetChanged()
+    }
+
+    class FriendViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val tvAvatarLetter: TextView = view.findViewById(R.id.tvAvatarLetter)
+        val tvFriendName: TextView = view.findViewById(R.id.tvFriendName)
+        val btnRemoveFriend: ImageButton = view.findViewById(R.id.btnRemoveFriend)
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FriendViewHolder {
-        val binding = ItemFriendBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return FriendViewHolder(binding)
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_friend, parent, false)
+        return FriendViewHolder(view)
     }
 
     override fun onBindViewHolder(holder: FriendViewHolder, position: Int) {
-        holder.bind(getItem(position))
-    }
+        val friend = items[position]
 
-    inner class FriendViewHolder(private val binding: ItemFriendBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(friend: Friend) {
-            binding.tvFriendName.text = friend.name
-            binding.tvFriendStatus.text = friend.status
+        // Привязываем данные
+        holder.tvFriendName.text = friend.name.ifEmpty { "Рыбак" }
+        holder.tvAvatarLetter.text = friend.name.firstOrNull()?.uppercase() ?: "?"
 
-            // Первая буква имени для аватара-заглушки
-            val firstLetter = if (friend.name.isNotEmpty()) {
-                friend.name[0].uppercaseChar().toString()
-            } else {
-                "?"
-            }
-            binding.tvAvatarLetter.text = firstLetter
+        // ✅ ОБРАБОТЧИКИ КЛИКОВ ПРИВЯЗЫВАЮТСЯ ЗДЕСЬ, ГДЕ ЕСТЬ ДОСТУП К СПИСКУ И ЛАМБДАМ
+        holder.itemView.setOnClickListener {
+            onFriendClick(friend)
+        }
 
-            // ✅ Клик по всей карточке - проверка дружбы
-            binding.root.setOnClickListener { onItemClick(friend) }
-
-            // Кнопки действий
-            binding.btnRequestSpot.setOnClickListener { onRequestClick(friend) }
-            binding.btnRemoveFriend.setOnClickListener { onRemoveClick(friend) }
+        holder.btnRemoveFriend.setOnClickListener {
+            onRemoveClick(friend)
         }
     }
 
-    class FriendDiffCallback : DiffUtil.ItemCallback<Friend>() {
-        override fun areItemsTheSame(oldItem: Friend, newItem: Friend): Boolean {
-            return oldItem.id == newItem.id
-        }
-
-        override fun areContentsTheSame(oldItem: Friend, newItem: Friend): Boolean {
-            return oldItem == newItem
-        }
-    }
+    override fun getItemCount() = items.size
 }

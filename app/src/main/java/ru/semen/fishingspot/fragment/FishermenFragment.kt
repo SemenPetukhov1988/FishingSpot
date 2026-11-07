@@ -51,11 +51,11 @@ class FishermenFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
+        // ✅ АДАПТИРОВАНО ПОД НОВЫЙ КОНСТРУКТОР ADAPTER
+        // onRequestClick убран (теперь это действие по клику на карточку)
+        // onItemClick переименован в onFriendClick
         adapter = FriendAdapter(
-            onRequestClick = { friend ->
-                RequestSpotBottomSheet(friend.id, friend.name)
-                    .show(childFragmentManager, "request_spot_sheet")
-            },
+            onFriendClick = { friend -> checkIfStillFriend(friend) },
             onRemoveClick = { friend ->
                 AlertDialog.Builder(requireContext())
                     .setTitle("Удалить из друзей?")
@@ -65,13 +65,13 @@ class FishermenFragment : Fragment() {
                     }
                     .setNegativeButton("Отмена", null)
                     .show()
-            },
-            onItemClick = { friend -> checkIfStillFriend(friend) }
+            }
         )
         binding.rvFriends.layoutManager = LinearLayoutManager(requireContext())
         binding.rvFriends.adapter = adapter
     }
 
+    // ✅ ЛОГИКА ПРОВЕРКИ ДРУЖБЫ ОСТАВЛЕНА БЕЗ ИЗМЕНЕНИЙ
     private fun checkIfStillFriend(friend: ru.semen.fishingspot.data.Friend) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
@@ -99,6 +99,7 @@ class FishermenFragment : Fragment() {
                 }
             } catch (e: Exception) {
                 android.util.Log.e("FRIEND_CHECK", "Ошибка проверки дружбы: ${e.message}")
+                // ✅ ФАЛЛБЭК: Если проверка не прошла - открываем запрос точки
                 RequestSpotBottomSheet(friend.id, friend.name)
                     .show(childFragmentManager, "request_spot_sheet")
             }
