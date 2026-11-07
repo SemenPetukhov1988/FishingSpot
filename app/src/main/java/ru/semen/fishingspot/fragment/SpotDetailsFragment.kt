@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import ru.semen.fishingspot.R
@@ -29,7 +30,6 @@ class SpotDetailsFragment : Fragment() {
     private var _binding: FragmentSpotDetailsBinding? = null
     private val binding get() = _binding!!
 
-    // ✅ ДОБАВЛЕНЫ VIEWMODEL ДЛЯ ТЕСТА
     private val spotViewModel: SpotViewModel by activityViewModels()
     private val commentViewModel: CommentViewModel by activityViewModels()
 
@@ -78,15 +78,10 @@ class SpotDetailsFragment : Fragment() {
 
         setupClickListeners()
 
-        // ✅ НАСТРОЙКА НАБЛЮДАТЕЛЕЙ КОММЕНТАРИЕВ
         commentViewModel.comments.observe(viewLifecycleOwner) { list ->
             Log.d("COMMENT_TEST", "✅ Загружено ${list.size} комментариев")
-            list.forEach { c ->
-                Log.d("COMMENT_TEST", "   - [${c.userName}] ${c.text}")
-            }
         }
 
-        // Добавь этот блок рядом с другими observers
         commentViewModel.error.observe(viewLifecycleOwner) { err ->
             if (!err.isNullOrEmpty()) {
                 Log.e("COMMENT_TEST", "❌ ОШИБКА КОММЕНТАРИЯ: $err")
@@ -94,7 +89,6 @@ class SpotDetailsFragment : Fragment() {
             }
         }
 
-        // Наблюдатели точек (без изменений)
         spotViewModel.isLoading.observe(viewLifecycleOwner) { loading ->
             if (_binding == null) return@observe
             binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
@@ -129,7 +123,6 @@ class SpotDetailsFragment : Fragment() {
         val me = UserSessionManager.getCurrentUserId(requireContext()) ?: ""
         val isAuthor = me.isNotEmpty() && me == spot.authorId
 
-        // Текстовые поля
         binding.tvSpotName.text = spot.name
         binding.tvDescription.text = spot.description.ifEmpty { "Нет описания" }
         binding.tvCatchWeight.text = weightText(spot.catchWeight)
@@ -137,56 +130,25 @@ class SpotDetailsFragment : Fragment() {
         binding.tvFishingDate.text = "📅 Рыбалка: " +
                 SimpleDateFormat("dd MMMM yyyy", Locale("ru")).format(Date(spot.createdAt))
 
-        // ✅ ЗАГРУЗКА ФОТО ЧЕРЕЗ GLIDE
-        Log.d(TAG, "📸 Проверка photoUrl: '${spot.photoUrl}'")
-        Log.d(TAG, "📸 photoUrl.isNullOrEmpty(): ${spot.photoUrl.isNullOrEmpty()}")
-
         if (!spot.photoUrl.isNullOrEmpty()) {
             binding.ivSpotPhoto.visibility = View.VISIBLE
             binding.ivPhotoPlaceholder.visibility = View.GONE
-
-            Log.d(TAG, "🚀 Запуск Glide для URL: ${spot.photoUrl}")
 
             Glide.with(this)
                 .load(spot.photoUrl)
                 .fitCenter()
                 .placeholder(R.drawable.add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_)
                 .error(R.drawable.add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_)
-                .listener(object : com.bumptech.glide.request.RequestListener<android.graphics.drawable.Drawable> {
-                    override fun onLoadFailed(
-                        e: com.bumptech.glide.load.engine.GlideException?,
-                        model: Any?,
-                        target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>?,
-                        isFirstResource: Boolean
-                    ): Boolean {
-                        Log.e(TAG, " Ошибка загрузки фото: ${e?.message}", e)
-                        return false
-                    }
-
-                    override fun onResourceReady(
-                        resource: android.graphics.drawable.Drawable?,
-                        model: Any?,
-                        target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>?,
-                        dataSource: com.bumptech.glide.load.DataSource?,
-                        isFirstResource: Boolean
-                    ): Boolean {
-                        Log.d(TAG, "✅ Фото успешно загружено!")
-                        return false
-                    }
-                })
                 .into(binding.ivSpotPhoto)
 
         } else {
             binding.ivSpotPhoto.visibility = View.GONE
             binding.ivPhotoPlaceholder.visibility = View.VISIBLE
-            Log.d(TAG, "📸 Фото отсутствует (photoUrl пуст)")
         }
 
-        // Баннер оффлайна
         binding.tvOfflineBanner.visibility = if (online) View.GONE else View.VISIBLE
         binding.btnNavigate.visibility = View.VISIBLE
 
-        // Управление кнопками
         val canManage = online && isAuthor
         binding.btnDeleteSpot.visibility = if (canManage) View.VISIBLE else View.GONE
 
@@ -229,10 +191,29 @@ class SpotDetailsFragment : Fragment() {
     }
 
     private fun setupClickListeners() {
-        binding.btnBack.setOnClickListener {
-            spotViewModel.setSelectedTab(sourceTab)
-            findNavController().navigateUp()
+        // ✅ ЕДИНЫЙ МЕТОД ВОЗВРАТА: Обновляем режим карты + переключаем таб
+        val navigateBack = Runnable {
+            // 1. Явно обновляем режим карты ПЕРЕД навигацией
+            when (sourceTab) {
+                R.id.nav_global_map -> spotViewModel.switchToPublicSpots()
+                else -> spotViewModel.switchToMySpots()
+            }
+
+            // 2. Переключаем таб
+            val bundle = Bundle().apply {
+                putInt("active_tab", sourceTab)
+            }
+
+            val navOptions = NavOptions.Builder()
+                .setPopUpTo(R.id.mainTabsFragment, inclusive = false)
+                .setEnterAnim(R.anim.slide_in_left)
+                .setExitAnim(R.anim.slide_out_right)
+                .build()
+
+            findNavController().navigate(R.id.mainTabsFragment, bundle, navOptions)
         }
+
+        binding.btnBack.setOnClickListener { navigateBack.run() }
 
         binding.btnNavigate.setOnClickListener {
             val spot = currentSpot ?: return@setOnClickListener
@@ -244,7 +225,6 @@ class SpotDetailsFragment : Fragment() {
             }
         }
 
-        // ✅ ОБРАБОТЧИК ТЕСТОВОЙ КНОПКИ
         binding.tvCommentsCount.setOnClickListener {
             CommentsBottomSheetDialogFragment.newInstance(currentSpot?.documentId ?: "")
                 .show(childFragmentManager, "comments")
@@ -254,7 +234,7 @@ class SpotDetailsFragment : Fragment() {
             val id = currentSpot?.documentId ?: return@setOnClickListener
             confirm("Удалить точку?", "Точка будет удалена с сервера навсегда.", "Удалить") {
                 spotViewModel.deleteSpot(id)
-                findNavController().navigateUp()
+                navigateBack.run()
             }
         }
 
@@ -293,7 +273,7 @@ class SpotDetailsFragment : Fragment() {
     private fun weightText(weight: Double): String = when {
         weight <= 0.0 -> "🐟 Улов не указан"
         weight <= 1.0 -> "⚖️ Вес улова: До 1 кг"
-        weight <= 5.0 -> "️ Вес улова: 1–5 кг"
+        weight <= 5.0 -> "⚖️ Вес улова: 1–5 кг"
         else -> "⚖️ Вес улова: Больше 5 кг"
     }
 

@@ -46,6 +46,10 @@ class MessagesFragment : Fragment() {
 
         setupAdapter()
         loadMessages()
+
+        binding.fabAddMessage.setOnClickListener {
+            SignalTypeBottomSheet().show(childFragmentManager, "signal_type_sheet")
+        }
     }
 
     private fun setupAdapter() {
@@ -116,6 +120,9 @@ class MessagesFragment : Fragment() {
 
     private fun loadMessages() {
         viewLifecycleOwner.lifecycleScope.launch {
+            // ✅ ПРОВЕРКА 1: Если фрагмент уже уничтожен или не добавлен — выходим сразу
+            if (_binding == null || !isAdded) return@launch
+
             val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: return@launch
 
             try {
@@ -129,37 +136,36 @@ class MessagesFragment : Fragment() {
                     )
                 )
 
+                // ✅ ПРОВЕРКА 2: После сетевого запроса снова проверяем состояние фрагмента
+                if (_binding == null || !isAdded) return@launch
+
                 val messages = result.documents.mapNotNull { doc ->
                     val data = doc.data
                     AppMessage(
                         id = doc.id,
-                        messageId = doc.id, // ✅ Дублируем ID для операций удаления/принятия
-
+                        messageId = doc.id,
                         senderId = data["senderId"] as? String ?: "",
                         senderName = data["senderName"] as? String ?: "Рыбак",
                         recipientId = data["recipientId"] as? String ?: "",
-
                         type = data["type"] as? String ?: "SYSTEM",
-
-                        spotId = data["spotId"] as? String ?: "", // ✅ Исправлено: String? → String с дефолтом
+                        spotId = data["spotId"] as? String ?: "",
                         spotName = data["spotName"] as? String ?: "",
-
                         spotLat = data["spotLat"] as? Double ?: 0.0,
                         spotLon = data["spotLon"] as? Double ?: 0.0,
-
                         contentText = data["contentText"] as? String ?: "",
                         customMessage = data["customMessage"] as? String ?: "",
-
                         spotDescription = data["spotDescription"] as? String ?: "",
                         spotWeight = data["spotWeight"] as? Double ?: 0.0,
                         spotCreatedAt = (data["spotCreatedAt"] as? Number)?.toLong() ?: 0L,
                         spotIsVerified = data["spotIsVerified"] as? Boolean ?: false,
-                        spotPhotoPath = data["spotPhotoPath"] as? String, // Nullable поле оставляем как есть
-
+                        spotPhotoPath = data["spotPhotoPath"] as? String,
                         isRead = data["isRead"] as? Boolean ?: false,
                         timestamp = (data["timestamp"] as? Number)?.toLong() ?: 0L
                     )
                 }
+
+                // ✅ ПРОВЕРКА 3: Перед обновлением UI убеждаемся, что binding жив
+                if (_binding == null || !isAdded) return@launch
 
                 adapter.submitList(messages)
 
@@ -172,7 +178,10 @@ class MessagesFragment : Fragment() {
                 }
 
             } catch (e: Exception) {
-                Toast.makeText(requireContext(), "Ошибка загрузки сообщений: ${e.message}", Toast.LENGTH_SHORT).show()
+                // ✅ БЕЗОПАСНЫЙ ТОСТ: только если фрагмент всё ещё активен
+                if (_binding != null && isAdded) {
+                    Toast.makeText(requireContext(), "Ошибка загрузки сообщений: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }

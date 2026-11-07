@@ -35,24 +35,42 @@ class MainTabsFragment : Fragment() {
         binding.bottomNavigation.itemIconTintList = null
         binding.bottomNavigation.itemActiveIndicatorColor = ColorStateList.valueOf(Color.TRANSPARENT)
 
-        // Синхронизация вкладки при возврате из других фрагментов
-        spotViewModel.selectedTabId.observe(viewLifecycleOwner) { tabId ->
-            currentSelectedItemId = tabId
-            binding.bottomNavigation.selectedItemId = tabId
-        }
+        // ✅ ОБРАБОТКА ЯВНОГО ЗАПРОСА НА ПЕРЕКЛЮЧЕНИЕ ТАБА (при возврате с карты сигнала)
+        // ✅ ОБРАБОТКА ЯВНОГО ЗАПРОСА НА ПЕРЕКЛЮЧЕНИЕ ТАБА (при возврате с карты сигнала)
+        val requestedTab = arguments?.getInt("active_tab")
+        if (requestedTab != null && requestedTab != 0) {
+            currentSelectedItemId = requestedTab
+            binding.bottomNavigation.selectedItemId = requestedTab
 
-        if (savedInstanceState == null) {
+            // ✅ ГЛАВНОЕ ИСПРАВЛЕНИЕ: Явно загружаем нужный фрагмент в контейнер
+            when (requestedTab) {
+                R.id.nav_my_places, R.id.nav_global_map -> ensureMapFragmentIsVisible()
+                R.id.nav_feed -> switchFragment(FeedFragment(), requestedTab)
+                R.id.nav_stats -> switchFragment(MessagesFragment(), requestedTab) // ← ЭТОГО НЕ ХВАТАЛО!
+                R.id.nav_fishermen -> switchFragment(FishermenFragment(), requestedTab)
+            }
+
+            arguments?.clear()
+        } else if (savedInstanceState == null) {
+            // Обычный первый запуск
             switchFragment(MyMapFragment(), R.id.nav_my_places)
-            spotViewModel.switchToMySpots() // По умолчанию показываем мои точки
+            spotViewModel.switchToMySpots()
         } else {
+            // Восстановление после поворота/убийства процесса
             currentSelectedItemId = savedInstanceState.getInt("SELECTED_ITEM", R.id.nav_my_places)
             binding.bottomNavigation.selectedItemId = currentSelectedItemId
+            when (currentSelectedItemId) {
+                R.id.nav_my_places, R.id.nav_global_map -> ensureMapFragmentIsVisible()
+                R.id.nav_feed -> switchFragment(FeedFragment(), currentSelectedItemId)
+                R.id.nav_stats -> switchFragment(MessagesFragment(), currentSelectedItemId)
+                R.id.nav_fishermen -> switchFragment(FishermenFragment(), currentSelectedItemId)
+            }
         }
 
         binding.bottomNavigation.setOnItemSelectedListener { item ->
             currentSelectedItemId = item.itemId
 
-            // Анимация иконки (твоя классная фишка, оставляем!)
+            // Анимация иконки
             val iconView = binding.bottomNavigation.findViewById<View>(item.itemId)
                 ?.findViewById<ImageView>(com.google.android.material.R.id.navigation_bar_item_icon_view)
 
@@ -63,16 +81,12 @@ class MainTabsFragment : Fragment() {
 
             when (item.itemId) {
                 R.id.nav_my_places -> {
-                    // 1. Убеждаемся, что открыта карта
                     ensureMapFragmentIsVisible()
-                    // 2. Переключаем ViewModel в режим "Мои точки"
                     spotViewModel.switchToMySpots()
                     true
                 }
                 R.id.nav_global_map -> {
-                    // 1. Убеждаемся, что открыта карта (если мы были в ленте, переключит на карту)
                     ensureMapFragmentIsVisible()
-                    // 2. Переключаем ViewModel в режим "Публичные точки"
                     spotViewModel.switchToPublicSpots()
                     true
                 }
@@ -85,7 +99,6 @@ class MainTabsFragment : Fragment() {
     }
 
     // ✅ НОВЫЙ МЕТОД: Переключает на MyMapFragment только если мы сейчас НЕ на нём.
-    // Это сохраняет состояние карты (зум, GPS), когда мы просто переключаем режимы!
     private fun ensureMapFragmentIsVisible() {
         if (currentFragment !is MyMapFragment) {
             switchFragment(MyMapFragment(), currentSelectedItemId)

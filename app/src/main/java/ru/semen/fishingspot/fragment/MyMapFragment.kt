@@ -9,12 +9,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.navigation.NavOptions
 import androidx.navigation.findNavController
 import androidx.navigation.fragment.findNavController
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
@@ -36,31 +39,22 @@ class MyMapFragment : Fragment() {
     private var isLocationAlreadyShown = false
     private var locationOverlay: MyLocationNewOverlay? = null
 
-    private val DEFAULT_POINT = GeoPoint(64.5401, 40.5433) // Архангельск
+    private val DEFAULT_POINT = GeoPoint(64.5401, 40.5433)
     private val CITY_ZOOM = 11.0
     private val MAX_ZOOM_LIMIT = 18.5
 
-    // ✅ СОВРЕМЕННЫЙ И НАДЕЖНЫЙ СПОСОБ ЗАПРОСА РАЗРЕШЕНИЙ
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
-        if (isGranted) {
-            Log.d(TAG, "👍 Разрешение получено, запускаем GPS")
-            startLocationTracking()
-        } else {
+        if (isGranted) startLocationTracking() else {
             Log.w(TAG, "🚫 Разрешение отклонено")
             hideLoading()
-            // Если отказали, хотя бы показываем дефолтный город
             binding.mapView.controller.setCenter(DEFAULT_POINT)
             binding.mapView.controller.setZoom(CITY_ZOOM)
         }
     }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentMapBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -70,19 +64,40 @@ class MyMapFragment : Fragment() {
         isLocationAlreadyShown = false
 
         val mapView = binding.mapView
-        mapView.setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
+        mapView.setTileSource(TileSourceFactory.MAPNIK)
         mapView.setMultiTouchControls(true)
         mapView.setMaxZoomLevel(MAX_ZOOM_LIMIT)
-
-        // ✅ УБИРАЕМ КВАДРАТИКИ: задаем цвет фона, пока грузятся тайлы
         mapView.setBackgroundColor(Color.parseColor("#E8E8E8"))
 
-        // 🌟 Инициализируем оверлей, но НЕ включаем поиск локации здесь!
         locationOverlay = MyLocationNewOverlay(mapView)
         locationOverlay?.setDrawAccuracyEnabled(true)
         mapView.overlays.add(locationOverlay)
 
         checkLocationPermission()
+
+        // ✅ ЕДИНЫЙ МЕТОД ВОЗВРАТА: Обновляем режим карты + переключаем таб
+        val navigateBackToCurrentTab = Runnable {
+            val currentTabId = spotViewModel.selectedTabId.value ?: R.id.nav_my_places
+
+            // 1. Явно обновляем режим карты ВМЕСТО того чтобы надеяться на observer
+            when (currentTabId) {
+                R.id.nav_global_map -> spotViewModel.switchToPublicSpots()
+                else -> spotViewModel.switchToMySpots()
+            }
+
+            // 2. Переключаем таб (без inclusive=true, чтобы сохранить состояние карты)
+            val bundle = Bundle().apply {
+                putInt("active_tab", currentTabId)
+            }
+
+            val navOptions = NavOptions.Builder()
+                .setPopUpTo(R.id.mainTabsFragment, inclusive = false)
+                .setEnterAnim(R.anim.slide_in_left)
+                .setExitAnim(R.anim.slide_out_right)
+                .build()
+
+            findNavController().navigate(R.id.mainTabsFragment, bundle, navOptions)
+        }
 
         binding.btnAddPoint.setOnClickListener {
             val center = mapView.mapCenter
@@ -94,13 +109,20 @@ class MyMapFragment : Fragment() {
                 .navigate(R.id.action_mainTabs_to_addPoint, bundle)
         }
 
-        // ✅ 1. СЛУШАЕМ СПИСОК ТОЧЕК (теперь он приходит чисто с сервера)
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    navigateBackToCurrentTab.run()
+                }
+            }
+        )
+
         spotViewModel.currentSpots.observe(viewLifecycleOwner) { spots ->
             Log.d(TAG, "LiveData update: ${spots.size} spots (Режим: ${spotViewModel.mapMode.value})")
             drawMarkers(spots)
         }
 
-        // ✅ 2. СЛУШАЕМ ОШИБКИ (например, "Нет интернета")
         spotViewModel.errorMessage.observe(viewLifecycleOwner) { message ->
             if (_binding == null || message.isNullOrBlank()) return@observe
             Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
@@ -111,11 +133,10 @@ class MyMapFragment : Fragment() {
         super.onResume()
         binding.mapView.onResume()
 
-        // ✅ 3. ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ ДАННЫХ ПРИ ВОЗВРАТЕ НА ЭКРАН
+        // ✅ ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ ДАННЫХ ПРИ ВОЗВРАТЕ
         spotViewModel.refreshMap()
 
         if (lastUserLocation != null && !isLocationAlreadyShown) {
-            Log.d(TAG, "Мгновенный переход на сохраненную позицию")
             binding.mapView.controller.setCenter(lastUserLocation)
             binding.mapView.controller.setZoom(CITY_ZOOM)
             isLocationAlreadyShown = true
@@ -129,45 +150,34 @@ class MyMapFragment : Fragment() {
 
     override fun onStop() {
         binding.mapView.onPause()
-        // Отключаем локацию при уходе с экрана для экономии батареи
         locationOverlay?.disableMyLocation()
         super.onStop()
     }
 
-    // ✅ ЗАЩИТА ОТ ЗАВИСАНИЯ ПРИ "ХОЛОДНОМ СТАРТЕ" GPS
     private fun startLocationTracking() {
         if (_binding == null) return
         showLoading()
-
         locationOverlay?.enableMyLocation()
-
-        // 1. Сразу показываем дефолтную точку, чтобы экран не был пустым
         binding.mapView.controller.setCenter(DEFAULT_POINT)
         binding.mapView.controller.setZoom(CITY_ZOOM)
 
-        // 2. Таймер-страховка: если GPS не найден за 6 секунд, убираем загрузку
         val timeoutRunnable = Runnable {
             if (_binding != null && !isLocationAlreadyShown) {
-                Log.d(TAG, "⏱️ GPS таймаут (6 сек). Скрываем загрузку, показываем карту.")
+                Log.d(TAG, "⏱️ GPS таймаут (6 сек)")
                 hideLoading()
             }
         }
         binding.mapView.postDelayed(timeoutRunnable, 6000)
 
-        // 3. Ждем реальный GPS
         locationOverlay?.runOnFirstFix {
             val location = locationOverlay?.myLocation
             if (location != null) {
                 val newLocation = GeoPoint(location.latitude, location.longitude)
-
                 requireActivity().runOnUiThread {
                     if (_binding != null) {
-                        // Отменяем таймер, так как GPS успешно сработал!
                         binding.mapView.removeCallbacks(timeoutRunnable)
-
                         lastUserLocation = newLocation
                         if (!isLocationAlreadyShown) {
-                            // 🌟 Плавная анимация центрирования
                             binding.mapView.controller.animateTo(lastUserLocation)
                             binding.mapView.controller.setZoom(CITY_ZOOM)
                             isLocationAlreadyShown = true
@@ -182,10 +192,8 @@ class MyMapFragment : Fragment() {
     private fun checkLocationPermission() {
         val permission = Manifest.permission.ACCESS_FINE_LOCATION
         if (ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, "🔐 Разрешение уже есть, запускаем GPS")
             startLocationTracking()
         } else {
-            Log.d(TAG, "⚠️ Запрашиваем разрешение...")
             requestPermissionLauncher.launch(permission)
         }
     }
@@ -207,9 +215,10 @@ class MyMapFragment : Fragment() {
 
     private fun drawMarkers(spots: List<FishingSpot>) {
         if (_binding == null) return
-
         val mapView = binding.mapView
-        mapView.overlays.removeAll { it is Marker } // Очищаем только маркеры
+        mapView.overlays.removeAll { it is Marker }
+
+        val currentTabId = spotViewModel.selectedTabId.value ?: R.id.nav_my_places
 
         spots.forEach { spot ->
             val point = GeoPoint(spot.latitude, spot.longitude)
@@ -217,12 +226,11 @@ class MyMapFragment : Fragment() {
             marker.position = point
             marker.setIcon(ContextCompat.getDrawable(requireContext(), R.drawable.metka4567))
 
-            // ✅ 4. УПРОЩЕННЫЙ КЛИК: передаем ТОЛЬКО document_id (String)
             marker.setOnMarkerClickListener { _, _ ->
                 Log.d(TAG, "КЛИК! documentId: ${spot.documentId}")
                 val detailsBundle = Bundle().apply {
                     putString("document_id", spot.documentId)
-                    putInt("source_tab", R.id.nav_my_places)
+                    putInt("source_tab", currentTabId)
                 }
                 findNavController().navigate(R.id.action_map_to_details, detailsBundle)
                 true

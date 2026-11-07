@@ -28,6 +28,13 @@
     </fragment>
 
     <fragment
+        android:id="@+id/sendFishingSignalFragment"
+        android:name="ru.semen.fishingspot.fragment.SendFishingSignalFragment"
+        android:label="Выбор местоположения">
+
+    </fragment>
+
+    <fragment
         android:id="@+id/addPointFragment"
         android:name="ru.semen.fishingspot.fragment.AddPointFragment"
         android:label="Новая точка">
