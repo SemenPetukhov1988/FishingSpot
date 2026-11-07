@@ -8,6 +8,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.switchMap
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import ru.semen.fishingspot.R
 import ru.semen.fishingspot.data.AppDatabase
 import ru.semen.fishingspot.data.FishingSpot
 import ru.semen.fishingspot.data.WaterChecker
@@ -21,29 +22,22 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
 
     private val server = SpotAppwriteRepository(application)
     private val favorites = SavedSpotsRepository(application)
-
-    // Room только для справочника водоемов. Точки отсюда НЕ читаются и НЕ пишутся.
     private val database = AppDatabase.getDatabase(application)
     private val waterChecker = WaterChecker()
-
     private val networkMonitor = NetworkMonitor.getInstance(application)
     private val userId = UserSessionManager.getCurrentUserId(application) ?: ""
     private val userName = UserSessionManager.getCurrentNickname(application) ?: "Неизвестно"
 
     enum class MapMode { MY_SPOTS, PUBLIC_SPOTS }
 
+    // ✅ ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ ДЛЯ ТАБОВ (переживает пересоздание UI)
+    var selectedTabId: Int = R.id.nav_my_places
+
     private val _mapMode = MutableLiveData(MapMode.MY_SPOTS)
     val mapMode: LiveData<MapMode> = _mapMode
 
-    private val _selectedTabId = MutableLiveData<Int>()
-    val selectedTabId: LiveData<Int> = _selectedTabId
-    fun setSelectedTab(tabId: Int) { _selectedTabId.value = tabId }
-
-    // Единственные списки точек в приложении — серверные, в памяти
     private val _mySpots = MutableLiveData<List<FishingSpot>>(emptyList())
     val mySpots: LiveData<List<FishingSpot>> = _mySpots
-
-    // Совместимость со старыми вызовами (FeedFragment и др.)
     val localSpots: LiveData<List<FishingSpot>> = _mySpots
 
     private val _publicSpots = MutableLiveData<List<FishingSpot>>(emptyList())
@@ -76,14 +70,14 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
         return false
     }
 
-    // ================= ЗАГРУЗКА =================
-
     fun switchToMySpots() {
+        selectedTabId = R.id.nav_my_places
         _mapMode.value = MapMode.MY_SPOTS
         loadMySpots()
     }
 
     fun switchToPublicSpots() {
+        selectedTabId = R.id.nav_global_map
         _mapMode.value = MapMode.PUBLIC_SPOTS
         loadPublicSpots()
     }
@@ -150,34 +144,20 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ================= ОБНОВЛЕНИЕ СПИСКОВ В ПАМЯТИ =================
-    // Это не кэш: просто состояние UI, чтобы карта перерисовалась сразу.
-
     private fun upsertInLists(spot: FishingSpot) {
-        Log.d("SPOT_SERVER", "📊 upsertInLists: добавляем точку ${spot.documentId} в списки")
-
+        Log.d("SPOT_SERVER", "📊 upsertInLists: ${spot.documentId}")
         val my = (_mySpots.value ?: emptyList()).filter { it.documentId != spot.documentId }
         _mySpots.value = listOf(spot) + my
-        Log.d("SPOT_SERVER", "📊 _mySpots обновлён, теперь содержит: ${_mySpots.value?.size} точек")
 
         val pub = (_publicSpots.value ?: emptyList()).filter { it.documentId != spot.documentId }
         _publicSpots.value = if (spot.visibility == "public") listOf(spot) + pub else pub
-        Log.d("SPOT_SERVER", "📊 _publicSpots обновлён, теперь содержит: ${_publicSpots.value?.size} точек")
-
-        Log.d("SPOT_SERVER", "📊 Текущий режим карты: ${_mapMode.value}")
     }
 
     private fun removeFromLists(documentId: String) {
-        Log.d("SPOT_SERVER", "📊 removeFromLists: удаляем точку $documentId из списков")
-
+        Log.d("SPOT_SERVER", "📊 removeFromLists: $documentId")
         _mySpots.value = (_mySpots.value ?: emptyList()).filter { it.documentId != documentId }
-        Log.d("SPOT_SERVER", "📊 _mySpots обновлён, теперь содержит: ${_mySpots.value?.size} точек")
-
         _publicSpots.value = (_publicSpots.value ?: emptyList()).filter { it.documentId != documentId }
-        Log.d("SPOT_SERVER", "📊 _publicSpots обновлён, теперь содержит: ${_publicSpots.value?.size} точек")
     }
-
-    // ================= СОЗДАНИЕ =================
 
     fun addFullSpot(
         lat: Double, lon: Double, name: String, description: String, weight: Double,
@@ -187,31 +167,16 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch {
             if (!hasNetwork()) return@launch
-
             val finalAuthorId = authorId?.takeIf { it.isNotEmpty() && it != "unknown_user" } ?: userId
-            val finalAuthorName = if (finalAuthorId == userId) {
-                userName
-            } else {
-                authorName?.takeIf { it.isNotEmpty() && it != "Рыбак" } ?: "Неизвестно"
-            }
+            val finalAuthorName = if (finalAuthorId == userId) userName
+            else authorName?.takeIf { it.isNotEmpty() && it != "Рыбак" } ?: "Неизвестно"
 
             val spot = FishingSpot(
-                id = 0,
-                documentId = "",
-                latitude = lat,
-                longitude = lon,
-                name = name,
-                description = description,
-                catchWeight = weight,
-                fishType = fishType,
-                photoPath = photoPath,
-                photoUrl = photoUrl,
-                isVerified = isVerified,
-                visibility = visibility,
-                isPublicOnMap = visibility == "public",
-                createdAt = createdAt,
-                authorId = finalAuthorId,
-                authorName = finalAuthorName
+                id = 0, documentId = "", latitude = lat, longitude = lon, name = name,
+                description = description, catchWeight = weight, fishType = fishType,
+                photoPath = photoPath, photoUrl = photoUrl, isVerified = isVerified,
+                visibility = visibility, isPublicOnMap = visibility == "public",
+                createdAt = createdAt, authorId = finalAuthorId, authorName = finalAuthorName
             )
 
             val result = server.createSpot(spot)
@@ -219,14 +184,11 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
                 val created = result.getOrNull() ?: return@launch
                 upsertInLists(created)
                 _errorMessage.value = null
-                Log.d("SPOT_SERVER", "✅ создана и добавлена в списки: ${created.documentId}")
             } else {
                 _errorMessage.value = "Ошибка сохранения: ${result.exceptionOrNull()?.message}"
             }
         }
     }
-
-    // ================= ВИДИМОСТЬ =================
 
     fun updateSpotVisibility(documentId: String, newVisibility: String) {
         viewModelScope.launch {
@@ -235,61 +197,41 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
             if (result.isSuccess) {
                 val current = _currentSpotDetails.value
                 if (current != null && current.documentId == documentId) {
-                    val updated = current.copy(
-                        visibility = newVisibility,
-                        isPublicOnMap = newVisibility == "public"
-                    )
+                    val updated = current.copy(visibility = newVisibility, isPublicOnMap = newVisibility == "public")
                     _currentSpotDetails.value = updated
                     upsertInLists(updated)
                 } else {
                     refreshMap()
                 }
                 _errorMessage.value = null
-                Log.d("SPOT_SERVER", "✅ видимость изменена: $documentId -> $newVisibility")
             } else {
                 _errorMessage.value = "Ошибка изменения видимости: ${result.exceptionOrNull()?.message}"
             }
         }
     }
 
-    // ================= УДАЛЕНИЕ =================
-
     fun deleteSpot(documentId: String) {
         viewModelScope.launch {
-            Log.d("SPOT_SERVER", "🗑️ Удаление documentId=$documentId")
-
+            Log.d("SPOT_SERVER", "🗑️ Удаление $documentId")
             if (!hasNetwork()) return@launch
 
-            // ✅ 1. СНАЧАЛА УДАЛЯЕМ ФОТО ИЗ STORAGE (если есть URL)
             val spot = currentSpots.value?.find { it.documentId == documentId }
             spot?.photoUrl?.let { url ->
                 try {
                     val fileId = url.substringAfter("/files/").substringBefore("/")
-                    AppwriteManager.storage.deleteFile(
-                        bucketId = "6ada43f9003aa9f4d6a2",
-                        fileId = fileId
-                    )
-                    Log.d("SPOT_SERVER", "✅ Файл $fileId удален из Storage")
-                } catch (e: Exception) {
-                    Log.e("SPOT_SERVER", "⚠️ Не удалось удалить файл: ${e.message}")
-                    // Не прерываем удаление точки, если файл не удалился
-                }
+                    AppwriteManager.storage.deleteFile(bucketId = "6ada43f9003aa9f4d6a2", fileId = fileId)
+                } catch (e: Exception) { Log.e("SPOT_SERVER", "⚠️ Ошибка удаления файла: ${e.message}") }
             }
 
-            // ✅ 2. ТЕПЕРЬ УДАЛЯЕМ ЗАПИСЬ ИЗ БАЗЫ
             val result = server.deleteSpotByDocumentId(documentId)
-
             if (result.isSuccess) {
                 removeFromLists(documentId)
                 _errorMessage.value = null
-                Log.d("SPOT_SERVER", "✅ Точка удалена с сервера и убрана из списков")
             } else {
                 _errorMessage.value = "Ошибка удаления: ${result.exceptionOrNull()?.message}"
             }
         }
     }
-
-    // ================= ИЗБРАННОЕ (тоже сервер) =================
 
     fun checkIfSpotSaved(documentId: String) {
         viewModelScope.launch {
@@ -302,19 +244,11 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
     fun saveToFavorites(spot: FishingSpot) {
         viewModelScope.launch {
             if (!hasNetwork()) return@launch
-            if (spot.documentId.isEmpty()) {
-                _errorMessage.value = "У точки нет серверного ID"
-                return@launch
-            }
+            if (spot.documentId.isEmpty()) { _errorMessage.value = "У точки нет серверного ID"; return@launch }
 
             val result = favorites.saveSpot(userId = userId, spot = spot)
-
             if (result.isSuccess) {
-                _isSpotSaved.value = true
-                _errorMessage.value = null
-                // ✅ ПЕРЕЗАГРУЖАЕМ "МОИ ТОЧКИ", ЧТОБЫ ВКЛЮЧИЛИ ИЗБРАННЫЕ
-                loadMySpots()
-                Log.d("SPOT_SERVER", "✅ Добавлено в избранное: ${spot.documentId}")
+                _isSpotSaved.value = true; _errorMessage.value = null; loadMySpots()
             } else {
                 _errorMessage.value = "Ошибка добавления в избранное: ${result.exceptionOrNull()?.message}"
             }
@@ -326,18 +260,12 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
             if (!hasNetwork()) return@launch
             val result = favorites.unsaveSpot(userId, spot.documentId)
             if (result.isSuccess) {
-                _isSpotSaved.value = false
-                _errorMessage.value = null
-                // ✅ ПЕРЕЗАГРУЖАЕМ "МОИ ТОЧКИ", ЧТОБЫ УБРАЛИ ИЗБРАННЫЕ
-                loadMySpots()
-                Log.d("SPOT_SERVER", "✅ Убрано из избранного: ${spot.documentId}")
+                _isSpotSaved.value = false; _errorMessage.value = null; loadMySpots()
             } else {
                 _errorMessage.value = "Ошибка удаления из избранного: ${result.exceptionOrNull()?.message}"
             }
         }
     }
-
-    // ================= ВОДОЕМЫ (Room, отдельная задача) =================
 
     suspend fun findNearbyWater(lat: Double, lon: Double): Boolean {
         val candidates = database.waterBodyDao().getNearbyWaterBodies(lat, lon)

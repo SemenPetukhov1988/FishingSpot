@@ -19,7 +19,6 @@ import androidx.navigation.findNavController
 import androidx.navigation.fragment.findNavController
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import ru.semen.fishingspot.R
@@ -29,15 +28,25 @@ import ru.semen.fishingspot.viewmodel.SpotViewModel
 
 class MyMapFragment : Fragment() {
 
+    companion object {
+        // Камера сохраняется ТОЛЬКО при клике по маркеру — это и есть «возврат из деталей»
+        var returnLat: Double? = null
+        var returnLon: Double? = null
+        var returnZoom: Double? = null
+        var pendingReturnMode: SpotViewModel.MapMode? = null
+    }
+
     private var _binding: FragmentMapBinding? = null
     private val binding get() = _binding!!
-
     private val spotViewModel: SpotViewModel by activityViewModels()
     private val TAG = "MAP_LIFECYCLE"
 
     private var lastUserLocation: GeoPoint? = null
     private var isLocationAlreadyShown = false
     private var locationOverlay: MyLocationNewOverlay? = null
+
+    // Режим, который последним показывался на этом экземпляре карты
+    private var lastShownMode: SpotViewModel.MapMode? = null
 
     private val DEFAULT_POINT = GeoPoint(64.5401, 40.5433)
     private val CITY_ZOOM = 11.0
@@ -73,29 +82,48 @@ class MyMapFragment : Fragment() {
         locationOverlay?.setDrawAccuracyEnabled(true)
         mapView.overlays.add(locationOverlay)
 
-        checkLocationPermission()
+        val currentMode = spotViewModel.mapMode.value
 
-        // ✅ ЕДИНЫЙ МЕТОД ВОЗВРАТА: Обновляем режим карты + переключаем таб
+        // ✅ ВОССТАНОВЛЕНИЕ ТОЛЬКО при настоящем возврате из деталей:
+        // камера сохранена кликом по маркеру И режим с тех пор не менялся
+        if (returnLat != null && returnLon != null && pendingReturnMode == currentMode) {
+            Log.d(TAG, "📍 Возврат из деталей: восстанавливаем камеру, zoom=${returnZoom}")
+            mapView.controller.setZoom(returnZoom ?: CITY_ZOOM)
+            mapView.controller.setCenter(GeoPoint(returnLat!!, returnLon!!))
+            isLocationAlreadyShown = true
+            hideLoading()
+        } else {
+            // Первый вход или сменённый режим → сбрасываем сохранённое и показываем GPS
+            Log.d(TAG, "🔄 Свежий вход/смена режима. Сброс сохранённой камеры.")
+            clearPendingCamera()
+            checkLocationPermission()
+        }
+
+        // Фиксируем показанный режим ДО регистрации наблюдателя,
+        // чтобы первое срабатывание (текущее значение) не сбросило камеру
+        lastShownMode = currentMode
+
+        // ✅ СБРОС КАМЕРЫ при смене «Мои места» ↔ «Глобальная» внутри того же фрагмента
+        spotViewModel.mapMode.observe(viewLifecycleOwner) { mode ->
+            if (_binding == null) return@observe
+            if (mode != lastShownMode) {
+                Log.d(TAG, "🔀 Смена режима: ${lastShownMode} → ${mode}. Сброс камеры.")
+                lastShownMode = mode
+                clearPendingCamera()
+                resetCameraForModeChange()
+            }
+        }
+
+        // ✅ ПРОСТОЙ ВОЗВРАТ В ТАБЫ
         val navigateBackToCurrentTab = Runnable {
-            val currentTabId = spotViewModel.selectedTabId.value ?: R.id.nav_my_places
-
-            // 1. Явно обновляем режим карты ВМЕСТО того чтобы надеяться на observer
-            when (currentTabId) {
-                R.id.nav_global_map -> spotViewModel.switchToPublicSpots()
-                else -> spotViewModel.switchToMySpots()
-            }
-
-            // 2. Переключаем таб (без inclusive=true, чтобы сохранить состояние карты)
-            val bundle = Bundle().apply {
-                putInt("active_tab", currentTabId)
-            }
-
+            val currentTabId = spotViewModel.selectedTabId
+            val bundle = Bundle().apply { putInt("active_tab", currentTabId) }
             val navOptions = NavOptions.Builder()
                 .setPopUpTo(R.id.mainTabsFragment, inclusive = false)
+                .setLaunchSingleTop(true)
                 .setEnterAnim(R.anim.slide_in_left)
                 .setExitAnim(R.anim.slide_out_right)
                 .build()
-
             findNavController().navigate(R.id.mainTabsFragment, bundle, navOptions)
         }
 
@@ -110,16 +138,13 @@ class MyMapFragment : Fragment() {
         }
 
         requireActivity().onBackPressedDispatcher.addCallback(
-            viewLifecycleOwner,
-            object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    navigateBackToCurrentTab.run()
-                }
+            viewLifecycleOwner, object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() { navigateBackToCurrentTab.run() }
             }
         )
 
         spotViewModel.currentSpots.observe(viewLifecycleOwner) { spots ->
-            Log.d(TAG, "LiveData update: ${spots.size} spots (Режим: ${spotViewModel.mapMode.value})")
+            Log.d(TAG, "LiveData: ${spots.size} spots (${spotViewModel.mapMode.value})")
             drawMarkers(spots)
         }
 
@@ -129,27 +154,59 @@ class MyMapFragment : Fragment() {
         }
     }
 
+    private fun clearPendingCamera() {
+        returnLat = null
+        returnLon = null
+        returnZoom = null
+        pendingReturnMode = null
+    }
+
+    // При смене режима камера возвращается к GPS-позиции (или городу по умолчанию)
+    private fun resetCameraForModeChange() {
+        if (_binding == null) return
+        val mapView = binding.mapView
+        isLocationAlreadyShown = false
+
+        val target = lastUserLocation ?: DEFAULT_POINT
+        mapView.controller.setCenter(target)
+        mapView.controller.setZoom(CITY_ZOOM)
+
+        // GPS-слой мог быть выключен при уходе — включаем, если разрешение есть
+        val hasPermission = ContextCompat.checkSelfPermission(
+            requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission && lastUserLocation == null) {
+            startLocationTracking()
+        } else {
+            hideLoading()
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         binding.mapView.onResume()
-
-        // ✅ ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ ДАННЫХ ПРИ ВОЗВРАТЕ
         spotViewModel.refreshMap()
 
-        if (lastUserLocation != null && !isLocationAlreadyShown) {
-            binding.mapView.controller.setCenter(lastUserLocation)
-            binding.mapView.controller.setZoom(CITY_ZOOM)
-            isLocationAlreadyShown = true
-            hideLoading()
-        } else if (lastUserLocation == null) {
-            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+        // Страховка для свежего входа: если GPS ещё не показан — начинаем трекинг
+        if (!isLocationAlreadyShown && _binding != null) {
+            if (lastUserLocation != null) {
+                binding.mapView.controller.setCenter(lastUserLocation)
+                binding.mapView.controller.setZoom(CITY_ZOOM)
+                isLocationAlreadyShown = true
+                hideLoading()
+            } else if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 startLocationTracking()
             }
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        // ✅ Камеру здесь НЕ сохраняем: только клик по маркеру вправе её запомнить
+        _binding?.mapView?.onPause()
+    }
+
     override fun onStop() {
-        binding.mapView.onPause()
         locationOverlay?.disableMyLocation()
         super.onStop()
     }
@@ -163,7 +220,7 @@ class MyMapFragment : Fragment() {
 
         val timeoutRunnable = Runnable {
             if (_binding != null && !isLocationAlreadyShown) {
-                Log.d(TAG, "⏱️ GPS таймаут (6 сек)")
+                Log.d(TAG, "⏱️ GPS таймаут")
                 hideLoading()
             }
         }
@@ -218,7 +275,7 @@ class MyMapFragment : Fragment() {
         val mapView = binding.mapView
         mapView.overlays.removeAll { it is Marker }
 
-        val currentTabId = spotViewModel.selectedTabId.value ?: R.id.nav_my_places
+        val currentTabId = spotViewModel.selectedTabId
 
         spots.forEach { spot ->
             val point = GeoPoint(spot.latitude, spot.longitude)
@@ -227,7 +284,14 @@ class MyMapFragment : Fragment() {
             marker.setIcon(ContextCompat.getDrawable(requireContext(), R.drawable.metka4567))
 
             marker.setOnMarkerClickListener { _, _ ->
-                Log.d(TAG, "КЛИК! documentId: ${spot.documentId}")
+                Log.d(TAG, "КЛИК! ${spot.documentId}")
+
+                // ✅ Камера запоминается ТОЛЬКО здесь
+                returnLat = spot.latitude
+                returnLon = spot.longitude
+                returnZoom = mapView.zoomLevelDouble
+                pendingReturnMode = spotViewModel.mapMode.value
+
                 val detailsBundle = Bundle().apply {
                     putString("document_id", spot.documentId)
                     putInt("source_tab", currentTabId)

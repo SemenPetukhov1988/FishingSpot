@@ -1,27 +1,22 @@
 package ru.semen.fishingspot.data
 
-/**
- * Модель сообщения для ленты уведомлений и запросов.
- * Используется как для Firebase (legacy), так и для Appwrite.
- */
 data class AppMessage(
-    val id: String = "",          // Document ID из базы
-    val messageId: String = "",   // ✅ ДОБАВЛЕНО: Для операций удаления/принятия (дублирует id для совместимости)
-
-    val type: String = "SYSTEM",  // Тип сообщения (NEW_FRIEND, SPOT_REQUEST и т.д.)
+    val id: String = "",
+    val messageId: String = "",
+    val type: String = "SYSTEM",
 
     val senderId: String = "",
     val senderName: String = "",
     val recipientId: String = "",
 
-    // Данные точки (для SPOT_SHARED, FRIEND_SPOT)
+    // Данные точки (для SPOT_SHARED, FRIEND_SPOT, ON_FISHING)
     val spotId: String = "",
     val spotName: String = "",
     val spotLat: Double = 0.0,
     val spotLon: Double = 0.0,
     val spotDescription: String = "",
     val spotWeight: Double = 0.0,
-    val spotCreatedAt: Long = 0L,     // ✅ Убрано System.currentTimeMillis()
+    val spotCreatedAt: Long = 0L,
     val spotIsVerified: Boolean = false,
     val spotPhotoPath: String? = null,
 
@@ -30,7 +25,7 @@ data class AppMessage(
     val customMessage: String = "",
 
     val isRead: Boolean = false,
-    val timestamp: Long = 0L          // ✅ Убрано System.currentTimeMillis()
+    val timestamp: Long = 0L
 )
 
 enum class MessageType(val value: String) {
@@ -39,7 +34,8 @@ enum class MessageType(val value: String) {
     SPOT_SHARED("SPOT_SHARED"),
     NEW_FRIEND("NEW_FRIEND"),
     SYSTEM("SYSTEM"),
-    FRIEND_SPOT("FRIEND_SPOT");
+    FRIEND_SPOT("FRIEND_SPOT"),
+    ON_FISHING("on_fishing"); // ✅ ДОБАВЛЕН ТИП ДЛЯ СИГНАЛА
 
     companion object {
         fun fromString(value: String): MessageType {

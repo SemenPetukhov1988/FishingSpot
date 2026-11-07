@@ -54,9 +54,7 @@ class SpotDetailsFragment : Fragment() {
         }
     }
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentSpotDetailsBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -74,8 +72,7 @@ class SpotDetailsFragment : Fragment() {
             return
         }
 
-        Log.d(TAG, "👁️ Открываем точку: $documentId")
-
+        Log.d(TAG, "👁️ Открываем точку: $documentId (из таба: $sourceTab)")
         setupClickListeners()
 
         commentViewModel.comments.observe(viewLifecycleOwner) { list ->
@@ -133,14 +130,10 @@ class SpotDetailsFragment : Fragment() {
         if (!spot.photoUrl.isNullOrEmpty()) {
             binding.ivSpotPhoto.visibility = View.VISIBLE
             binding.ivPhotoPlaceholder.visibility = View.GONE
-
-            Glide.with(this)
-                .load(spot.photoUrl)
-                .fitCenter()
+            Glide.with(this).load(spot.photoUrl).fitCenter()
                 .placeholder(R.drawable.add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_)
                 .error(R.drawable.add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_)
                 .into(binding.ivSpotPhoto)
-
         } else {
             binding.ivSpotPhoto.visibility = View.GONE
             binding.ivPhotoPlaceholder.visibility = View.VISIBLE
@@ -151,15 +144,10 @@ class SpotDetailsFragment : Fragment() {
 
         val canManage = online && isAuthor
         binding.btnDeleteSpot.visibility = if (canManage) View.VISIBLE else View.GONE
-
-        binding.btnToggleFriendsVisibility.visibility =
-            if (canManage && spot.visibility != "public") View.VISIBLE else View.GONE
-        binding.btnToggleFriendsVisibility.text =
-            if (spot.visibility == "friends") " Скрыть от друзей" else "👥 Показать точку друзьям"
-
+        binding.btnToggleFriendsVisibility.visibility = if (canManage && spot.visibility != "public") View.VISIBLE else View.GONE
+        binding.btnToggleFriendsVisibility.text = if (spot.visibility == "friends") " Скрыть от друзей" else "👥 Показать точку друзьям"
         binding.btnTogglePublicMap.visibility = if (canManage) View.VISIBLE else View.GONE
-        binding.btnTogglePublicMap.text =
-            if (spot.visibility == "public") "🌍 Скрыть с публичной карты" else " Показать на публичной карте"
+        binding.btnTogglePublicMap.text = if (spot.visibility == "public") "🌍 Скрыть с публичной карты" else " Показать на публичной карте"
 
         updateFavoriteButton()
     }
@@ -178,39 +166,30 @@ class SpotDetailsFragment : Fragment() {
         if (isSaved) {
             binding.btnSaveToLocal.text = "⭐ Убрать со своей карты"
             binding.btnSaveToLocal.visibility = View.VISIBLE
-            binding.btnSaveToLocal.setOnClickListener {
-                spotViewModel.unsaveFromFavorites(spot)
-            }
+            binding.btnSaveToLocal.setOnClickListener { spotViewModel.unsaveFromFavorites(spot) }
         } else {
             binding.btnSaveToLocal.text = "💾 Добавить к себе на карту"
             binding.btnSaveToLocal.visibility = View.VISIBLE
-            binding.btnSaveToLocal.setOnClickListener {
-                spotViewModel.saveToFavorites(spot)
-            }
+            binding.btnSaveToLocal.setOnClickListener { spotViewModel.saveToFavorites(spot) }
         }
     }
 
     private fun setupClickListeners() {
-        // ✅ ЕДИНЫЙ МЕТОД ВОЗВРАТА: Обновляем режим карты + переключаем таб
+        // ✅ УМНЫЙ ВОЗВРАТ: проверяем источник открытия точки
         val navigateBack = Runnable {
-            // 1. Явно обновляем режим карты ПЕРЕД навигацией
-            when (sourceTab) {
-                R.id.nav_global_map -> spotViewModel.switchToPublicSpots()
-                else -> spotViewModel.switchToMySpots()
+            if (sourceTab == R.id.nav_fishermen) {
+                // Если пришли с карты друга — просто закрываем детали и возвращаемся на карту
+                findNavController().popBackStack()
+            } else {
+                // Для личных/публичных точек — возвращаемся в табы с нужным режимом
+                val bundle = Bundle().apply { putInt("active_tab", sourceTab) }
+                val navOptions = NavOptions.Builder()
+                    .setPopUpTo(R.id.mainTabsFragment, inclusive = false)
+                    .setEnterAnim(R.anim.slide_in_left)
+                    .setExitAnim(R.anim.slide_out_right)
+                    .build()
+                findNavController().navigate(R.id.mainTabsFragment, bundle, navOptions)
             }
-
-            // 2. Переключаем таб
-            val bundle = Bundle().apply {
-                putInt("active_tab", sourceTab)
-            }
-
-            val navOptions = NavOptions.Builder()
-                .setPopUpTo(R.id.mainTabsFragment, inclusive = false)
-                .setEnterAnim(R.anim.slide_in_left)
-                .setExitAnim(R.anim.slide_out_right)
-                .build()
-
-            findNavController().navigate(R.id.mainTabsFragment, bundle, navOptions)
         }
 
         binding.btnBack.setOnClickListener { navigateBack.run() }
@@ -218,11 +197,8 @@ class SpotDetailsFragment : Fragment() {
         binding.btnNavigate.setOnClickListener {
             val spot = currentSpot ?: return@setOnClickListener
             val uri = Uri.parse("geo:${spot.latitude},${spot.longitude}?q=${spot.latitude},${spot.longitude}")
-            try {
-                startActivity(Intent(Intent.ACTION_VIEW, uri))
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "Не удалось открыть карты", Toast.LENGTH_SHORT).show()
-            }
+            try { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+            catch (e: Exception) { Toast.makeText(requireContext(), "Не удалось открыть карты", Toast.LENGTH_SHORT).show() }
         }
 
         binding.tvCommentsCount.setOnClickListener {
@@ -234,7 +210,7 @@ class SpotDetailsFragment : Fragment() {
             val id = currentSpot?.documentId ?: return@setOnClickListener
             confirm("Удалить точку?", "Точка будет удалена с сервера навсегда.", "Удалить") {
                 spotViewModel.deleteSpot(id)
-                navigateBack.run()
+                navigateBack.run() // ← Используем ту же умную логику
             }
         }
 
@@ -263,8 +239,7 @@ class SpotDetailsFragment : Fragment() {
     private fun confirm(title: String, message: String, positive: String, onConfirm: () -> Unit) {
         if (!isAdded || _binding == null) return
         AlertDialog.Builder(requireContext())
-            .setTitle(title)
-            .setMessage(message)
+            .setTitle(title).setMessage(message)
             .setPositiveButton(positive) { dialog, _ -> dialog.dismiss(); onConfirm() }
             .setNegativeButton("Отмена") { dialog, _ -> dialog.dismiss() }
             .show()
