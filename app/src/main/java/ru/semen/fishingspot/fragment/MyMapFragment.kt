@@ -2,10 +2,16 @@ package ru.semen.fishingspot.fragment
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Point
+import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
@@ -19,7 +25,7 @@ import androidx.navigation.findNavController
 import androidx.navigation.fragment.findNavController
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.data.FishingSpot
@@ -29,7 +35,6 @@ import ru.semen.fishingspot.viewmodel.SpotViewModel
 class MyMapFragment : Fragment() {
 
     companion object {
-        // Камера сохраняется ТОЛЬКО при клике по маркеру — это и есть «возврат из деталей»
         var returnLat: Double? = null
         var returnLon: Double? = null
         var returnZoom: Double? = null
@@ -44,8 +49,6 @@ class MyMapFragment : Fragment() {
     private var lastUserLocation: GeoPoint? = null
     private var isLocationAlreadyShown = false
     private var locationOverlay: MyLocationNewOverlay? = null
-
-    // Режим, который последним показывался на этом экземпляре карты
     private var lastShownMode: SpotViewModel.MapMode? = null
 
     private val DEFAULT_POINT = GeoPoint(64.5401, 40.5433)
@@ -84,8 +87,6 @@ class MyMapFragment : Fragment() {
 
         val currentMode = spotViewModel.mapMode.value
 
-        // ✅ ВОССТАНОВЛЕНИЕ ТОЛЬКО при настоящем возврате из деталей:
-        // камера сохранена кликом по маркеру И режим с тех пор не менялся
         if (returnLat != null && returnLon != null && pendingReturnMode == currentMode) {
             Log.d(TAG, "📍 Возврат из деталей: восстанавливаем камеру, zoom=${returnZoom}")
             mapView.controller.setZoom(returnZoom ?: CITY_ZOOM)
@@ -93,17 +94,13 @@ class MyMapFragment : Fragment() {
             isLocationAlreadyShown = true
             hideLoading()
         } else {
-            // Первый вход или сменённый режим → сбрасываем сохранённое и показываем GPS
             Log.d(TAG, "🔄 Свежий вход/смена режима. Сброс сохранённой камеры.")
             clearPendingCamera()
             checkLocationPermission()
         }
 
-        // Фиксируем показанный режим ДО регистрации наблюдателя,
-        // чтобы первое срабатывание (текущее значение) не сбросило камеру
         lastShownMode = currentMode
 
-        // ✅ СБРОС КАМЕРЫ при смене «Мои места» ↔ «Глобальная» внутри того же фрагмента
         spotViewModel.mapMode.observe(viewLifecycleOwner) { mode ->
             if (_binding == null) return@observe
             if (mode != lastShownMode) {
@@ -114,7 +111,6 @@ class MyMapFragment : Fragment() {
             }
         }
 
-        // ✅ ПРОСТОЙ ВОЗВРАТ В ТАБЫ
         val navigateBackToCurrentTab = Runnable {
             val currentTabId = spotViewModel.selectedTabId
             val bundle = Bundle().apply { putInt("active_tab", currentTabId) }
@@ -161,7 +157,6 @@ class MyMapFragment : Fragment() {
         pendingReturnMode = null
     }
 
-    // При смене режима камера возвращается к GPS-позиции (или городу по умолчанию)
     private fun resetCameraForModeChange() {
         if (_binding == null) return
         val mapView = binding.mapView
@@ -171,7 +166,6 @@ class MyMapFragment : Fragment() {
         mapView.controller.setCenter(target)
         mapView.controller.setZoom(CITY_ZOOM)
 
-        // GPS-слой мог быть выключен при уходе — включаем, если разрешение есть
         val hasPermission = ContextCompat.checkSelfPermission(
             requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
@@ -187,7 +181,6 @@ class MyMapFragment : Fragment() {
         binding.mapView.onResume()
         spotViewModel.refreshMap()
 
-        // Страховка для свежего входа: если GPS ещё не показан — начинаем трекинг
         if (!isLocationAlreadyShown && _binding != null) {
             if (lastUserLocation != null) {
                 binding.mapView.controller.setCenter(lastUserLocation)
@@ -202,7 +195,6 @@ class MyMapFragment : Fragment() {
 
     override fun onPause() {
         super.onPause()
-        // ✅ Камеру здесь НЕ сохраняем: только клик по маркеру вправе её запомнить
         _binding?.mapView?.onPause()
     }
 
@@ -270,38 +262,94 @@ class MyMapFragment : Fragment() {
         }
     }
 
+    // ✅ ОБНОВЛЕННЫЙ МЕТОД ОТРИСОВКИ МАРКЕРОВ С АВТОРОМ
     private fun drawMarkers(spots: List<FishingSpot>) {
         if (_binding == null) return
         val mapView = binding.mapView
-        mapView.overlays.removeAll { it is Marker }
 
-        val currentTabId = spotViewModel.selectedTabId
+        // Удаляем ТОЛЬКО наши кастомные оверлеи, оставляя геолокацию
+        mapView.overlays.removeAll { it is AuthorMarkerOverlay }
+
+        val icon = ContextCompat.getDrawable(requireContext(), R.drawable.metka4567)
 
         spots.forEach { spot ->
-            val point = GeoPoint(spot.latitude, spot.longitude)
-            val marker = Marker(mapView)
-            marker.position = point
-            marker.setIcon(ContextCompat.getDrawable(requireContext(), R.drawable.metka4567))
+            val overlay = AuthorMarkerOverlay(
+                spot = spot,
+                iconDrawable = icon,
+                onClick = {
+                    Log.d(TAG, "КЛИК! ${spot.documentId}")
 
-            marker.setOnMarkerClickListener { _, _ ->
-                Log.d(TAG, "КЛИК! ${spot.documentId}")
+                    returnLat = spot.latitude
+                    returnLon = spot.longitude
+                    returnZoom = mapView.zoomLevelDouble
+                    pendingReturnMode = spotViewModel.mapMode.value
 
-                // ✅ Камера запоминается ТОЛЬКО здесь
-                returnLat = spot.latitude
-                returnLon = spot.longitude
-                returnZoom = mapView.zoomLevelDouble
-                pendingReturnMode = spotViewModel.mapMode.value
-
-                val detailsBundle = Bundle().apply {
-                    putString("document_id", spot.documentId)
-                    putInt("source_tab", currentTabId)
+                    val detailsBundle = Bundle().apply {
+                        putString("document_id", spot.documentId)
+                        putInt("source_tab", spotViewModel.selectedTabId)
+                    }
+                    findNavController().navigate(R.id.action_map_to_details, detailsBundle)
                 }
-                findNavController().navigate(R.id.action_map_to_details, detailsBundle)
-                true
-            }
-            mapView.overlays.add(marker)
+            )
+            mapView.overlays.add(overlay)
         }
+
         mapView.invalidate()
+    }
+
+    // ✅ КАСТОМНЫЙ ОВЕРЛЕЙ ДЛЯ МАРКЕРА С ТЕКСТОМ АВТОРА
+    inner class AuthorMarkerOverlay(
+        private val spot: FishingSpot,
+        private val iconDrawable: Drawable?,
+        private val onClick: () -> Unit
+    ) : Overlay() {
+
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textSize = 28f
+            typeface = Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.CENTER
+        }
+
+        override fun draw(canvas: Canvas, mapView: org.osmdroid.views.MapView, shadow: Boolean) {
+            if (shadow) return
+
+            val point = GeoPoint(spot.latitude, spot.longitude)
+            val screenPos = Point()
+            mapView.projection.toPixels(point, screenPos)
+
+            iconDrawable?.let { drawable ->
+                val w = drawable.intrinsicWidth
+                val h = drawable.intrinsicHeight
+                drawable.setBounds(screenPos.x - w / 2, screenPos.y - h, screenPos.x + w / 2, screenPos.y)
+                drawable.draw(canvas)
+
+                canvas.drawText(
+                    spot.authorName.ifEmpty { "Неизвестно" },
+                    screenPos.x.toFloat(),
+                    screenPos.y + 16f,
+                    paint
+                )
+            }
+        }
+
+        override fun onSingleTapConfirmed(e: MotionEvent?, mapView: org.osmdroid.views.MapView): Boolean {
+            val tapX = e?.x?.toInt() ?: 0
+            val tapY = e?.y?.toInt() ?: 0
+            val tapPoint = Point(tapX, tapY)
+
+            val markerScreen = Point()
+            mapView.projection.toPixels(GeoPoint(spot.latitude, spot.longitude), markerScreen)
+
+            val dx = Math.abs(tapX - markerScreen.x)
+            val dy = Math.abs(tapY - markerScreen.y)
+
+            if (dx < 40 && dy < 60) {
+                onClick()
+                return true
+            }
+            return false
+        }
     }
 
     override fun onDestroyView() {
