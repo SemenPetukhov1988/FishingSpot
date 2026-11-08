@@ -26,7 +26,7 @@ class MessagesFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val MESSAGES_COL_ID = "6aeb4c1600142e707a69"
-    private val NOTIFICATIONS_COL_ID = "6aef1b7300251aa8ce5b" // ✅ ID КОЛЛЕКЦИИ УВЕДОМЛЕНИЙ
+    private val NOTIFICATIONS_COL_ID = "6aef1b7300251aa8ce5b"
     private val DB_ID = "6ad5021a0029a2c88786"
 
     private val spotViewModel: SpotViewModel by viewModels()
@@ -44,7 +44,7 @@ class MessagesFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setupAdapter()
-        loadMessagesAndSignals() // ✅ ОБНОВЛЕННОЕ НАЗВАНИЕ МЕТОДА
+        loadMessagesAndSignals()
 
         binding.fabAddMessage.setOnClickListener {
             SignalTypeBottomSheet().show(childFragmentManager, "signal_type_sheet")
@@ -108,6 +108,62 @@ class MessagesFragment : Fragment() {
                     messageId = message.id,
                     onDeclineAndDelete = { deleteMessage(message.id) }
                 ).show(childFragmentManager, "spot_preview_sheet")
+            },
+            onShowMapClick = { message ->
+                NotificationMapPreviewDialog.newInstance(
+                    lat = message.spotLat,
+                    lon = message.spotLon,
+                    name = message.senderName
+                ).show(childFragmentManager, "notif_map_preview")
+            },
+
+            // ✅ ОТПРАВКА ПОЖЕЛАНИЯ С ЗАЩИТОЙ ОТ ДУБЛЕЙ И РЕАЛЬНЫМ НИКОМ
+            onWishGoodFishingClick = { message ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: return@launch
+
+                        // Получаем реальный никнейм текущего пользователя
+                        val currentNickname = UserSessionManager.getCurrentNickname(requireContext()) ?: "Рыбак"
+
+                        // Генерируем уникальный ID через MD5 (всегда 32 символа)
+                        val rawKey = "wish_${currentUserId}_${message.senderId}_${message.id}"
+                        val wishDocId = java.security.MessageDigest.getInstance("MD5")
+                            .digest(rawKey.toByteArray())
+                            .joinToString("") { "%02x".format(it) }
+
+                        AppwriteManager.databases.createDocument(
+                            databaseId = DB_ID,
+                            collectionId = NOTIFICATIONS_COL_ID,
+                            documentId = wishDocId,
+                            data = mapOf(
+                                "senderId" to currentUserId,
+                                "receiverId" to message.senderId,
+
+                                // ✅ СОХРАНЯЕМ РЕАЛЬНЫЙ НИК В БАЗУ
+                                "senderName" to currentNickname,
+
+                                "type" to "fishing_wish",
+                                "isRead" to false,
+                                "createdAt" to Instant.now().toString(),
+                                "lat" to 0.0,
+                                "lon" to 0.0,
+                                "zoom" to 0.0
+                            )
+                        )
+
+                        Toast.makeText(requireContext(), "Пожелание отправлено! 🎣", Toast.LENGTH_SHORT).show()
+
+                    } catch (e: io.appwrite.exceptions.AppwriteException) {
+                        if (e.code == 409 || e.message?.contains("already exists", ignoreCase = true) == true) {
+                            Toast.makeText(requireContext(), "Вы уже желали хорошей рыбалки этому рыбаку! 🎣", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(requireContext(), "Ошибка сервера: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(requireContext(), "Ошибка: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         )
 
@@ -115,7 +171,6 @@ class MessagesFragment : Fragment() {
         binding.rvMessages.adapter = adapter
     }
 
-    // ✅ ОБЪЕДИНЕННАЯ ЗАГРУЗКА СООБЩЕНИЙ И СИГНАЛОВ
     private fun loadMessagesAndSignals() {
         viewLifecycleOwner.lifecycleScope.launch {
             if (_binding == null || !isAdded) return@launch
@@ -123,7 +178,6 @@ class MessagesFragment : Fragment() {
             val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: return@launch
 
             try {
-                // 1. Загружаем обычные сообщения
                 val messagesResult = AppwriteManager.databases.listDocuments(
                     databaseId = DB_ID,
                     collectionId = MESSAGES_COL_ID,
@@ -134,14 +188,13 @@ class MessagesFragment : Fragment() {
                     )
                 )
 
-                // 2. ✅ Загружаем сигналы "Я на рыбалке"
                 val signalsResult = AppwriteManager.databases.listDocuments(
                     databaseId = DB_ID,
                     collectionId = NOTIFICATIONS_COL_ID,
                     queries = listOf(
                         Query.equal("receiverId", currentUserId),
                         Query.orderDesc("createdAt"),
-                        Query.limit(50)
+                        Query.limit(100)
                     )
                 )
 
@@ -149,7 +202,6 @@ class MessagesFragment : Fragment() {
 
                 val allItems = mutableListOf<AppMessage>()
 
-                // Маппим сообщения
                 messagesResult.documents.forEach { doc ->
                     val data = doc.data
                     allItems.add(AppMessage(
@@ -175,29 +227,54 @@ class MessagesFragment : Fragment() {
                     ))
                 }
 
-                // ✅ Маппим сигналы
-                signalsResult.documents.forEach { doc ->
-                    val data = doc.data
-                    allItems.add(AppMessage(
-                        id = doc.id,
-                        messageId = doc.id,
-                        senderId = data["senderId"] as? String ?: "",
-                        senderName = data["senderName"] as? String ?: "Рыбак",
-                        recipientId = data["receiverId"] as? String ?: "",
-                        type = "on_fishing", // Явно задаем тип
-                        spotLat = (data["lat"] as? Number)?.toDouble() ?: 0.0,
-                        spotLon = (data["lon"] as? Number)?.toDouble() ?: 0.0,
-                        timestamp = try {
-                            Instant.parse(data["createdAt"] as? String ?: "").toEpochMilli()
-                        } catch (e: Exception) { System.currentTimeMillis() }
-                    ))
+                // Универсальный парсер времени
+                val parseTime = { ts: Any? ->
+                    when (ts) {
+                        is Number -> ts.toLong()
+                        is String -> try { Instant.parse(ts).toEpochMilli() }
+                        catch (e: Exception) { System.currentTimeMillis() }
+                        else -> System.currentTimeMillis()
+                    }
                 }
 
-                // Сортируем всё вместе по времени (новые сверху)
+                signalsResult.documents.forEach { doc ->
+                    val data = doc.data
+                    val type = data["type"] as? String ?: ""
+
+                    when (type) {
+                        "on_fishing" -> {
+                            allItems.add(AppMessage(
+                                id = doc.id,
+                                messageId = doc.id,
+                                senderId = data["senderId"] as? String ?: "",
+                                senderName = data["senderName"] as? String ?: "Рыбак",
+                                recipientId = data["receiverId"] as? String ?: "",
+                                type = "on_fishing",
+                                spotLat = (data["lat"] as? Number)?.toDouble() ?: 0.0,
+                                spotLon = (data["lon"] as? Number)?.toDouble() ?: 0.0,
+                                timestamp = parseTime(data["createdAt"])
+                            ))
+                        }
+                        "fishing_wish" -> {
+                            // ✅ БЕЗОПАСНОЕ ПОЛУЧЕНИЕ ИМЕНИ ИЗ БАЗЫ (ИСПРАВЛЕНИЕ БАГА NULL)
+                            val savedName = data["senderName"] as? String
+                            val displayName = if (!savedName.isNullOrBlank()) savedName else "Рыбак"
+
+                            allItems.add(AppMessage(
+                                id = doc.id,
+                                messageId = doc.id,
+                                senderId = data["senderId"] as? String ?: "",
+                                senderName = displayName,
+                                recipientId = data["receiverId"] as? String ?: "",
+                                type = "SYSTEM",
+                                contentText = "$displayName пожелал хорошей рыбалки! 🎣",
+                                timestamp = parseTime(data["createdAt"])
+                            ))
+                        }
+                    }
+                }
+
                 allItems.sortByDescending { it.timestamp }
-
-                if (_binding == null || !isAdded) return@launch
-
                 adapter.submitList(allItems)
 
                 if (allItems.isEmpty()) {

@@ -1,13 +1,15 @@
 package ru.semen.fishingspot.adapter
 
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import ru.semen.fishingspot.databinding.ItemFriendSpotBinding
 import ru.semen.fishingspot.databinding.ItemFriendRequestBinding
 import ru.semen.fishingspot.databinding.ItemMessageBinding
-import ru.semen.fishingspot.databinding.ItemOnFishingSignalBinding // ✅ НОВЫЙ ЛЕЙАУТ
+import ru.semen.fishingspot.databinding.ItemOnFishingSignalBinding
 import ru.semen.fishingspot.databinding.ItemSpotRequestBinding
 import ru.semen.fishingspot.databinding.ItemSpotSharedBinding
 import ru.semen.fishingspot.data.AppMessage
@@ -25,8 +27,8 @@ class MessagesAdapter(
     private val onAcceptFriendClick: ((AppMessage) -> Unit)? = null,
     private val onDeclineFriendClick: ((AppMessage) -> Unit)? = null,
     private val onViewFriendSpotClick: ((AppMessage) -> Unit)? = null,
-    private val onShowMapClick: ((AppMessage) -> Unit)? = null,      // ✅ ДЛЯ КНОПКИ "НА КАРТЕ"
-    private val onWishGoodFishingClick: ((AppMessage) -> Unit)? = null // ✅ ДЛЯ КНОПКИ "ПОЖЕЛАТЬ"
+    private val onShowMapClick: ((AppMessage) -> Unit)? = null,
+    private val onWishGoodFishingClick: ((AppMessage) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private var items: List<AppMessage> = emptyList()
@@ -39,7 +41,7 @@ class MessagesAdapter(
         const val VIEW_TYPE_SYSTEM = 4
         const val VIEW_TYPE_FRIEND_SPOT = 5
         const val VIEW_TYPE_FRIEND_ACCEPTED = 6
-        const val VIEW_TYPE_ON_FISHING = 7 // ✅ НОВЫЙ ТИП
+        const val VIEW_TYPE_ON_FISHING = 7
     }
 
     fun submitList(newList: List<AppMessage>) {
@@ -50,7 +52,7 @@ class MessagesAdapter(
     override fun getItemViewType(position: Int): Int {
         val typeStr = items[position].type.uppercase()
         return when {
-            typeStr == "ON_FISHING" -> VIEW_TYPE_ON_FISHING // ✅ ПРОВЕРЯЕМ ПЕРВЫМ
+            typeStr == "ON_FISHING" -> VIEW_TYPE_ON_FISHING
             typeStr == "NEW_REVIEW" -> VIEW_TYPE_NEW_REVIEW
             typeStr == "SPOT_REQUEST" || typeStr == "REQUEST_SPOT" -> VIEW_TYPE_SPOT_REQUEST
             typeStr == "SPOT_SHARED" -> VIEW_TYPE_SPOT_SHARED
@@ -64,34 +66,14 @@ class MessagesAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         return when (viewType) {
-            VIEW_TYPE_ON_FISHING -> { // ✅ СОЗДАЕМ НОВЫЙ VIEWHOLDER
-                val binding = ItemOnFishingSignalBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-                OnFishingViewHolder(binding)
-            }
-            VIEW_TYPE_NEW_REVIEW -> {
-                val binding = ItemMessageBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-                NewReviewViewHolder(binding)
-            }
-            VIEW_TYPE_SPOT_REQUEST -> {
-                val binding = ItemSpotRequestBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-                SpotRequestViewHolder(binding)
-            }
-            VIEW_TYPE_SPOT_SHARED -> {
-                val binding = ItemSpotSharedBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-                SpotSharedViewHolder(binding)
-            }
-            VIEW_TYPE_NEW_FRIEND -> {
-                val binding = ItemFriendRequestBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-                FriendRequestViewHolder(binding)
-            }
-            VIEW_TYPE_FRIEND_SPOT -> {
-                val binding = ItemFriendSpotBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-                FriendSpotViewHolder(binding)
-            }
-            VIEW_TYPE_FRIEND_ACCEPTED -> {
-                val binding = ItemMessageBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-                FriendAcceptedViewHolder(binding)
-            }
+            VIEW_TYPE_ON_FISHING -> OnFishingViewHolder(ItemOnFishingSignalBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+            VIEW_TYPE_NEW_REVIEW -> NewReviewViewHolder(ItemMessageBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+            VIEW_TYPE_SPOT_REQUEST -> SpotRequestViewHolder(ItemSpotRequestBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+            VIEW_TYPE_SPOT_SHARED -> SpotSharedViewHolder(ItemSpotSharedBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+            VIEW_TYPE_NEW_FRIEND -> FriendRequestViewHolder(ItemFriendRequestBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+            VIEW_TYPE_FRIEND_SPOT -> FriendSpotViewHolder(ItemFriendSpotBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+            VIEW_TYPE_FRIEND_ACCEPTED -> FriendAcceptedViewHolder(ItemMessageBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+            VIEW_TYPE_SYSTEM -> SystemMessageViewHolder(ItemMessageBinding.inflate(LayoutInflater.from(parent.context), parent, false))
             else -> throw IllegalArgumentException("Unknown view type: $viewType")
         }
     }
@@ -99,26 +81,36 @@ class MessagesAdapter(
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val message = items[position]
         when (holder) {
-            is OnFishingViewHolder -> holder.bind(message, onShowMapClick, onWishGoodFishingClick) // ✅
+            is OnFishingViewHolder -> holder.bind(message, onShowMapClick, onWishGoodFishingClick)
             is NewReviewViewHolder -> holder.bind(message)
             is SpotRequestViewHolder -> holder.bind(message)
             is SpotSharedViewHolder -> holder.bind(message)
             is FriendRequestViewHolder -> holder.bind(message)
             is FriendSpotViewHolder -> holder.bind(message)
             is FriendAcceptedViewHolder -> holder.bind(message)
+            is SystemMessageViewHolder -> holder.bind(message)
         }
     }
 
     override fun getItemCount() = items.size
 
-    // ✅ НОВЫЙ VIEWHOLDER ДЛЯ СИГНАЛА "Я НА РЫБАЛКЕ"
     inner class OnFishingViewHolder(private val binding: ItemOnFishingSignalBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(signal: AppMessage, onShowMap: ((AppMessage) -> Unit)?, onWishGood: ((AppMessage) -> Unit)?) {
             binding.tvSenderName.text = "${signal.senderName} сейчас на рыбалке! 🎣"
             binding.tvTime.text = getTimeAgo(signal.timestamp)
 
             binding.btnShowOnMap.setOnClickListener { onShowMap?.invoke(signal) }
-            binding.btnWishGoodFishing.setOnClickListener { onWishGood?.invoke(signal) }
+
+            // ✅ КНОПКА ВСЕГДА АКТИВНА И СИНЯЯ
+            binding.btnWishGoodFishing.isEnabled = true
+            binding.btnWishGoodFishing.alpha = 1.0f
+            val tvText = binding.btnWishGoodFishing.getChildAt(1) as? TextView
+            tvText?.text = "Хорошей рыбалки!"
+            tvText?.setTextColor(Color.parseColor("#0288D1"))
+
+            binding.btnWishGoodFishing.setOnClickListener {
+                onWishGood?.invoke(signal)
+            }
 
             binding.tvSenderName.setOnClickListener { onSenderClick(signal) }
         }
@@ -198,6 +190,20 @@ class MessagesAdapter(
             binding.viewUnreadIndicator.visibility = View.GONE
             binding.tvSenderName.setOnClickListener { onSenderClick(message) }
             binding.root.setOnClickListener { onMessageClick(message) }
+        }
+    }
+
+    // ✅ VIEWHOLDER ДЛЯ СИСТЕМНЫХ УВЕДОМЛЕНИЙ (ПОЖЕЛАНИЯ)
+    inner class SystemMessageViewHolder(private val binding: ItemMessageBinding) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(message: AppMessage) {
+            binding.tvSenderName.text = message.contentText.ifEmpty { "Системное уведомление" }
+            binding.tvMessageAction.visibility = View.GONE
+            binding.tvMessagePreview.visibility = View.GONE
+            binding.tvMessageTime.text = getTimeAgo(message.timestamp)
+            binding.viewUnreadIndicator.visibility = View.GONE
+
+            binding.root.setOnClickListener(null)
+            binding.tvSenderName.setOnClickListener(null)
         }
     }
 

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+ > <!-- Твой drawable со скруглением -->
+
+    <!-- 1. ШАПКА (ЗАГОЛОВОК) -->
+    <TextView
+        android:id="@+id/tvMapDialogTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:textColor="#222222"
+        android:text="📍 Местоположение друга" />
+
+    <!-- 2. КОНТЕЙНЕР КАРТЫ -->
+    <FrameLayout
+        android:id="@+id/mapContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:minHeight="300dp"
+        android:background="#EAEFF5" />
+
+    <!-- 3. ПАНЕЛЬ ДЕЙСТВИЙ (КАК В КАРТОЧКАХ СООБЩЕНИЙ) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp"
+        android:gravity="center_vertical">
+
+        <!-- Кнопка "Закрыть" (стиль как у "Отклонить") -->
+        <LinearLayout
+            android:id="@+id/btnCancelMapPreview"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingHorizontal="12dp">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/close_24dp_000000_fill0_wght400_grad0_opsz24"
+                app:tint="#F44336"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Закрыть"
+                android:textSize="14sp"
+                android:textColor="#F44336"
+                android:layout_marginStart="6dp"/>
+        </LinearLayout>
+
+        <!-- Спейсер -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1"/>
+
+        <!-- ✅ КНОПКА "ДОБРАТЬСЯ" (скрыта по умолчанию, стиль как у "Принять") -->
+        <LinearLayout
+            android:id="@+id/btnNavigateToSpot"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingHorizontal="12dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/alt_route_24dp_000000_fill0_wght400_grad0_opsz24"
+                app:tint="#0288D1"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Добраться"
+                android:textSize="14sp"
+                android:textColor="#0288D1"
+                android:layout_marginStart="6dp"/>
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Тонкий разделитель внизу -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E7E8EC"/>
+
+</LinearLayout>
