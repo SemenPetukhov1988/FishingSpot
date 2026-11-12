@@ -47,8 +47,6 @@ class MessagesFragment : Fragment() {
     private lateinit var adapter: MessagesAdapter
     private var friendMessages: List<AppMessage> = emptyList()
     private var fishingSignals: List<FishingSignal> = emptyList()
-
-    // ✅ ФЛАГ ЗАЩИТЫ ОТ ДВОЙНОГО КЛИКА ПО КАРТЕ
     private var isMapDialogShowing = false
 
     override fun onCreateView(
@@ -62,8 +60,11 @@ class MessagesFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupAdapter()
         observeSignalsState()
+
+        // ✅ Запускаем ТОЛЬКО загрузку сообщений. Сигналы загрузятся ПОСЛЕ них.
         loadFriendMessages()
-        loadSignalsIfNeeded()
+
+        // ❌ УБРАНО: loadSignalsIfNeeded() - чтобы избежать гонки данных при старте
 
         binding.fabAddMessage.setOnClickListener {
             SignalTypeBottomSheet().show(childFragmentManager, "signal_type_sheet")
@@ -95,7 +96,6 @@ class MessagesFragment : Fragment() {
             },
             onMessageClick = { /* Логика клика при необходимости */ },
 
-            // ✅ ИСПРАВЛЕНИЕ БАГА С КАРТОЙ: ЗАЩИТА ОТ RACE CONDITION
             onShowMapClick = { item ->
                 if (isMapDialogShowing) return@MessagesAdapter
 
@@ -116,8 +116,6 @@ class MessagesFragment : Fragment() {
                             name = item.signal.senderName
                         ).show(childFragmentManager, "notif_map_preview")
 
-                        // Сбрасываем флаг после попытки показать диалог
-                        // В идеале нужно слушать dismiss, но для простоты используем таймер или reset при следующем клике
                         view?.postDelayed({ isMapDialogShowing = false }, 500)
                     } catch (e: Exception) {
                         isMapDialogShowing = false
@@ -126,14 +124,12 @@ class MessagesFragment : Fragment() {
                 }
             },
 
-            // ✅ ИСПРАВЛЕНИЕ БАГА С ПРОПАДАЮЩИМИ ПОЖЕЛАНИЯМИ
             onWishGoodFishingClick = { anchorId, receiverId ->
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {
                         val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: return@launch
                         val currentNickname = UserSessionManager.getCurrentNickname(requireContext()) ?: "Рыбак"
 
-                        // Находим сигнал для физического удаления
                         val signalToDelete = fishingSignals.find {
                             it.anchorId == anchorId &&
                                     it.senderId == receiverId &&
@@ -141,21 +137,16 @@ class MessagesFragment : Fragment() {
                         }
 
                         if (signalToDelete != null) {
-                            // ✅ УДАЛЯЕМ ДОКУМЕНТ, НО НЕ ТРОГАЕМ UI
                             AppwriteManager.databases.deleteDocument(
                                 databaseId = DB_ID,
                                 collectionId = NOTIFICATIONS_COL_ID,
                                 documentId = signalToDelete.id
                             )
                             android.util.Log.d("FRAGMENT_WISH", "🗑️ Сигнал ${signalToDelete.id} удалён из базы")
-
-                            // ⚠️ ВАЖНО: НИКАКИХ loadSignalsIfNeeded() ИЛИ updateCombinedList() ЗДЕСЬ!
-                            // UI обновится ТОЛЬКО когда StateFlow эмитит Success с новыми данными.
                         } else {
                             android.util.Log.e("FRAGMENT_WISH", "❌ Не найден сигнал для удаления: anchorId=$anchorId")
                         }
 
-                        // Отправляем пожелание
                         signalsViewModel.sendSignal(
                             senderId = currentUserId,
                             senderName = currentNickname,
@@ -184,15 +175,11 @@ class MessagesFragment : Fragment() {
                 signalsViewModel.uiState.collect { state ->
                     when (state) {
                         is SignalsUiState.Loading -> {
-                            // ✅ НЕ ОБНОВЛЯЕМ СПИСОК СООБЩЕНИЙ ПРИ КАЖДОЙ ЗАГРУЗКЕ СИГНАЛОВ!
-                            // Это вызывает рассинхрон. Сообщения грузятся отдельно.
                             android.util.Log.d("SIGNAL_LOAD", "⏳ Загрузка сигналов...")
                         }
                         is SignalsUiState.Success -> {
                             android.util.Log.d("SIGNAL_LOAD", "✅ Получено ${state.signals.size} сигналов")
 
-                            // ✅ ОБНОВЛЯЕМ ТОЛЬКО СИГНАЛЫ. СООБЩЕНИЯ (ЯКОРЯ) НЕ ТРОГАЕМ.
-                            // Якоря обновляются только в loadFriendMessages() и loadFriendMessagesSync()
                             fishingSignals = state.signals
                             updateCombinedList()
                         }
@@ -206,7 +193,6 @@ class MessagesFragment : Fragment() {
         }
     }
 
-    // ✅ ЭТОТ МЕТОД ТЕПЕРЬ ВЫЗЫВАЕТСЯ ТОЛЬКО ЯВНО, А НЕ ВНУТРИ ПОТОКА СИГНАЛОВ
     private suspend fun loadFriendMessagesSync() {
         val currentUserId = UserSessionManager.getCurrentUserId(requireContext()) ?: return
 
@@ -283,6 +269,9 @@ class MessagesFragment : Fragment() {
 
                 friendMessages = items
                 updateCombinedList()
+
+                // ✅ ТЕПЕРЬ ГРУЗИМ СИГНАЛЫ ТОЛЬКО КОГДА ЯКОРЯ УЖЕ НА МЕСТЕ
+                signalsViewModel.loadSignals(currentUserId)
 
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "Ошибка загрузки друзей: ${e.message}", Toast.LENGTH_SHORT).show()
