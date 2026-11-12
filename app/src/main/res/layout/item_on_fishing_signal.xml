@@ -120,8 +120,18 @@
                 android:textColor="#0288D1"
                 android:layout_marginStart="6dp"/>
         </LinearLayout>
-
     </LinearLayout>
+
+    <!-- ✅ КОНТЕЙНЕР ДЛЯ ОТВЕТОВ/ПОЖЕЛАНИЙ СО СДВИГОМ ВПРАВО -->
+    <LinearLayout
+        android:id="@+id/containerReplies"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="48dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="8dp" />
 
     <!-- Тонкий разделитель внизу (как в ленте) -->
     <View

@@ -1,209 +1,132 @@
 package ru.semen.fishingspot.adapter
 
-import android.graphics.Color
+import android.content.res.Resources
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import ru.semen.fishingspot.databinding.ItemFriendSpotBinding
-import ru.semen.fishingspot.databinding.ItemFriendRequestBinding
-import ru.semen.fishingspot.databinding.ItemMessageBinding
-import ru.semen.fishingspot.databinding.ItemOnFishingSignalBinding
-import ru.semen.fishingspot.databinding.ItemSpotRequestBinding
-import ru.semen.fishingspot.databinding.ItemSpotSharedBinding
-import ru.semen.fishingspot.data.AppMessage
+import ru.semen.fishingspot.R
+import ru.semen.fishingspot.databinding.*
+import ru.semen.fishingspot.data.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class MessagesAdapter(
-    private val onSenderClick: (AppMessage) -> Unit,
-    private val onMessageClick: (AppMessage) -> Unit,
-    private val onShareRequestClick: ((AppMessage) -> Unit)? = null,
-    private val onDeclineRequestClick: ((AppMessage) -> Unit)? = null,
-    private val onTakeSpotClick: ((AppMessage) -> Unit)? = null,
-    private val onAcceptFriendClick: ((AppMessage) -> Unit)? = null,
-    private val onDeclineFriendClick: ((AppMessage) -> Unit)? = null,
-    private val onViewFriendSpotClick: ((AppMessage) -> Unit)? = null,
-    private val onShowMapClick: ((AppMessage) -> Unit)? = null,
-    private val onWishGoodFishingClick: ((AppMessage) -> Unit)? = null
+    private val onSenderClick: ((FeedItem) -> Unit)? = null,
+    private val onMessageClick: ((FeedItem) -> Unit)? = null,
+    private val onShowMapClick: ((FeedItem) -> Unit)? = null,
+    // ✅ ИЗМЕНЁННАЯ СИГНАТУРА: принимаем anchorId и receiverId как строки
+    private val onWishGoodFishingClick: ((String, String) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    private var items: List<AppMessage> = emptyList()
+    private var items: List<FeedItem> = emptyList()
 
     companion object {
-        const val VIEW_TYPE_NEW_REVIEW = 0
-        const val VIEW_TYPE_SPOT_REQUEST = 1
-        const val VIEW_TYPE_SPOT_SHARED = 2
-        const val VIEW_TYPE_NEW_FRIEND = 3
-        const val VIEW_TYPE_SYSTEM = 4
-        const val VIEW_TYPE_FRIEND_SPOT = 5
-        const val VIEW_TYPE_FRIEND_ACCEPTED = 6
-        const val VIEW_TYPE_ON_FISHING = 7
+        const val VIEW_TYPE_FRIEND_MESSAGE = 0
+        const val VIEW_TYPE_INCOMING_SIGNAL = 1
+        const val VIEW_TYPE_ANCHOR_GROUP = 2
     }
 
-    fun submitList(newList: List<AppMessage>) {
+    fun submitList(newList: List<FeedItem>) {
         items = newList
         notifyDataSetChanged()
     }
 
     override fun getItemViewType(position: Int): Int {
-        val typeStr = items[position].type.uppercase()
-        return when {
-            typeStr == "ON_FISHING" -> VIEW_TYPE_ON_FISHING
-            typeStr == "NEW_REVIEW" -> VIEW_TYPE_NEW_REVIEW
-            typeStr == "SPOT_REQUEST" || typeStr == "REQUEST_SPOT" -> VIEW_TYPE_SPOT_REQUEST
-            typeStr == "SPOT_SHARED" -> VIEW_TYPE_SPOT_SHARED
-            typeStr == "NEW_FRIEND" -> VIEW_TYPE_NEW_FRIEND
-            typeStr == "FRIEND_SPOT" -> VIEW_TYPE_FRIEND_SPOT
-            typeStr == "FRIEND_ACCEPTED" -> VIEW_TYPE_FRIEND_ACCEPTED
-            typeStr == "SYSTEM" -> VIEW_TYPE_SYSTEM
-            else -> VIEW_TYPE_NEW_REVIEW
+        return when (items[position]) {
+            is FriendMessageItem -> VIEW_TYPE_FRIEND_MESSAGE
+            is SignalItem -> VIEW_TYPE_INCOMING_SIGNAL
+            is AnchorGroupItem -> VIEW_TYPE_ANCHOR_GROUP
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         return when (viewType) {
-            VIEW_TYPE_ON_FISHING -> OnFishingViewHolder(ItemOnFishingSignalBinding.inflate(LayoutInflater.from(parent.context), parent, false))
-            VIEW_TYPE_NEW_REVIEW -> NewReviewViewHolder(ItemMessageBinding.inflate(LayoutInflater.from(parent.context), parent, false))
-            VIEW_TYPE_SPOT_REQUEST -> SpotRequestViewHolder(ItemSpotRequestBinding.inflate(LayoutInflater.from(parent.context), parent, false))
-            VIEW_TYPE_SPOT_SHARED -> SpotSharedViewHolder(ItemSpotSharedBinding.inflate(LayoutInflater.from(parent.context), parent, false))
-            VIEW_TYPE_NEW_FRIEND -> FriendRequestViewHolder(ItemFriendRequestBinding.inflate(LayoutInflater.from(parent.context), parent, false))
-            VIEW_TYPE_FRIEND_SPOT -> FriendSpotViewHolder(ItemFriendSpotBinding.inflate(LayoutInflater.from(parent.context), parent, false))
-            VIEW_TYPE_FRIEND_ACCEPTED -> FriendAcceptedViewHolder(ItemMessageBinding.inflate(LayoutInflater.from(parent.context), parent, false))
-            VIEW_TYPE_SYSTEM -> SystemMessageViewHolder(ItemMessageBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+            VIEW_TYPE_FRIEND_MESSAGE -> FriendMsgViewHolder(ItemMessageBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+            VIEW_TYPE_INCOMING_SIGNAL -> IncomingSignalViewHolder(ItemOnFishingSignalBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+            VIEW_TYPE_ANCHOR_GROUP -> AnchorGroupViewHolder(ItemAnchorSignalBinding.inflate(LayoutInflater.from(parent.context), parent, false))
             else -> throw IllegalArgumentException("Unknown view type: $viewType")
         }
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        val message = items[position]
+        val item = items[position]
         when (holder) {
-            is OnFishingViewHolder -> holder.bind(message, onShowMapClick, onWishGoodFishingClick)
-            is NewReviewViewHolder -> holder.bind(message)
-            is SpotRequestViewHolder -> holder.bind(message)
-            is SpotSharedViewHolder -> holder.bind(message)
-            is FriendRequestViewHolder -> holder.bind(message)
-            is FriendSpotViewHolder -> holder.bind(message)
-            is FriendAcceptedViewHolder -> holder.bind(message)
-            is SystemMessageViewHolder -> holder.bind(message)
+            is FriendMsgViewHolder -> holder.bind(item as FriendMessageItem)
+            is IncomingSignalViewHolder -> holder.bind(item as SignalItem, onShowMapClick, onWishGoodFishingClick)
+            is AnchorGroupViewHolder -> holder.bind(item as AnchorGroupItem)
         }
     }
 
     override fun getItemCount() = items.size
 
-    inner class OnFishingViewHolder(private val binding: ItemOnFishingSignalBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(signal: AppMessage, onShowMap: ((AppMessage) -> Unit)?, onWishGood: ((AppMessage) -> Unit)?) {
-            binding.tvSenderName.text = "${signal.senderName} сейчас на рыбалке! 🎣"
-            binding.tvTime.text = getTimeAgo(signal.timestamp)
+    inner class FriendMsgViewHolder(private val binding: ItemMessageBinding) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(item: FriendMessageItem) {
+            val msg = item.message
+            binding.tvSenderName.text = msg.senderName.ifEmpty { "Рыбак" }
+            binding.tvMessageAction.text = msg.contentText.ifEmpty { "(без текста)" }
+            binding.tvMessagePreview.visibility = View.GONE
+            binding.tvMessageTime.text = getTimeAgo(msg.timestamp)
+            binding.viewUnreadIndicator.visibility = if (msg.isRead) View.GONE else View.VISIBLE
 
-            binding.btnShowOnMap.setOnClickListener { onShowMap?.invoke(signal) }
+            binding.root.setOnClickListener { onMessageClick?.invoke(item) }
+            binding.tvSenderName.setOnClickListener { onSenderClick?.invoke(item) }
+        }
+    }
 
-            // ✅ КНОПКА ВСЕГДА АКТИВНА И СИНЯЯ
-            binding.btnWishGoodFishing.isEnabled = true
-            binding.btnWishGoodFishing.alpha = 1.0f
-            val tvText = binding.btnWishGoodFishing.getChildAt(1) as? TextView
-            tvText?.text = "Хорошей рыбалки!"
-            tvText?.setTextColor(Color.parseColor("#0288D1"))
+    inner class IncomingSignalViewHolder(private val binding: ItemOnFishingSignalBinding) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(item: SignalItem, onShowMap: ((FeedItem) -> Unit)?, onWish: ((String, String) -> Unit)?) {
+            val sig = item.signal
 
+            android.util.Log.d("LESHA_DEBUG", "👁️ Входящий сигнал type='${sig.type}'")
+            android.util.Log.d("LESHA_DEBUG", "   signal.id = ${sig.id}")
+            android.util.Log.d("LESHA_DEBUG", "   signal.anchorId = '${sig.anchorId}'")
+
+            binding.tvSenderName.text = "${sig.senderName} сейчас на рыбалке! 🎣"
+            binding.tvTime.text = getTimeAgo(sig.createdAt)
+
+            binding.containerReplies.removeAllViews()
+            binding.containerReplies.visibility = View.GONE
+
+            binding.btnShowOnMap.setOnClickListener { onShowMap?.invoke(item) }
+
+            // ✅ ЯВНАЯ ПЕРЕДАЧА ANCHOR_ID И SENDER_ID ПРИ КЛИКЕ
             binding.btnWishGoodFishing.setOnClickListener {
-                onWishGood?.invoke(signal)
+                val anchorId = sig.anchorId
+                val senderId = sig.senderId
+                android.util.Log.d("LESHA_DEBUG", "👆 Клик 'Хорошей рыбалки'. Отправляю anchorId='$anchorId' receiverId='$senderId'")
+                onWish?.invoke(anchorId, senderId)
             }
 
-            binding.tvSenderName.setOnClickListener { onSenderClick(signal) }
+            binding.tvSenderName.setOnClickListener { onSenderClick?.invoke(item) }
         }
     }
 
-    inner class NewReviewViewHolder(private val binding: ItemMessageBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(message: AppMessage) {
-            val authorName = message.senderName.ifEmpty { "Рыбак" }
-            binding.tvSenderName.text = authorName
-            binding.tvMessageAction.text = "оставил отзыв"
-            binding.tvMessagePreview.text = message.contentText.ifEmpty { "(без текста)" }
-            binding.tvMessageTime.text = "На точке '${message.spotName}' • ${getTimeAgo(message.timestamp)}"
-            binding.viewUnreadIndicator.visibility = if (message.isRead) View.GONE else View.VISIBLE
-            binding.tvSenderName.setOnClickListener { onSenderClick(message) }
-            binding.root.setOnClickListener { onMessageClick(message) }
-        }
-    }
+    inner class AnchorGroupViewHolder(private val binding: ItemAnchorSignalBinding) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(item: AnchorGroupItem) {
+            binding.tvAnchorText.text = item.anchorMessage.contentText
+            binding.tvAnchorTime.text = getTimeAgo(item.anchorMessage.timestamp)
 
-    inner class SpotRequestViewHolder(private val binding: ItemSpotRequestBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(message: AppMessage) {
-            val authorName = message.senderName.ifEmpty { "Рыбак" }
-            binding.tvRequestAuthorName.text = authorName
-            binding.tvRequestAvatar.text = authorName.firstOrNull()?.uppercase() ?: "?"
-            binding.tvRequestTime.text = getTimeAgo(message.timestamp)
-            binding.tvRequestMessage.text = message.customMessage.ifEmpty { "(без текста)" }
-            binding.tvRequestAuthorName.setOnClickListener { onSenderClick(message) }
-            binding.btnShareSpot.setOnClickListener { onShareRequestClick?.invoke(message) }
-            binding.btnDeclineRequest.setOnClickListener { onDeclineRequestClick?.invoke(message) }
-        }
-    }
+            binding.containerReplies.removeAllViews()
+            binding.containerReplies.visibility = if (item.replies.isEmpty()) View.GONE else View.VISIBLE
 
-    inner class SpotSharedViewHolder(private val binding: ItemSpotSharedBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(message: AppMessage) {
-            val authorName = message.senderName.ifEmpty { "Рыбак" }
-            binding.tvSharedAuthorName.text = authorName
-            binding.tvSharedAvatar.text = authorName.firstOrNull()?.uppercase() ?: "?"
-            binding.tvSharedTime.text = getTimeAgo(message.timestamp)
-            binding.tvSharedSpotName.text = message.spotName.ifEmpty { "Без названия" }
-            binding.tvSharedAuthorName.setOnClickListener { onSenderClick(message) }
-            binding.btnTakeSpot.setOnClickListener { onTakeSpotClick?.invoke(message) }
-            binding.root.setOnClickListener { onMessageClick(message) }
-        }
-    }
+            item.replies.forEach { reply ->
+                val replyView = LayoutInflater.from(binding.root.context)
+                    .inflate(R.layout.item_reply_signal, binding.containerReplies, false)
 
-    inner class FriendRequestViewHolder(private val binding: ItemFriendRequestBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(message: AppMessage) {
-            val authorName = message.senderName.ifEmpty { "Рыбак" }
-            binding.tvFriendReqAuthorName.text = authorName
-            binding.tvFriendReqAvatar.text = authorName.firstOrNull()?.uppercase() ?: "?"
-            binding.tvFriendReqTime.text = getTimeAgo(message.timestamp)
-            binding.tvFriendReqAuthorName.setOnClickListener { onSenderClick(message) }
-            binding.btnAcceptFriend.setOnClickListener { onAcceptFriendClick?.invoke(message) }
-            binding.btnDeclineFriend.setOnClickListener { onDeclineFriendClick?.invoke(message) }
-        }
-    }
+                val tvText = replyView.findViewById<TextView>(R.id.tvReplyText)
+                val tvTime = replyView.findViewById<TextView>(R.id.tvReplyTime)
 
-    inner class FriendSpotViewHolder(private val binding: ItemFriendSpotBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(message: AppMessage) {
-            val authorName = message.senderName.ifEmpty { "Рыбак" }
-            binding.tvFriendSpotAuthorName.text = authorName
-            binding.tvFriendSpotAvatar.text = authorName.firstOrNull()?.uppercase() ?: "?"
-            binding.tvFriendSpotTime.text = getTimeAgo(message.timestamp)
-            binding.tvFriendSpotName.text = message.spotName
-            binding.tvFriendSpotDescription.text = message.spotDescription.ifEmpty { "Без описания" }
-            binding.tvFriendSpotAuthorName.setOnClickListener { onSenderClick(message) }
-            binding.btnViewSpot.setOnClickListener { onViewFriendSpotClick?.invoke(message) }
-        }
-    }
+                tvText.text = "${reply.senderName} пожелал хорошей рыбалки! 🎣"
+                tvTime.text = getTimeAgo(reply.createdAt)
 
-    inner class FriendAcceptedViewHolder(private val binding: ItemMessageBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(message: AppMessage) {
-            val authorName = message.senderName.ifEmpty { "Рыбак" }
-            binding.tvSenderName.text = authorName
-            binding.tvMessageAction.text = "принял вашу заявку"
-            binding.tvMessagePreview.text = message.contentText.ifEmpty { "Теперь вы друзья!" }
-            binding.tvMessageTime.text = getTimeAgo(message.timestamp)
-            binding.viewUnreadIndicator.visibility = View.GONE
-            binding.tvSenderName.setOnClickListener { onSenderClick(message) }
-            binding.root.setOnClickListener { onMessageClick(message) }
-        }
-    }
+                binding.containerReplies.addView(replyView)
+            }
 
-    // ✅ VIEWHOLDER ДЛЯ СИСТЕМНЫХ УВЕДОМЛЕНИЙ (ПОЖЕЛАНИЯ)
-    inner class SystemMessageViewHolder(private val binding: ItemMessageBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(message: AppMessage) {
-            binding.tvSenderName.text = message.contentText.ifEmpty { "Системное уведомление" }
-            binding.tvMessageAction.visibility = View.GONE
-            binding.tvMessagePreview.visibility = View.GONE
-            binding.tvMessageTime.text = getTimeAgo(message.timestamp)
-            binding.viewUnreadIndicator.visibility = View.GONE
-
-            binding.root.setOnClickListener(null)
-            binding.tvSenderName.setOnClickListener(null)
+            binding.root.setOnClickListener { onMessageClick?.invoke(item) }
         }
     }
 
@@ -219,3 +142,5 @@ class MessagesAdapter(
         }
     }
 }
+
+fun Int.dpToPx(): Int = (this * Resources.getSystem().displayMetrics.density).toInt()
