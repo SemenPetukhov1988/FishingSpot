@@ -14,7 +14,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -30,7 +29,6 @@ import ru.semen.fishingspot.databinding.FragmentSendFishingSignalBinding
 import ru.semen.fishingspot.utils.UserSessionManager
 import ru.semen.fishingspot.viewmodel.FishingSignalsViewModel
 import ru.semen.fishingspot.viewmodel.SendSignalState
-import ru.semen.fishingspot.viewmodel.SignalsUiState
 
 class SendFishingSignalFragment : Fragment() {
 
@@ -42,7 +40,7 @@ class SendFishingSignalFragment : Fragment() {
     private val CITY_ZOOM = 11.0
     private val TARGET_ZOOM = 17.0
 
-    // ✅ ИСПОЛЬЗУЕМ VIEWMODEL ВМЕСТО ПРЯМОГО ВЫЗОВА APPWRITE
+    // ✅ ОБЩАЯ VIEWMODEL — состояние отправки видно всем фрагментам
     private val signalsViewModel: FishingSignalsViewModel by activityViewModels()
 
     private var isZoomAdjusted = false
@@ -97,7 +95,13 @@ class SendFishingSignalFragment : Fragment() {
 
         checkLocationPermission()
 
-        // ✅ НАБЛЮДЕНИЕ ЗА РЕЗУЛЬТАТОМ ОТПРАВКИ
+        // ✅ СБРОС СОСТОЯНИЯ ПЕРЕД ПОДПИСКОЙ
+        // Гасим протухший Success/Error от прошлой отправки,
+        // иначе новый экран мгновенно отреагирует на старое событие
+        // и уедет обратно ещё до первого взаимодействия
+        signalsViewModel.resetSendState()
+
+        // ✅ РЕАКТИВНАЯ ОБРАБОТКА РЕЗУЛЬТАТА ОТПРАВКИ
         observeSendResult()
 
         val navigateBackToMessages = Runnable {
@@ -113,6 +117,11 @@ class SendFishingSignalFragment : Fragment() {
         }
 
         binding.btnConfirm.setOnClickListener {
+            // ✅ ЗАЩИТА ОТ ДВОЙНОГО КЛИКА И ЛЕТЯЩЕЙ В ФОНЕ ОТПРАВКИ
+            if (signalsViewModel.sendState.value == SendSignalState.Sending) {
+                return@setOnClickListener
+            }
+
             val currentZoom = mapView.zoomLevel
 
             if (!isZoomAdjusted && currentZoom < TARGET_ZOOM - 1.0) {
@@ -126,7 +135,6 @@ class SendFishingSignalFragment : Fragment() {
             val lon = mapView.mapCenter.longitude
             val zoom = mapView.zoomLevelDouble
 
-            // ✅ ОТПРАВКА ЧЕРЕЗ VIEWMODEL
             signalsViewModel.sendSignal(
                 senderId = senderId,
                 senderName = senderName,
@@ -150,7 +158,6 @@ class SendFishingSignalFragment : Fragment() {
         )
     }
 
-    // ✅ РЕАКТИВНАЯ ОБРАБОТКА РЕЗУЛЬТАТА ОТПРАВКИ
     // ✅ НАБЛЮДЕНИЕ ЗА СТАТУСОМ ОТПРАВКИ (НЕ ЗА ЛЕНТОЙ!)
     private fun observeSendResult() {
         viewLifecycleOwner.lifecycleScope.launch {

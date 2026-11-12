@@ -29,31 +29,29 @@ class SignalTypeBottomSheet : BottomSheetDialogFragment() {
 
         binding.btnOnFishing.setOnClickListener {
             dismiss()
-            // ✅ ПЕРЕДАЕМ ИМЯ И ID В СЛЕДУЮЩИЙ ШЕЙТ
-            RecipientSelectionBottomSheet(
-                signalType = "on_fishing",
-                senderName = senderName,
-                senderId = senderId
-            ).show(parentFragmentManager, "recipient_sheet")
+            openRecipientSheet("on_fishing", senderName, senderId)
         }
 
         binding.btnGoingFishing.setOnClickListener {
             dismiss()
-            RecipientSelectionBottomSheet(
-                signalType = "going_fishing",
-                senderName = senderName,
-                senderId = senderId
-            ).show(parentFragmentManager, "recipient_sheet")
+            openRecipientSheet("going_fishing", senderName, senderId)
         }
 
         binding.btnRequestSpot.setOnClickListener {
             dismiss()
-            RecipientSelectionBottomSheet(
-                signalType = "request_spot",
-                senderName = senderName,
-                senderId = senderId
-            ).show(parentFragmentManager, "recipient_sheet")
+            openRecipientSheet("request_spot", senderName, senderId)
         }
+    }
+
+    // ✅ ЗАЩИТА ОТ ДУБЛЯ ШЕЙТА ПРИ БЫСТРЫХ ТАПАХ
+    private fun openRecipientSheet(signalType: String, senderName: String, senderId: String) {
+        if (parentFragmentManager.findFragmentByTag("recipient_sheet") != null) return
+
+        RecipientSelectionBottomSheet(
+            signalType = signalType,
+            senderName = senderName,
+            senderId = senderId
+        ).show(parentFragmentManager, "recipient_sheet")
     }
 
     override fun onDestroyView() {
