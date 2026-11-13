@@ -7,7 +7,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import ru.semen.fishingspot.R
-import ru.semen.fishingspot.viewmodel.Comment
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

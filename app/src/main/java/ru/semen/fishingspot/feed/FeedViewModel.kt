@@ -1,9 +1,8 @@
-package ru.semen.fishingspot.viewmodel
+package ru.semen.fishingspot.feed
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.ViewModel
-import ru.semen.fishingspot.data.FishingSpot
-import ru.semen.fishingspot.repository.FeedRepository
+import ru.semen.fishingspot.map.point.data.FishingSpot
 
 class FeedViewModel : ViewModel() {
 

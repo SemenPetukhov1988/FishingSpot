@@ -15,7 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.friends.adapter.UserSearchAdapter
 import ru.semen.fishingspot.databinding.FragmentAddFriendBottomSheetBinding
-import ru.semen.fishingspot.viewmodel.FriendsViewModel
+import ru.semen.fishingspot.friends.FriendsViewModel
 
 class AddFriendBottomSheet : BottomSheetDialogFragment() {
 

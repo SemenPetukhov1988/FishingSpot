@@ -25,10 +25,10 @@ import ru.semen.fishingspot.messages.data.SignalItem
 import ru.semen.fishingspot.databinding.FragmentMessagesBinding
 import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.UserSessionManager
-import ru.semen.fishingspot.viewmodel.FishingSignalsViewModel
-import ru.semen.fishingspot.viewmodel.FriendsViewModel
-import ru.semen.fishingspot.viewmodel.SignalsUiState
-import ru.semen.fishingspot.viewmodel.SpotViewModel
+import ru.semen.fishingspot.messages.viewmodel.FishingSignalsViewModel
+import ru.semen.fishingspot.friends.FriendsViewModel
+import ru.semen.fishingspot.messages.viewmodel.SignalsUiState
+import ru.semen.fishingspot.map.point.SpotViewModel
 
 class MessagesFragment : Fragment() {
 
@@ -115,7 +115,7 @@ class MessagesFragment : Fragment() {
 
                     isMapDialogShowing = true
                     try {
-                        NotificationMapPreviewDialog.Companion.newInstance(
+                        NotificationMapPreviewDialog.newInstance(
                             lat = lat,
                             lon = lon,
                             name = item.signal.senderName
@@ -181,7 +181,17 @@ class MessagesFragment : Fragment() {
                         Log.e("FRAGMENT_WISH", "❌ Ошибка: ${e.message}")
                     }
                 }
-            }
+            },
+
+            // ✅ НОВЫЕ КОЛБЭКИ ДЛЯ КАРТОЧКИ ЗАПРОСА В ДРУЗЬЯ
+            // ✅ ОБРАБОТКА КНОПОК В КАРТОЧКЕ ДРУЖБЫ
+            onAcceptFriendClick = { senderId, messageId ->
+                friendsViewModel.acceptFriendRequest(senderId, messageId)
+
+                // ✅ МГНОВЕННО УБИРАЕМ ЗАПРОС ИЗ ЛЕНТЫ ПОСЛЕ НАЖАТИЯ
+                friendMessages = friendMessages.filter { it.id != messageId }
+                updateCombinedList()
+            },
         )
 
         binding.rvMessages.layoutManager = LinearLayoutManager(requireContext())
@@ -220,9 +230,9 @@ class MessagesFragment : Fragment() {
                 databaseId = DB_ID,
                 collectionId = MESSAGES_COL_ID,
                 queries = listOf(
-                    Query.Companion.equal("recipientId", currentUserId),
-                    Query.Companion.orderDesc("timestamp"),
-                    Query.Companion.limit(50)
+                    Query.equal("recipientId", currentUserId),
+                    Query.orderDesc("timestamp"),
+                    Query.limit(50)
                 )
             )
 
@@ -263,9 +273,9 @@ class MessagesFragment : Fragment() {
                     databaseId = DB_ID,
                     collectionId = MESSAGES_COL_ID,
                     queries = listOf(
-                        Query.Companion.equal("recipientId", currentUserId),
-                        Query.Companion.orderDesc("timestamp"),
-                        Query.Companion.limit(50)
+                        Query.equal("recipientId", currentUserId),
+                        Query.orderDesc("timestamp"),
+                        Query.limit(50)
                     )
                 )
 

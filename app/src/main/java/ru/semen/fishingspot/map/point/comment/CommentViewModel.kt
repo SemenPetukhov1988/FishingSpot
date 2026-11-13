@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.viewmodel
+package ru.semen.fishingspot.map.point.comment
 
 
 
@@ -10,8 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.appwrite.ID
 import io.appwrite.Query
-import io.appwrite.models.Document // ← Убедись, что это есть
-    // ← ИСПРАВЛЕНО: добавлено .models
+// ← ИСПРАВЛЕНО: добавлено .models
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.UserSessionManager

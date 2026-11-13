@@ -11,8 +11,6 @@ import com.google.android.material.snackbar.Snackbar
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentLoginBinding
 import ru.semen.fishingspot.utils.UserSessionManager
-import ru.semen.fishingspot.viewmodel.AuthUiState
-import ru.semen.fishingspot.viewmodel.AuthViewModel
 
 class LoginFragment : Fragment() {
 

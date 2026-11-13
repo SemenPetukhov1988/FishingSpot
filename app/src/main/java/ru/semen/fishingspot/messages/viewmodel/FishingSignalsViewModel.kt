@@ -1,5 +1,6 @@
-package ru.semen.fishingspot.viewmodel
+package ru.semen.fishingspot.messages.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -7,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.messages.data.FishingSignal
-import ru.semen.fishingspot.repository.FishingSignalRepository
+import ru.semen.fishingspot.messages.repository.FishingSignalRepository
 
 sealed class SignalsUiState {
     object Loading : SignalsUiState()
@@ -34,26 +35,26 @@ class FishingSignalsViewModel(
 
     fun loadSignals(userId: String) {
         viewModelScope.launch {
-            android.util.Log.d("SIGNAL_LOAD", "📤 Вызов репозитория для userId='$userId'")
+            Log.d("SIGNAL_LOAD", "📤 Вызов репозитория для userId='$userId'")
             _uiState.value = SignalsUiState.Loading
 
             try {
                 val result = repository.getSignals(userId)
-                android.util.Log.d("SIGNAL_LOAD", "📥 Репозиторий вернул Result")
+                Log.d("SIGNAL_LOAD", "📥 Репозиторий вернул Result")
 
                 result.fold(
                     onSuccess = { signals ->
-                        android.util.Log.d("SIGNAL_LOAD", "✅ Успех: ${signals.size} сигналов")
+                        Log.d("SIGNAL_LOAD", "✅ Успех: ${signals.size} сигналов")
                         val sorted = signals.sortedByDescending { it.createdAt }
                         _uiState.value = SignalsUiState.Success(sorted)
                     },
                     onFailure = { error ->
-                        android.util.Log.e("SIGNAL_LOAD", "❌ Ошибка репозитория: ${error.message}")
+                        Log.e("SIGNAL_LOAD", "❌ Ошибка репозитория: ${error.message}")
                         _uiState.value = SignalsUiState.Error(error.message ?: "Неизвестная ошибка")
                     }
                 )
             } catch (e: Exception) {
-                android.util.Log.e("SIGNAL_LOAD", "💥 Критическое исключение: ${e.message}", e)
+                Log.e("SIGNAL_LOAD", "💥 Критическое исключение: ${e.message}", e)
                 _uiState.value = SignalsUiState.Error(e.message ?: "Критическая ошибка")
             }
         }

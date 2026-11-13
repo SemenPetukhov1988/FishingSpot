@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.viewmodel
+package ru.semen.fishingspot.map.point
 
 import android.app.Application
 import android.util.Log
@@ -9,22 +9,22 @@ import androidx.lifecycle.switchMap
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.R
-import ru.semen.fishingspot.utils.water.AppDatabase
-import ru.semen.fishingspot.data.FishingSpot
-import ru.semen.fishingspot.utils.water.WaterChecker
-import ru.semen.fishingspot.repository.SavedSpotsRepository
-import ru.semen.fishingspot.repository.SpotAppwriteRepository
+import ru.semen.fishingspot.map.point.data.FishingSpot
+import ru.semen.fishingspot.map.point.repository.SavedSpotsRepository
+import ru.semen.fishingspot.map.point.repository.SpotAppwriteRepository
 import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.NetworkMonitor
 import ru.semen.fishingspot.utils.UserSessionManager
+import ru.semen.fishingspot.utils.water.AppDatabase
+import ru.semen.fishingspot.utils.water.WaterChecker
 
 class SpotViewModel(application: Application) : AndroidViewModel(application) {
 
     private val server = SpotAppwriteRepository(application)
     private val favorites = SavedSpotsRepository(application)
-    private val database = AppDatabase.getDatabase(application)
+    private val database = AppDatabase.Companion.getDatabase(application)
     private val waterChecker = WaterChecker()
-    private val networkMonitor = NetworkMonitor.getInstance(application)
+    private val networkMonitor = NetworkMonitor.Companion.getInstance(application)
     private val userId = UserSessionManager.getCurrentUserId(application) ?: ""
     private val userName = UserSessionManager.getCurrentNickname(application) ?: "Неизвестно"
 
@@ -194,7 +194,7 @@ class SpotViewModel(application: Application) : AndroidViewModel(application) {
             else authorName?.takeIf { it.isNotEmpty() && it != "Рыбак" } ?: "Неизвестно"
 
             val spot = FishingSpot(
-                id = 0, documentId = "", latitude = lat, longitude = lon, name = name,
+                documentId = "", latitude = lat, longitude = lon, name = name,
                 description = description,
                 postText = postText,
                 catchWeight = weight, fishType = fishType,

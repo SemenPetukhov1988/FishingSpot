@@ -29,9 +29,9 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import ru.semen.fishingspot.R
-import ru.semen.fishingspot.data.FishingSpot
+import ru.semen.fishingspot.map.point.data.FishingSpot
 import ru.semen.fishingspot.databinding.FragmentMapBinding
-import ru.semen.fishingspot.viewmodel.SpotViewModel
+import ru.semen.fishingspot.map.point.SpotViewModel
 
 class MyMapFragment : Fragment() {
 

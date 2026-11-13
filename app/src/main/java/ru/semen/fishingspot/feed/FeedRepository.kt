@@ -1,5 +1,6 @@
-package ru.semen.fishingspot.repository
+package ru.semen.fishingspot.feed
 
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import io.appwrite.Query
@@ -7,7 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import ru.semen.fishingspot.data.FishingSpot
+import ru.semen.fishingspot.map.point.data.FishingSpot
 import ru.semen.fishingspot.utils.AppwriteManager
 
 class FeedRepository {
@@ -25,20 +26,20 @@ class FeedRepository {
     fun loadPublicSpots() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                android.util.Log.d("FEED_REPO", "🔄 Начало загрузки публичных точек...")
-                android.util.Log.d("FEED_REPO", "   DB: $DATABASE_ID | Collection: $COLLECTION_ID")
+                Log.d("FEED_REPO", "🔄 Начало загрузки публичных точек...")
+                Log.d("FEED_REPO", "   DB: $DATABASE_ID | Collection: $COLLECTION_ID")
 
                 val result = AppwriteManager.databases.listDocuments(
                     databaseId = DATABASE_ID,
                     collectionId = COLLECTION_ID,
                     queries = listOf(
-                        Query.equal("visibility", "public"), // ✅ Фильтр по видимости
-                        Query.orderDesc("createdAt"),         // ✅ Новые сверху
-                        Query.limit(50)                       // ✅ Пагинация
+                        Query.Companion.equal("visibility", "public"), // ✅ Фильтр по видимости
+                        Query.Companion.orderDesc("createdAt"),         // ✅ Новые сверху
+                        Query.Companion.limit(50)                       // ✅ Пагинация
                     )
                 )
 
-                android.util.Log.d("FEED_REPO", "✅ Сервер вернул документов: ${result.documents.size}")
+                Log.d("FEED_REPO", "✅ Сервер вернул документов: ${result.documents.size}")
 
                 // В FeedRepository.kt, внутри loadPublicSpots()
 
@@ -46,7 +47,7 @@ class FeedRepository {
                     val data = doc.data
 
                     // Логируем для проверки
-                    android.util.Log.d("FEED_REPO", "   📍 Точка: ${data["name"]} | postText=${data["postText"]}")
+                    Log.d("FEED_REPO", "   📍 Точка: ${data["name"]} | postText=${data["postText"]}")
 
                     FishingSpot(
                         documentId = doc.id,
@@ -70,11 +71,11 @@ class FeedRepository {
 
                 withContext(Dispatchers.Main) {
                     _spots.value = list
-                    android.util.Log.d("FEED_REPO", " UI обновлен. Всего точек в ленте: ${list.size}")
+                    Log.d("FEED_REPO", " UI обновлен. Всего точек в ленте: ${list.size}")
                 }
 
             } catch (e: Exception) {
-                android.util.Log.e("FEED_REPO", "❌ КРИТИЧЕСКАЯ ОШИБКА: ${e.message}", e)
+                Log.e("FEED_REPO", "❌ КРИТИЧЕСКАЯ ОШИБКА: ${e.message}", e)
                 withContext(Dispatchers.Main) {
                     _spots.value = emptyList()
                 }

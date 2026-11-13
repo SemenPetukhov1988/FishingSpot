@@ -10,7 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.google.android.material.imageview.ShapeableImageView
 import ru.semen.fishingspot.R
-import ru.semen.fishingspot.data.FishingSpot
+import ru.semen.fishingspot.map.point.data.FishingSpot
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

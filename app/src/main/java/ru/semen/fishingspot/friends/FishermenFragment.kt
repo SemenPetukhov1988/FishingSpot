@@ -15,11 +15,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.friends.adapter.FriendAdapter
-import ru.semen.fishingspot.data.Friend
+import ru.semen.fishingspot.friends.data.Friend
 import ru.semen.fishingspot.databinding.FragmentUserBinding
 import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.UserSessionManager
-import ru.semen.fishingspot.viewmodel.FriendsViewModel
+import ru.semen.fishingspot.friends.FriendsViewModel
 
 class FishermenFragment : Fragment() {
 

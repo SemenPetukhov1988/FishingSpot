@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.repository
+package ru.semen.fishingspot.map.point.repository
 
 import android.content.Context
 import android.util.Log
@@ -6,7 +6,7 @@ import io.appwrite.ID
 import io.appwrite.Permission
 import io.appwrite.Query
 import io.appwrite.Role
-import ru.semen.fishingspot.data.FishingSpot
+import ru.semen.fishingspot.map.point.data.FishingSpot
 import ru.semen.fishingspot.utils.AppwriteManager
 
 class SpotAppwriteRepository(private val context: Context) {
@@ -26,7 +26,7 @@ class SpotAppwriteRepository(private val context: Context) {
         val rawPost = data["postText"]
         Log.d("SPOT_REPO", "🔍 Маппинг $documentId: postText=$rawPost")
         return FishingSpot(
-            id = 0,
+
             documentId = documentId,
             latitude = asDouble(data["latitude"]),
             longitude = asDouble(data["longitude"]),
@@ -52,8 +52,8 @@ class SpotAppwriteRepository(private val context: Context) {
                 databaseId = databaseId,
                 collectionId = spotsCollectionId,
                 queries = listOf(
-                    Query.equal("visibility", "public"),
-                    Query.limit(500)
+                    Query.Companion.equal("visibility", "public"),
+                    Query.Companion.limit(500)
                 )
             )
             val spots = response.documents.map { toSpot(it.id, it.data) }
@@ -71,8 +71,8 @@ class SpotAppwriteRepository(private val context: Context) {
                 databaseId = "6ad5021a0029a2c88786",
                 collectionId = "6ada41db002ea68773d9",
                 queries = listOf(
-                    Query.equal("userId", userId),
-                    Query.limit(500)
+                    Query.Companion.equal("userId", userId),
+                    Query.Companion.limit(500)
                 )
             )
             val savedSpotIds = savedResponse.documents.mapNotNull { doc ->
@@ -84,8 +84,8 @@ class SpotAppwriteRepository(private val context: Context) {
                 databaseId = databaseId,
                 collectionId = spotsCollectionId,
                 queries = listOf(
-                    Query.equal("authorId", userId),
-                    Query.limit(500)
+                    Query.Companion.equal("authorId", userId),
+                    Query.Companion.limit(500)
                 )
             )
             val mySpots = myResponse.documents.map { toSpot(it.id, it.data) }
@@ -96,8 +96,8 @@ class SpotAppwriteRepository(private val context: Context) {
                     databaseId = databaseId,
                     collectionId = spotsCollectionId,
                     queries = listOf(
-                        Query.equal("\$id", savedSpotIds),
-                        Query.limit(500)
+                        Query.Companion.equal("\$id", savedSpotIds),
+                        Query.Companion.limit(500)
                     )
                 )
                 savedResponse2.documents.map { toSpot(it.id, it.data) }
@@ -149,18 +149,18 @@ class SpotAppwriteRepository(private val context: Context) {
             )
 
             val permissions = mutableListOf(
-                Permission.read(Role.user(spot.authorId)),
-                Permission.update(Role.user(spot.authorId)),
-                Permission.delete(Role.user(spot.authorId))
+                Permission.Companion.read(Role.Companion.user(spot.authorId)),
+                Permission.Companion.update(Role.Companion.user(spot.authorId)),
+                Permission.Companion.delete(Role.Companion.user(spot.authorId))
             )
             if (spot.visibility == "public") {
-                permissions.add(Permission.read(Role.any()))
+                permissions.add(Permission.Companion.read(Role.Companion.any()))
             }
 
             val doc = AppwriteManager.databases.createDocument(
                 databaseId = databaseId,
                 collectionId = spotsCollectionId,
-                documentId = ID.unique(),
+                documentId = ID.Companion.unique(),
                 data = data,
                 permissions = permissions
             )

@@ -7,7 +7,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import ru.semen.fishingspot.R
-import ru.semen.fishingspot.data.Friend
+import ru.semen.fishingspot.friends.data.Friend
 
 class FriendAdapter(
     private val onFriendClick: (Friend) -> Unit,

@@ -17,9 +17,9 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import ru.semen.fishingspot.R
-import ru.semen.fishingspot.data.FishingSpot
+import ru.semen.fishingspot.map.point.data.FishingSpot
 import ru.semen.fishingspot.databinding.DialogSpotMapPreviewBinding
-import ru.semen.fishingspot.viewmodel.SpotViewModel
+import ru.semen.fishingspot.map.point.SpotViewModel
 
 class SpotMapPreviewDialog : BottomSheetDialogFragment() {
 

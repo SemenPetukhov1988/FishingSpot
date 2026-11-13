@@ -1,10 +1,9 @@
-package ru.semen.fishingspot.repository
+package ru.semen.fishingspot.auth
 
 import android.content.Context
 import io.appwrite.Permission
 import io.appwrite.Query
 import io.appwrite.Role
-
 import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.UserSessionManager
 
@@ -17,7 +16,7 @@ class AuthRepository(private val context: Context) {
     suspend fun loginAnonymously(nickname: String): Result<String> {
         return try {
             // 1. Проверяем, занят ли никнейм (ищем документы с таким nickname)
-            val queries = listOf(Query.equal("nickname", nickname))
+            val queries = listOf(Query.Companion.equal("nickname", nickname))
             val existingUsers = AppwriteManager.databases.listDocuments(
                 databaseId = databaseId,
                 collectionId = collectionId,
@@ -48,9 +47,9 @@ class AuthRepository(private val context: Context) {
                 documentId = userId, // Важно: ID документа = ID пользователя
                 data = userData,
                 permissions = listOf(
-                    Permission.read(Role.any()), // Читать могут все (для поиска друзей)
-                    Permission.update(Role.user(userId)), // Обновлять только владелец
-                    Permission.delete(Role.user(userId))  // Удалять только владелец
+                    Permission.Companion.read(Role.Companion.any()), // Читать могут все (для поиска друзей)
+                    Permission.Companion.update(Role.Companion.user(userId)), // Обновлять только владелец
+                    Permission.Companion.delete(Role.Companion.user(userId))  // Удалять только владелец
                 )
             )
 

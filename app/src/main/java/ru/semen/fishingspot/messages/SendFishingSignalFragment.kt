@@ -27,8 +27,8 @@ import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.FragmentSendFishingSignalBinding
 import ru.semen.fishingspot.utils.UserSessionManager
-import ru.semen.fishingspot.viewmodel.FishingSignalsViewModel
-import ru.semen.fishingspot.viewmodel.SendSignalState
+import ru.semen.fishingspot.messages.viewmodel.FishingSignalsViewModel
+import ru.semen.fishingspot.messages.viewmodel.SendSignalState
 
 class SendFishingSignalFragment : Fragment() {
 

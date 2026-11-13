@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.viewmodel
+package ru.semen.fishingspot.friends
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -6,9 +6,8 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
-import ru.semen.fishingspot.data.Friend
-import ru.semen.fishingspot.data.FriendsRepository
-import ru.semen.fishingspot.data.User
+import ru.semen.fishingspot.friends.data.Friend
+import ru.semen.fishingspot.friends.data.User
 
 class FriendsViewModel(application: Application) : AndroidViewModel(application) {
 

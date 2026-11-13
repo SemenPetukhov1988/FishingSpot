@@ -11,7 +11,7 @@ import ru.semen.fishingspot.feed.FeedAdapter
 import ru.semen.fishingspot.databinding.FragmentFeedBinding
 import ru.semen.fishingspot.feed.SpotMapPreviewDialog
 import ru.semen.fishingspot.map.point.comment.CommentsBottomSheetDialogFragment
-import ru.semen.fishingspot.viewmodel.FeedViewModel
+import ru.semen.fishingspot.feed.FeedViewModel
 
 class FeedFragment : Fragment() {
 

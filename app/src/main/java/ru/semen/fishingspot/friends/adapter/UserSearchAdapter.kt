@@ -5,7 +5,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import ru.semen.fishingspot.data.User
+import ru.semen.fishingspot.friends.data.User
 import ru.semen.fishingspot.databinding.ItemUserSearchBinding
 
 class UserSearchAdapter(

@@ -15,7 +15,7 @@ import ru.semen.fishingspot.feed.FeedFragment
 import ru.semen.fishingspot.friends.FishermenFragment
 import ru.semen.fishingspot.map.MyMapFragment
 import ru.semen.fishingspot.messages.MessagesFragment
-import ru.semen.fishingspot.viewmodel.SpotViewModel
+import ru.semen.fishingspot.map.point.SpotViewModel
 
 class MainTabsFragment : Fragment() {
 

@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.data
+package ru.semen.fishingspot.friends.data
 
 /**
  * Модель друга для отображения в списке.

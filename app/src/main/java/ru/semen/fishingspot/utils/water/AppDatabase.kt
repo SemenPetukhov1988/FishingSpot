@@ -4,12 +4,11 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import ru.semen.fishingspot.data.FishingSpot
-import ru.semen.fishingspot.data.FishingSpotDao
+import ru.semen.fishingspot.map.point.data.FishingSpot
 
-@Database(entities = [FishingSpot::class, WaterBody::class], version = 3) // Версия 3!
+@Database(entities = [ WaterBody::class], version = 3) // Версия 3!
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun fishingSpotDao(): FishingSpotDao
+
     abstract fun waterBodyDao(): WaterBodyDao
 
     companion object {

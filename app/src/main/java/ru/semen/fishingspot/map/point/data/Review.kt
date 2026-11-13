@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.data
+package ru.semen.fishingspot.map.point.data
 
 /**
  * Модель отзыва к публичной точке.

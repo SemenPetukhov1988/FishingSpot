@@ -12,9 +12,7 @@ import com.google.android.material.R
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import ru.semen.fishingspot.map.point.comment.CommentsAdapter
 import ru.semen.fishingspot.databinding.FragmentCommentsBottomSheetBinding
-import ru.semen.fishingspot.viewmodel.CommentViewModel
 
 class CommentsBottomSheetDialogFragment : BottomSheetDialogFragment() {
 

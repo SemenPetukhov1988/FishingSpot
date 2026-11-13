@@ -28,7 +28,7 @@ import ru.semen.fishingspot.databinding.FragmentRefineLocationBinding
 import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.ImageUtils
 import ru.semen.fishingspot.utils.NetworkMonitor
-import ru.semen.fishingspot.viewmodel.SpotViewModel
+import ru.semen.fishingspot.map.point.SpotViewModel
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin

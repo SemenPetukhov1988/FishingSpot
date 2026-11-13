@@ -15,13 +15,13 @@ import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import ru.semen.fishingspot.R
-import ru.semen.fishingspot.data.FishingSpot
+import ru.semen.fishingspot.map.point.data.FishingSpot
 import ru.semen.fishingspot.databinding.FragmentSpotDetailsBinding
 import ru.semen.fishingspot.map.point.comment.CommentsBottomSheetDialogFragment
 import ru.semen.fishingspot.utils.NetworkMonitor
 import ru.semen.fishingspot.utils.UserSessionManager
-import ru.semen.fishingspot.viewmodel.CommentViewModel
-import ru.semen.fishingspot.viewmodel.SpotViewModel
+import ru.semen.fishingspot.map.point.comment.CommentViewModel
+import ru.semen.fishingspot.map.point.SpotViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

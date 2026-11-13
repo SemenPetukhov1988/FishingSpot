@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.repository
+package ru.semen.fishingspot.map.point.repository
 
 import android.content.Context
 import android.util.Log
@@ -6,7 +6,7 @@ import io.appwrite.ID
 import io.appwrite.Permission
 import io.appwrite.Query
 import io.appwrite.Role
-import ru.semen.fishingspot.data.FishingSpot
+import ru.semen.fishingspot.map.point.data.FishingSpot
 import ru.semen.fishingspot.utils.AppwriteManager
 
 class SavedSpotsRepository(private val context: Context) {
@@ -38,12 +38,12 @@ class SavedSpotsRepository(private val context: Context) {
             AppwriteManager.databases.createDocument(
                 databaseId = databaseId,
                 collectionId = savedSpotsCollectionId,
-                documentId = ID.unique(),
+                documentId = ID.Companion.unique(),
                 data = data,
                 permissions = listOf(
-                    Permission.read(Role.user(userId)),
-                    Permission.update(Role.user(userId)),
-                    Permission.delete(Role.user(userId))
+                    Permission.Companion.read(Role.Companion.user(userId)),
+                    Permission.Companion.update(Role.Companion.user(userId)),
+                    Permission.Companion.delete(Role.Companion.user(userId))
                 )
             )
 
@@ -64,9 +64,9 @@ class SavedSpotsRepository(private val context: Context) {
                 databaseId = databaseId,
                 collectionId = savedSpotsCollectionId,
                 queries = listOf(
-                    Query.equal("userId", userId),
-                    Query.equal("spotId", spotDocumentId),
-                    Query.limit(1)
+                    Query.Companion.equal("userId", userId),
+                    Query.Companion.equal("spotId", spotDocumentId),
+                    Query.Companion.limit(1)
                 )
             )
 
@@ -99,15 +99,15 @@ class SavedSpotsRepository(private val context: Context) {
                 databaseId = databaseId,
                 collectionId = savedSpotsCollectionId,
                 queries = listOf(
-                    Query.equal("userId", userId),
-                    Query.limit(500)
+                    Query.Companion.equal("userId", userId),
+                    Query.Companion.limit(500)
                 )
             )
 
             val savedSpots = response.documents.map { doc ->
                 val data = doc.data
                 FishingSpot(
-                    id = 0,
+
                     documentId = data["spotId"] as? String ?: "",
                     latitude = (data["latitude"] as? Number)?.toDouble() ?: 0.0,
                     longitude = (data["longitude"] as? Number)?.toDouble() ?: 0.0,
@@ -123,7 +123,8 @@ class SavedSpotsRepository(private val context: Context) {
                     visibility = "private",
                     isPublicOnMap = false,
                     // ✅ ИСПРАВЛЕНО: читаем как Number и конвертируем в Long
-                    createdAt = (data["createdAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                    createdAt = (data["createdAt"] as? Number)?.toLong()
+                        ?: System.currentTimeMillis()
                 )
             }
 
@@ -144,9 +145,9 @@ class SavedSpotsRepository(private val context: Context) {
                 databaseId = databaseId,
                 collectionId = savedSpotsCollectionId,
                 queries = listOf(
-                    Query.equal("userId", userId),
-                    Query.equal("spotId", spotDocumentId),
-                    Query.limit(1)
+                    Query.Companion.equal("userId", userId),
+                    Query.Companion.equal("spotId", spotDocumentId),
+                    Query.Companion.limit(1)
                 )
             )
 
