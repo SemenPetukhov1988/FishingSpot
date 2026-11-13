@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import ru.semen.fishingspot.data.FishingSignal
+import ru.semen.fishingspot.messages.data.FishingSignal
 import ru.semen.fishingspot.repository.FishingSignalRepository
 
 sealed class SignalsUiState {

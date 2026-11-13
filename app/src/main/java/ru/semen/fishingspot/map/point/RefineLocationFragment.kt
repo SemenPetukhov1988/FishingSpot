@@ -1,0 +1,366 @@
+package ru.semen.fishingspot.map.point
+
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Bundle
+import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.findNavController
+import io.appwrite.ID
+import io.appwrite.models.InputFile
+import kotlinx.coroutines.launch
+import org.osmdroid.api.IGeoPoint
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.overlay.CopyrightOverlay
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import ru.semen.fishingspot.R
+import ru.semen.fishingspot.databinding.FragmentRefineLocationBinding
+import ru.semen.fishingspot.utils.AppwriteManager
+import ru.semen.fishingspot.utils.ImageUtils
+import ru.semen.fishingspot.utils.NetworkMonitor
+import ru.semen.fishingspot.viewmodel.SpotViewModel
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
+
+class RefineLocationFragment : Fragment() {
+
+    private var _binding: FragmentRefineLocationBinding? = null
+    private val binding get() = _binding!!
+
+    // ✅ Данные точки (разделенные)
+    private var spotName: String = ""
+    private var spotMetaInfo: String = ""   // Снасти, наживка, дата (для description)
+    private var spotPostText: String = ""   // Текст поста от пользователя (для postText)
+    private var spotWeight: Double = 0.0
+    private var spotVisibility: String = "private"
+    private var spotCreatedAt: Long = System.currentTimeMillis()
+    private var fishType: String? = null
+    private var photoPath: String? = null
+
+    // ✅ Данные автора
+    private var authorName: String = "Рыбак"
+    private var authorId: String = "unknown_user"
+
+    private val spotViewModel: SpotViewModel by activityViewModels()
+    private lateinit var networkMonitor: NetworkMonitor
+    private val TAG = "FISHING_DEBUG"
+
+    private var lastUserLocation: IGeoPoint? = null
+    private var isLocationAlreadyShown = false
+    private var isZoomAdjusted = false
+
+    private val DEFAULT_POINT = GeoPoint(64.5401, 40.5433)
+    private val CITY_ZOOM = 15.0
+    private val TARGET_ZOOM = 17.5
+    private val MAX_DISTANCE_METERS = 250.0
+
+    private var locationOverlay: MyLocationNewOverlay? = null
+
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        _binding = FragmentRefineLocationBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        networkMonitor = NetworkMonitor.Companion.getInstance(requireContext())
+
+        // ✅ ЧИТАЕМ РАЗДЕЛЕННЫЕ ДАННЫЕ ИЗ BUNDLE
+        spotName = arguments?.getString("NAME") ?: "Без названия"
+        spotMetaInfo = arguments?.getString("META_INFO") ?: ""      // Было DESC
+        spotPostText = arguments?.getString("POST_TEXT") ?: ""      // Новое поле
+        spotWeight = arguments?.getDouble("WEIGHT") ?: 0.0
+        spotVisibility = arguments?.getString("VISIBILITY") ?: "private"
+        spotCreatedAt = arguments?.getLong("CREATED_AT") ?: System.currentTimeMillis()
+        fishType = arguments?.getString("FISH_TYPE")
+        photoPath = arguments?.getString("PHOTO_PATH")
+
+        authorName = arguments?.getString("AUTHOR_NAME") ?: "Рыбак"
+        authorId = arguments?.getString("AUTHOR_ID") ?: "unknown_user"
+
+        val mapView = binding.refineMapView
+        mapView.setTileSource(TileSourceFactory.MAPNIK)
+        mapView.setMultiTouchControls(true)
+
+        val copyrightOverlay = CopyrightOverlay(requireContext())
+        mapView.overlays.add(copyrightOverlay)
+
+        locationOverlay = MyLocationNewOverlay(mapView)
+        locationOverlay?.enableMyLocation()
+        locationOverlay?.setDrawAccuracyEnabled(true)
+        mapView.overlays.add(locationOverlay)
+
+        checkLocationPermission()
+
+        binding.btnDone.setOnClickListener {
+            val currentZoom = mapView.zoomLevel
+            if (!isZoomAdjusted && currentZoom < 16.0) {
+                mapView.controller.setZoom(TARGET_ZOOM)
+                isZoomAdjusted = true
+                Toast.makeText(context, "📍 Уточните место на карте", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+
+            checkWaterLocalAndSave(mapView.mapCenter)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        binding.refineMapView.onResume()
+        if (lastUserLocation != null && !isLocationAlreadyShown) {
+            binding.refineMapView.controller.setCenter(lastUserLocation)
+            binding.refineMapView.controller.setZoom(CITY_ZOOM)
+            isLocationAlreadyShown = true
+            hideLoading()
+        } else if (lastUserLocation == null && ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            startLocationTracking()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        binding.refineMapView.onPause()
+    }
+
+    private fun startLocationTracking() {
+        if (_binding == null) return
+        showLoading()
+        binding.refineMapView.controller.setCenter(DEFAULT_POINT)
+        binding.refineMapView.controller.setZoom(CITY_ZOOM)
+
+        locationOverlay?.runOnFirstFix {
+            val location = locationOverlay?.myLocation
+            if (location != null) {
+                val newLocation = GeoPoint(location.latitude, location.longitude)
+                requireActivity().runOnUiThread {
+                    if (_binding != null) {
+                        lastUserLocation = newLocation
+                        if (!isLocationAlreadyShown) {
+                            binding.refineMapView.controller.setCenter(lastUserLocation)
+                            binding.refineMapView.controller.setZoom(CITY_ZOOM)
+                            isLocationAlreadyShown = true
+                        }
+                        hideLoading()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun checkLocationPermission() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            startLocationTracking()
+        } else {
+            Toast.makeText(context, "Нет прав на геолокацию", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showLoading() {
+        if (_binding != null) {
+            binding.progressLocation.visibility = View.VISIBLE
+            binding.tvLoadingText.visibility = View.VISIBLE
+        }
+    }
+
+    private fun hideLoading() {
+        if (_binding != null) {
+            binding.progressLocation.visibility = View.GONE
+            binding.tvLoadingText.visibility = View.GONE
+        }
+    }
+
+    private fun checkWaterLocalAndSave(point: IGeoPoint) {
+        lifecycleScope.launch {
+            if (_binding == null) return@launch
+
+            val isOnline = networkMonitor.value == true
+            Log.d("DEBUG_REFINE", "🌐 Проверка сети: isOnline = $isOnline")
+
+            if (!isOnline) {
+                Toast.makeText(requireContext(), "⚠️ Для создания точки требуется интернет", Toast.LENGTH_LONG).show()
+                binding.btnDone.isEnabled = true
+                binding.btnDone.text = "Готово"
+                return@launch
+            }
+
+            binding.btnDone.isEnabled = false
+            binding.btnDone.text = "Проверка..."
+
+            if (spotVisibility != "public") {
+                saveSpot(point, isVerified = false)
+                return@launch
+            }
+
+            val isWaterInDb = spotViewModel.findNearbyWater(point.latitude, point.longitude)
+            val distance = if (lastUserLocation != null)
+                calculateDistance(lastUserLocation!!, point) else Double.MAX_VALUE
+
+            when {
+                isWaterInDb && distance < MAX_DISTANCE_METERS -> {
+                    Log.d(TAG, "[VERIFIED] Вода в БД + GPS совпал")
+                    saveSpot(point, isVerified = true)
+                }
+                !isWaterInDb && distance < MAX_DISTANCE_METERS -> {
+                    Log.w(TAG, "[SUSPICIOUS] GPS совпал, но воды нет в БД")
+                    showSuspiciousDialog(point)
+                }
+                else -> {
+                    Log.e(TAG, "[REJECTED] Рыбак далеко (${distance.toInt()} м)")
+                    showFarAwayDialog(point)
+                }
+            }
+
+            if (_binding != null) {
+                binding.btnDone.isEnabled = true
+                binding.btnDone.text = "Готово"
+            }
+        }
+    }
+
+    private fun showSuspiciousDialog(point: IGeoPoint) {
+        if (!isAdded || _binding == null) return
+        AlertDialog.Builder(requireContext())
+            .setTitle("⚠️ Водоем не найден в базе")
+            .setMessage("Рядом с вами нет зарегистрированного водоема. Точка будет добавлена со статусом «Сомнительная».")
+            .setPositiveButton("Сохранить как сомнительную") { dialog, _ ->
+                dialog.dismiss()
+                if (isAdded && _binding != null) saveSpot(point, isVerified = false)
+            }
+            .setNegativeButton("Отмена") { dialog, _ ->
+                dialog.dismiss()
+                if (_binding != null) {
+                    binding.btnDone.isEnabled = true
+                    binding.btnDone.text = "Готово"
+                }
+            }
+            .setCancelable(false)
+            .create()
+            .show()
+    }
+
+    private fun showFarAwayDialog(point: IGeoPoint) {
+        if (!isAdded || _binding == null) return
+        AlertDialog.Builder(requireContext())
+            .setTitle("Вы слишком далеко!")
+            .setMessage("Расстояние > 250м. Сохранить как ЛИЧНУЮ точку?")
+            .setPositiveButton("Сохранить как личную") { d, _ ->
+                d.dismiss()
+                if (isAdded && _binding != null) {
+                    spotVisibility = "private"
+                    saveSpot(point, isVerified = false)
+                }
+            }
+            .setNegativeButton("Отмена") { d, _ ->
+                d.dismiss()
+                if (_binding != null) {
+                    binding.btnDone.isEnabled = true
+                    binding.btnDone.text = "Готово"
+                }
+            }
+            .create().show()
+    }
+
+    private fun saveSpot(point: IGeoPoint, isVerified: Boolean) {
+        lifecycleScope.launch {
+            if (_binding == null) return@launch
+
+            binding.btnDone.isEnabled = false
+            binding.btnDone.text = "Загрузка фото..."
+
+            var photoUrl: String? = null
+
+            val photoUriString = arguments?.getString("PHOTO_URI")
+            if (!photoUriString.isNullOrEmpty()) {
+                try {
+                    val photoUri = Uri.parse(photoUriString)
+                    val imageBytes = ImageUtils.compressImage(requireContext(), photoUri)
+
+                    if (imageBytes != null) {
+                        val fileName = "spot_${System.currentTimeMillis()}.jpg"
+                        val fileId = ID.Companion.unique()
+                        val inputFile = InputFile.Companion.fromBytes(imageBytes, fileName, "image/jpeg")
+
+                        val file = AppwriteManager.storage.createFile(
+                            bucketId = "6ada43f9003aa9f4d6a2",
+                            fileId = fileId,
+                            file = inputFile
+                        )
+
+                        Log.d("REFINE_DEBUG", "✅ Файл создан. File ID: ${file.id}")
+
+                        val serverIp = "153.76.168.237"
+                        val bucketId = "6ada43f9003aa9f4d6a2"
+                        val projectId = "6acfd94b00107a8657d8"
+
+                        photoUrl = "http://$serverIp:8080/v1/storage/buckets/$bucketId/files/${file.id}/view?project=$projectId"
+                        Log.d("REFINE_DEBUG", "✅ URL: $photoUrl")
+                    }
+                } catch (e: Exception) {
+                    Log.e("REFINE_DEBUG", "❌ Ошибка загрузки фото", e)
+                    Toast.makeText(requireContext(), "Не удалось загрузить фото", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            binding.btnDone.text = "Сохранение точки..."
+
+            // ✅ ПЕРЕДАЕМ РАЗДЕЛЕННЫЕ ДАННЫЕ В VIEWMODEL
+            spotViewModel.addFullSpot(
+                lat = point.latitude,
+                lon = point.longitude,
+                name = spotName,
+                description = spotMetaInfo,     // Мета-инфо (снасти/наживка) → в description
+                postText = spotPostText,        // Текст поста → в postText
+                weight = spotWeight,
+                visibility = spotVisibility,
+                photoPath = null,
+                photoUrl = photoUrl,
+                fishType = fishType,
+                isVerified = isVerified,
+                createdAt = spotCreatedAt,
+                authorId = authorId,
+                authorName = authorName
+            )
+
+            navigateBack()
+        }
+    }
+
+    private fun navigateBack() {
+        try {
+            requireActivity().findNavController(R.id.fragmentContainer).navigate(R.id.action_refine_to_tabs)
+        } catch (e: Exception) {
+            requireActivity().onBackPressedDispatcher.onBackPressed()
+        }
+    }
+
+    private fun calculateDistance(p1: IGeoPoint, p2: IGeoPoint): Double {
+        val r = 6371000.0
+        val dLat = Math.toRadians(p2.latitude - p1.latitude)
+        val dLon = Math.toRadians(p2.longitude - p1.longitude)
+        val a = sin(dLat / 2) * sin(dLat / 2) + cos(Math.toRadians(p1.latitude)) * cos(
+            Math.toRadians(
+                p2.latitude
+            )
+        ) * sin(dLon / 2) * sin(dLon / 2)
+        return r * 2 * atan2(sqrt(a), sqrt(1 - a))
+    }
+
+    override fun onDestroyView() {
+        locationOverlay?.disableMyLocation()
+        _binding = null
+        super.onDestroyView()
+    }
+}

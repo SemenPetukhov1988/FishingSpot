@@ -6,9 +6,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import io.appwrite.exceptions.AppwriteException
 import kotlinx.coroutines.launch
-import ru.semen.fishingspot.data.AppDatabase
+import ru.semen.fishingspot.utils.water.AppDatabase
 import ru.semen.fishingspot.utils.AppwriteManager
-import ru.semen.fishingspot.utils.DataImporter
+import ru.semen.fishingspot.utils.water.DataImporter
 
 class MainActivity : AppCompatActivity() {
 

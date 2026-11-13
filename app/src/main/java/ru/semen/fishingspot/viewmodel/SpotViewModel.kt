@@ -9,9 +9,9 @@ import androidx.lifecycle.switchMap
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.R
-import ru.semen.fishingspot.data.AppDatabase
+import ru.semen.fishingspot.utils.water.AppDatabase
 import ru.semen.fishingspot.data.FishingSpot
-import ru.semen.fishingspot.data.WaterChecker
+import ru.semen.fishingspot.utils.water.WaterChecker
 import ru.semen.fishingspot.repository.SavedSpotsRepository
 import ru.semen.fishingspot.repository.SpotAppwriteRepository
 import ru.semen.fishingspot.utils.AppwriteManager

@@ -4,7 +4,7 @@ import io.appwrite.ID
 import io.appwrite.Query
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import ru.semen.fishingspot.data.FishingSignal
+import ru.semen.fishingspot.messages.data.FishingSignal
 import ru.semen.fishingspot.utils.AppwriteManager
 import java.time.Instant
 
