@@ -13,47 +13,6 @@
         android:layout_height="match_parent"
         android:background="#F0F2F5">
 
-        <!-- Заголовок с пояснением -->
-        <com.google.android.material.appbar.AppBarLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@android:color/white"
-            app:elevation="2dp">
-
-            <androidx.appcompat.widget.Toolbar
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="?attr/actionBarSize">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center_horizontal"
-                    android:paddingVertical="4dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Друзья"
-                        android:textColor="#000000"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <!-- ✅ ПОЯСНЕНИЕ В ЗАГОЛОВКЕ -->
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="📍 Нажми на друга, чтобы увидеть его точки"
-                        android:textSize="13sp"
-                        android:textColor="#0288D1"
-                        android:layout_marginTop="2dp" />
-
-                </LinearLayout>
-
-            </androidx.appcompat.widget.Toolbar>
-        </com.google.android.material.appbar.AppBarLayout>
-
         <!-- Список друзей -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvFriends"
@@ -61,8 +20,7 @@
             android:layout_height="match_parent"
             android:clipToPadding="false"
             android:padding="8dp"
-            android:paddingBottom="80dp"
-            app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+            android:paddingBottom="80dp" />
 
         <!-- Пустое состояние -->
         <LinearLayout

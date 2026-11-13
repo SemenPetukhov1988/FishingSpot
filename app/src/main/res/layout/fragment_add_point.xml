@@ -1,26 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#EAEFF5"
+    android:background="#FFFFFF"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="20dp">
+        android:padding="16dp">
 
-        <!-- ✅ 1. ШАПКА -->
+        <!-- ✅ 1. ШАПКА С КНОПКОЙ НАЗАД -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="20dp">
+            android:layout_marginBottom="16dp">
 
+            <!-- Кнопка назад (возвращена для binding.btnBack) -->
             <ImageButton
                 android:id="@+id/btnBack"
                 android:layout_width="48dp"
@@ -28,106 +28,94 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/back"
                 android:contentDescription="Назад"
-                app:tint="#2C3E50" />
+                app:tint="#222222" />
 
+            <!-- Заголовок по центру -->
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Новая точка"
-                android:textSize="22sp"
+                android:textSize="20sp"
                 android:textStyle="bold"
-                android:textColor="#2C3E50"
-                android:gravity="center"
-                android:fontFamily="sans-serif-medium" />
+                android:textColor="#222222"
+                android:gravity="center" />
 
+            <!-- Пустой spacer справа для симметрии -->
             <View
                 android:layout_width="48dp"
                 android:layout_height="48dp" />
         </LinearLayout>
 
-        <!-- ✅ 2. БЛОК ФОТО (Исправленный: показывает фото целиком) -->
-        <com.google.android.material.card.MaterialCardView
+        <!-- ✅ 2. БЛОК ФОТО (Без карточки, как в ленте) -->
+        <FrameLayout
             android:id="@+id/cardPhoto"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardCornerRadius="16dp"
-            app:cardBackgroundColor="#FFFFFF"
-            app:strokeWidth="1dp"
-            app:strokeColor="#E2E8F0"
-            app:cardElevation="2dp"
-            android:layout_marginBottom="20dp"
+            android:background="#F0F2F5"
+            android:minHeight="160dp"
+            android:layout_marginBottom="16dp"
             android:clickable="true"
             android:focusable="true"
             android:foreground="?attr/selectableItemBackground">
 
-            <!-- УБРАЛИ ФИКСИРОВАННУЮ ВЫСОТУ 160dp! Теперь высота зависит от контента -->
-            <FrameLayout
+            <!-- Плейсхолдер -->
+            <LinearLayout
+                android:id="@+id/layoutPhotoPlaceholder"
+                android:layout_width="match_parent"
+                android:layout_height="160dp"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="16dp">
+
+                <ImageView
+                    android:id="@+id/ivPhotoIcon"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_"
+                    app:tint="#B0BEC5"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/tvPhotoHint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Добавить фото"
+                    android:textSize="14sp"
+                    android:textColor="#818C99" />
+            </LinearLayout>
+
+            <!-- Превью фото -->
+            <ImageView
+                android:id="@+id/ivPhotoPreview"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="160dp">
+                android:adjustViewBounds="true"
+                android:scaleType="fitCenter"
+                android:visibility="gone"
+                android:maxHeight="400dp" />
 
-                <!-- Плейсхолдер (иконка + текст) -->
-                <LinearLayout
-                    android:id="@+id/layoutPhotoPlaceholder"
-                    android:layout_width="match_parent"
-                    android:layout_height="160dp"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="16dp">
+            <!-- Кнопка удаления -->
+            <ImageButton
+                android:id="@+id/btnRemovePhoto"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/no_accounts_24dp_000000_fill0_wght400_grad0_opsz24"
+                android:contentDescription="Удалить фото"
+                android:layout_gravity="top|end"
+                android:layout_margin="12dp"
+                android:visibility="gone"
+                app:tint="#EF4444"
+                android:background="?attr/selectableItemBackgroundBorderless" />
+        </FrameLayout>
 
-                    <ImageView
-                        android:id="@+id/ivPhotoIcon"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:src="@drawable/add_a_photo_24dp_000000_fill0_wght400_grad0_opsz24__1_"
-                        app:tint="#0288D1"
-                        android:layout_marginBottom="8dp" />
-
-                    <TextView
-                        android:id="@+id/tvPhotoHint"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Добавить фото (Камера или Галерея)"
-                        android:textSize="15sp"
-                        android:textColor="#64748B"
-                        android:fontFamily="sans-serif-medium" />
-                </LinearLayout>
-
-                <!-- Превью фото: теперь оно адаптивное! -->
-                <ImageView
-                    android:id="@+id/ivPhotoPreview"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:adjustViewBounds="true"
-                    android:scaleType="fitCenter"
-                    android:visibility="gone"
-                    android:maxHeight="400dp" />
-
-                <!-- Кнопка удаления: позиционируется поверх фото -->
-                <ImageButton
-                    android:id="@+id/btnRemovePhoto"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-
-                    android:src="@drawable/no_accounts_24dp_000000_fill0_wght400_grad0_opsz24"
-                    android:contentDescription="Удалить фото"
-                    android:layout_gravity="top|end"
-                    android:layout_margin="12dp"
-                    android:visibility="gone"
-                    app:tint="#EF4444" />
-
-            </FrameLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- ✅ 3. ВИДИМОСТЬ ТОЧКИ (Современный Toggle) -->
+        <!-- ✅ 3. ВИДИМОСТЬ ТОЧКИ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Кто видит эту точку"
             android:textSize="14sp"
-            android:textColor="#64748B"
-            android:fontFamily="sans-serif-medium"
+            android:textColor="#818C99"
             android:layout_marginBottom="8dp" />
 
         <com.google.android.material.button.MaterialButtonToggleGroup
@@ -136,47 +124,53 @@
             android:layout_height="wrap_content"
             app:singleSelection="true"
             app:selectionRequired="true"
-            android:layout_marginBottom="24dp">
+            android:layout_marginBottom="20dp">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnVisibilityPrivate"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="🔒 Личная"
-                android:textSize="12sp" />
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:strokeColor="#0288D1" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnVisibilityFriends"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="👥 Друзья"
-                android:textSize="12sp" />
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:strokeColor="#0288D1" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnVisibilityPublic"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="🌍 Публичная"
-                android:textSize="12sp" />
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:strokeColor="#0288D1" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
-        <!-- ✅ 4. ОСНОВНАЯ ИНФОРМАЦИЯ -->
+        <!-- ✅ 4. ПОЛЯ ВВОДА -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Название места (напр. 'Заводь у моста')"
-            app:boxCornerRadiusTopStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            app:boxCornerRadiusBottomStart="12dp"
-            app:boxCornerRadiusBottomEnd="12dp"
+            android:hint="Название места"
             app:boxStrokeColor="#0288D1"
             app:hintTextColor="#0288D1"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusBottomEnd="8dp"
             android:layout_marginBottom="16dp">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -184,8 +178,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textCapSentences"
-                android:maxLength="50"
-                android:fontFamily="sans-serif-medium" />
+                android:maxLength="50" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
@@ -195,32 +188,30 @@
             android:hint="Дата рыбалки"
             app:endIconMode="custom"
             app:endIconDrawable="@drawable/calendar_month_24dp_000000_fill0_wght400_grad0_opsz24"
-            app:boxCornerRadiusTopStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            app:boxCornerRadiusBottomStart="12dp"
-            app:boxCornerRadiusBottomEnd="12dp"
             app:boxStrokeColor="#0288D1"
-            android:layout_marginBottom="24dp">
+            app:hintTextColor="#0288D1"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusBottomEnd="8dp"
+            android:layout_marginBottom="20dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etFishingDate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="none"
-                android:focusable="false"
-                android:fontFamily="sans-serif-medium" />
+                android:focusable="false" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- ✅ 5. ДЕТАЛИ РЫБАЛКИ (Блоки для выбора) -->
-
-        <!-- Место ловли -->
+        <!-- ✅ 5. ЧИПСЫ И ВЫБОР -->
+        <!-- Способ ловли -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Способ ловли"
             android:textSize="14sp"
-            android:textColor="#2C3E50"
-            android:textStyle="bold"
+            android:textColor="#818C99"
             android:layout_marginBottom="8dp" />
 
         <com.google.android.material.button.MaterialButtonToggleGroup
@@ -235,17 +226,23 @@
                 android:id="@+id/btnLocationShore"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:text="🏕️ С берега" />
+                android:text="🏕️ С берега"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:strokeColor="#0288D1" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnLocationBoat"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:text="🚤 С лодки" />
+                android:text="🚤 С лодки"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:strokeColor="#0288D1" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <!-- Снасти -->
@@ -254,8 +251,7 @@
             android:layout_height="wrap_content"
             android:text="Снасти"
             android:textSize="14sp"
-            android:textColor="#2C3E50"
-            android:textStyle="bold"
+            android:textColor="#818C99"
             android:layout_marginBottom="8dp" />
 
         <com.google.android.material.chip.ChipGroup
@@ -270,36 +266,56 @@
                 android:id="@+id/chipTackleSpinner"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Спиннинг" />
+                android:layout_height="36dp"
+                android:text="Спиннинг"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipTackleFeeder"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Фидер" />
+                android:layout_height="36dp"
+                android:text="Фидер"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipTackleFloat"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Поплавок" />
+                android:layout_height="36dp"
+                android:text="Поплавок"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipTackleWinter"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Зимняя" />
+                android:layout_height="36dp"
+                android:text="Зимняя"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipTackleOther"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Другое" />
+                android:layout_height="36dp"
+                android:text="Другое"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
         </com.google.android.material.chip.ChipGroup>
 
         <!-- Наживка -->
@@ -308,8 +324,7 @@
             android:layout_height="wrap_content"
             android:text="Наживка / Приманка"
             android:textSize="14sp"
-            android:textColor="#2C3E50"
-            android:textStyle="bold"
+            android:textColor="#818C99"
             android:layout_marginBottom="8dp" />
 
         <com.google.android.material.chip.ChipGroup
@@ -324,46 +339,65 @@
                 android:id="@+id/chipBaitWorm"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Червь" />
+                android:layout_height="36dp"
+                android:text="Червь"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipBaitMaggot"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Опарыш" />
+                android:layout_height="36dp"
+                android:text="Опарыш"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipBaitBloodworm"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Мотыль" />
+                android:layout_height="36dp"
+                android:text="Мотыль"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipBaitLure"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Блесна/Воблер" />
+                android:layout_height="36dp"
+                android:text="Блесна/Воблер"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipBaitOther"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Другое" />
+                android:layout_height="36dp"
+                android:text="Другое"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
         </com.google.android.material.chip.ChipGroup>
 
-        <!-- Вид рыбы (твой старый блок, он отличный) -->
+        <!-- Вид рыбы -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Преимущественно в улове"
             android:textSize="14sp"
-            android:textColor="#2C3E50"
-            android:textStyle="bold"
+            android:textColor="#818C99"
             android:layout_marginBottom="8dp" />
 
         <com.google.android.material.chip.ChipGroup
@@ -374,26 +408,88 @@
             app:selectionRequired="true"
             android:layout_marginBottom="20dp">
 
-            <com.google.android.material.chip.Chip android:id="@+id/chipPike" style="@style/Widget.MaterialComponents.Chip.Choice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Щука" />
-            <com.google.android.material.chip.Chip android:id="@+id/chipPerch" style="@style/Widget.MaterialComponents.Chip.Choice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Окунь" />
-            <com.google.android.material.chip.Chip android:id="@+id/chipZander" style="@style/Widget.MaterialComponents.Chip.Choice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Судак" />
-            <com.google.android.material.chip.Chip android:id="@+id/chipBream" style="@style/Widget.MaterialComponents.Chip.Choice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Лещ" />
-            <com.google.android.material.chip.Chip android:id="@+id/chipRoach" style="@style/Widget.MaterialComponents.Chip.Choice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Плотва" />
-            <com.google.android.material.chip.Chip android:id="@+id/chipOtherFish" style="@style/Widget.MaterialComponents.Chip.Choice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Другое" />
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipPike"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Щука"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipPerch"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Окунь"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipZander"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Судак"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipBream"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Лещ"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipRoach"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Плотва"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipOtherFish"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Другое"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:checkedIconTint="#0288D1"
+                app:chipStrokeColor="#0288D1" />
         </com.google.android.material.chip.ChipGroup>
 
+        <!-- Поле для другой рыбы -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/layoutOtherFish"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Введите вид рыбы"
-            app:boxCornerRadiusTopStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            app:boxCornerRadiusBottomStart="12dp"
-            app:boxCornerRadiusBottomEnd="12dp"
             app:boxStrokeColor="#0288D1"
+            app:hintTextColor="#0288D1"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusBottomEnd="8dp"
             android:visibility="gone"
             android:layout_marginBottom="20dp">
+
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etOtherFish"
                 android:layout_width="match_parent"
@@ -407,8 +503,7 @@
             android:layout_height="wrap_content"
             android:text="Вес улова"
             android:textSize="14sp"
-            android:textColor="#2C3E50"
-            android:textStyle="bold"
+            android:textColor="#818C99"
             android:layout_marginBottom="8dp" />
 
         <com.google.android.material.button.MaterialButtonToggleGroup
@@ -423,38 +518,47 @@
                 android:id="@+id/btnWeight1"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:text="До 1 кг" />
+                android:text="До 1 кг"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:strokeColor="#0288D1" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnWeight2"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:text="1–5 кг" />
+                android:text="1–5 кг"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:strokeColor="#0288D1" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnWeight3"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:text="> 5 кг" />
+                android:text="> 5 кг"
+                android:textSize="13sp"
+                android:textColor="#0288D1"
+                app:strokeColor="#0288D1" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <!-- ✅ 6. ОПИСАНИЕ -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Описание места (глубина, течение, особенности дна...)"
-            app:boxCornerRadiusTopStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            app:boxCornerRadiusBottomStart="12dp"
-            app:boxCornerRadiusBottomEnd="12dp"
+            android:hint="Описание места"
             app:boxStrokeColor="#0288D1"
             app:hintTextColor="#0288D1"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusBottomEnd="8dp"
             android:layout_marginBottom="16dp">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -463,8 +567,7 @@
                 android:layout_height="wrap_content"
                 android:inputType="textMultiLine"
                 android:minLines="3"
-                android:gravity="top"
-                android:fontFamily="sans-serif-medium" />
+                android:gravity="top" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <TextView
@@ -472,23 +575,31 @@
             android:layout_height="wrap_content"
             android:text="📍 Координаты сохранены автоматически"
             android:textSize="12sp"
-            android:textColor="#64748B"
+            android:textColor="#818C99"
             android:layout_marginBottom="24dp" />
 
         <!-- ✅ 7. КНОПКА СОХРАНИТЬ -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSave"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="36dp"
             android:text="Сохранить точку"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:backgroundTint="#0288D1"
-            app:cornerRadius="16dp"
+            android:textSize="14sp"
+            android:textColor="#0288D1"
+            app:cornerRadius="18dp"
+            app:strokeColor="#0288D1"
+            app:strokeWidth="1dp"
+            app:backgroundTint="@android:color/transparent"
             app:icon="@drawable/mymapblack"
-            app:iconGravity="textEnd"
-            app:iconTint="#FFFFFF"
+            app:iconTint="#0288D1"
+            app:iconGravity="textStart"
             android:layout_marginBottom="16dp" />
+
+        <!-- Тонкий разделитель внизу -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#E7E8EC"/>
 
     </LinearLayout>
 </ScrollView>

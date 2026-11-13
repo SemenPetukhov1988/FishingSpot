@@ -12,18 +12,6 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- ✅ ПРОСТОЙ ЗАГОЛОВОК БЕЗ КНОПКИ -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="16dp"
-            android:text="💬 Сообщения"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:textColor="#212121"
-            android:background="#FFFFFF"
-            android:elevation="2dp" />
-
         <!-- Список сообщений -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvMessages"
