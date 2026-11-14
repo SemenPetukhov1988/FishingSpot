@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.messages
+package ru.semen.fishingspot.messages.friends
 
 import android.os.Bundle
 import android.util.Log
@@ -11,8 +11,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.R
-import ru.semen.fishingspot.messages.adapter.FriendItem
-import ru.semen.fishingspot.messages.adapter.FriendRecipientAdapter
 import ru.semen.fishingspot.databinding.BottomSheetRecipientSelectionBinding
 import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.UserSessionManager

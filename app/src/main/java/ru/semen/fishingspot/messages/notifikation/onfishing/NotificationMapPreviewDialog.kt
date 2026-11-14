@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.messages
+package ru.semen.fishingspot.messages.notifikation.onfishing
 
 import android.app.Dialog
 import android.content.Intent

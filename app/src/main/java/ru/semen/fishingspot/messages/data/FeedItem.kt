@@ -1,6 +1,6 @@
 package ru.semen.fishingspot.messages.data
 
-import ru.semen.fishingspot.messages.data.FishingSignal
+import ru.semen.fishingspot.messages.friends.data.AppMessage
 
 sealed interface FeedItem {
     val timestamp: Long

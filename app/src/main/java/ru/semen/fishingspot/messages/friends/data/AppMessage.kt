@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.messages.data
+package ru.semen.fishingspot.messages.friends.data
 
 data class AppMessage(
     val id: String = "",

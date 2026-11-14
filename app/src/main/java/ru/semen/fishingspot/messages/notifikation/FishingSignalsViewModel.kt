@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.messages.viewmodel
+package ru.semen.fishingspot.messages.notifikation
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.messages.data.FishingSignal
-import ru.semen.fishingspot.messages.repository.FishingSignalRepository
+import ru.semen.fishingspot.messages.notifikation.FishingSignalRepository
 
 sealed class SignalsUiState {
     object Loading : SignalsUiState()
@@ -96,7 +96,10 @@ class FishingSignalsViewModel(
             )
         }
     }
-
+    // В FishingSignalsViewModel.kt добавь этот метод
+    fun reloadForCurrentUser(userId: String) {
+        loadSignals(userId)
+    }
     fun resetSendState() {
         _sendState.value = SendSignalState.Idle
     }

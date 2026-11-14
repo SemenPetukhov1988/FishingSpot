@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.messages.adapter
+package ru.semen.fishingspot.messages.friends
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -12,7 +12,7 @@ data class FriendItem(val id: String, val name: String)
 
 class FriendRecipientAdapter(
     private val onFriendClick: (String) -> Unit // Всё ещё возвращаем только ID при клике
-) : androidx.recyclerview.widget.ListAdapter<FriendItem, FriendRecipientAdapter.FriendViewHolder>(DiffCallback()) {
+) : ListAdapter<FriendItem, FriendRecipientAdapter.FriendViewHolder>(DiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FriendViewHolder {
         val binding = ItemFriendRecipientBinding.inflate(

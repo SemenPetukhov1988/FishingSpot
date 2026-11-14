@@ -1,4 +1,4 @@
-package ru.semen.fishingspot.messages.repository
+package ru.semen.fishingspot.messages.notifikation
 
 import android.util.Log
 import io.appwrite.ID

@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/swipeRefresh"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#FAFAFA">
 
     <!-- Вертикальный контейнер для основного контента -->
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:layout_height="match_parent">
 
         <!-- Список сообщений -->
         <androidx.recyclerview.widget.RecyclerView
@@ -56,19 +56,19 @@
                 android:textColor="#9E9E9E" />
         </LinearLayout>
 
-    </LinearLayout>
+        <!-- ✅ КНОПКА "+" В ПРАВОМ НИЖНЕМ УГЛУ -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabAddMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="24dp"
+            android:src="@android:drawable/ic_input_add"
+            app:tint="@android:color/white"
+            app:backgroundTint="#1976D2"
+            android:contentDescription="Новое сообщение" />
 
-    <!-- ✅ КНОПКА "+" В ПРАВОМ НИЖНЕМ УГЛУ -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabAddMessage"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="24dp"
-        android:src="@android:drawable/ic_input_add"
-        app:tint="@android:color/white"
-        app:backgroundTint="#1976D2"
-        android:contentDescription="Новое сообщение" />
+    </FrameLayout>
 
-</FrameLayout>
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

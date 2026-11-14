@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import ru.semen.fishingspot.databinding.BottomSheetSignalTypeBinding
+import ru.semen.fishingspot.messages.friends.RecipientSelectionBottomSheet
 import ru.semen.fishingspot.utils.UserSessionManager
 
 class SignalTypeBottomSheet : BottomSheetDialogFragment() {
