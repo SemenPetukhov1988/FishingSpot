@@ -29,23 +29,25 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
     private val _messagesFlow = MutableStateFlow<List<AppMessage>>(emptyList())
     private val _signalsFlow = MutableStateFlow<List<FishingSignal>>(emptyList())
     private val _signalsError = MutableStateFlow<String?>(null)
+    private val _isRefreshing = MutableStateFlow(false)
 
+    // ✅ ОПТИМИСТИЧНЫЕ ФЛАГИ
     private val _acceptedIds = MutableStateFlow<Set<String>>(emptySet())
     private val _declinedIds = MutableStateFlow<Set<String>>(emptySet())
     private val _wishedIds = MutableStateFlow<Set<String>>(emptySet())
+    private val _swipedIds = MutableStateFlow<Set<String>>(emptySet()) // ✅ НОВЫЙ ФЛАГ ДЛЯ СВАЙПОВ
 
-    // ✅ ОТДЕЛЬНЫЙ ПОТОК ДЛЯ СПИННЕРА — не зависит от эмиссий данных
-    private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     private data class ActionFlags(
         val accepted: Set<String> = emptySet(),
         val declined: Set<String> = emptySet(),
-        val wished: Set<String> = emptySet()
+        val wished: Set<String> = emptySet(),
+        val swiped: Set<String> = emptySet() // ✅ ДОБАВЛЕНО В DATA CLASS
     )
 
-    private val flagsFlow = combine(_acceptedIds, _declinedIds, _wishedIds) { a, d, w ->
-        ActionFlags(a, d, w)
+    private val flagsFlow = combine(_acceptedIds, _declinedIds, _wishedIds, _swipedIds) { a, d, w, s ->
+        ActionFlags(a, d, w, s)
     }
 
     val uiState: StateFlow<MessagesUiState> = combine(
@@ -58,8 +60,12 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
         sigError: String?,
         flags: ActionFlags ->
 
-        val filteredMessages = messages.filter { it.id !in flags.accepted && it.id !in flags.declined }
-        val visibleSignals = signals.filterNot { it.type == "on_fishing" && it.id in flags.wished }
+        val filteredMessages = messages.filter {
+            it.id !in flags.accepted && it.id !in flags.declined && it.id !in flags.swiped
+        }
+        val visibleSignals = signals.filterNot {
+            it.type == "on_fishing" && it.id in flags.wished
+        }
 
         val feedItems = buildFeedList(filteredMessages, visibleSignals)
 
@@ -80,50 +86,39 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
             try {
                 val userId = UserSessionManager.getCurrentUserId(getApplication())
                 if (userId.isNullOrEmpty()) {
-                    Log.e("MESSAGES_VM", "User ID пустой, загрузка невозможна")
+                    Log.e("MESSAGES_VM", "User ID пустой")
                     _signalsError.value = "Не удалось определить пользователя"
                     return@launch
                 }
 
-                // Загружаем сообщения
                 val msgResult = notificationsRepo.getIncomingMessages()
                 if (msgResult.isSuccess) {
                     _messagesFlow.value = msgResult.getOrNull() ?: emptyList()
 
-                    // ✅ ФЛАГИ ОБРЕЗАЕМ ПОСЛЕ ПРИХОДА СВЕЖИХ ДАННЫХ:
-                    // остаём флаг только для id, которые ещё существуют на сервере.
-                    // Удалённые документы исчезают из списков — их флаги падают сами.
-                    val freshMessageIds = _messagesFlow.value.map { it.id }.toSet()
-                    _acceptedIds.value = _acceptedIds.value intersect freshMessageIds
-                    _declinedIds.value = _declinedIds.value intersect freshMessageIds
-                } else {
-                    Log.e("MESSAGES_VM", "Ошибка загрузки сообщений: ${msgResult.exceptionOrNull()?.message}")
+                    // ✅ УМНАЯ ОЧИСТКА ФЛАГОВ: оставляем только те ID, которые есть на сервере
+                    val freshMsgIds = _messagesFlow.value.map { it.id }.toSet()
+                    _acceptedIds.value = _acceptedIds.value intersect freshMsgIds
+                    _declinedIds.value = _declinedIds.value intersect freshMsgIds
+                    _swipedIds.value = _swipedIds.value intersect freshMsgIds
                 }
 
-                // Загружаем сигналы
                 val sigResult = signalsRepo.getSignals(userId)
                 if (sigResult.isSuccess) {
                     _signalsFlow.value = sigResult.getOrNull()?.sortedByDescending { it.createdAt } ?: emptyList()
 
-                    // ✅ Аналогично: wished-флаг живёт, только пока сигнал существует
-                    val freshSignalIds = _signalsFlow.value.map { it.id }.toSet()
-                    _wishedIds.value = _wishedIds.value intersect freshSignalIds
+                    val freshSigIds = _signalsFlow.value.map { it.id }.toSet()
+                    _wishedIds.value = _wishedIds.value intersect freshSigIds
                     _signalsError.value = null
                 } else {
                     _signalsError.value = sigResult.exceptionOrNull()?.message ?: "Ошибка загрузки сигналов"
-                    Log.e("MESSAGES_VM", "Ошибка загрузки сигналов: ${_signalsError.value}")
                 }
             } finally {
-                // ✅ СПИННЕР ГАСИТСЯ ВСЕГДА — даже при ошибке и пустом userId
                 _isRefreshing.value = false
             }
         }
     }
 
-    private fun buildFeedList(
-        messages: List<AppMessage>,
-        signals: List<FishingSignal>
-    ): List<FeedItem> {
+    private fun buildFeedList(messages: List<AppMessage>, signals: List<FishingSignal>): List<FeedItem> {
         val anchorsMap = mutableMapOf<String, MutableList<FishingSignal>>()
         val anchorIds = mutableSetOf<String>()
 
@@ -141,7 +136,6 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
         }
 
         val feedItems = mutableListOf<FeedItem>()
-
         messages.filter { it.type != "ANCHOR_ON_FISHING" }.forEach { msg ->
             feedItems.add(FriendMessageItem(msg))
         }
@@ -161,27 +155,32 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
         return feedItems.sortedByDescending { it.timestamp }
     }
 
-    fun acceptFriendRequest(senderId: String, messageId: String) {
-        _acceptedIds.value = _acceptedIds.value + messageId
+    // ✅ МЕТОД ДЛЯ СВАЙПА
+    fun swipeToDelete(messageId: String) {
+        _swipedIds.value = _swipedIds.value + messageId
 
         viewModelScope.launch {
-            friendsActionsRepo.acceptFriendRequest(senderId, messageId)
+            notificationsRepo.deleteMessage(messageId)
                 .onFailure { e ->
-                    Log.e("MESSAGES_VM", "Ошибка принятия заявки $messageId: ${e.message}")
-                    _acceptedIds.value = _acceptedIds.value - messageId
+                    Log.e("MESSAGES_VM", "Ошибка удаления по свайпу: ${e.message}")
+                    _swipedIds.value = _swipedIds.value - messageId
                 }
+        }
+    }
+
+    fun acceptFriendRequest(senderId: String, messageId: String) {
+        _acceptedIds.value = _acceptedIds.value + messageId
+        viewModelScope.launch {
+            friendsActionsRepo.acceptFriendRequest(senderId, messageId)
+                .onFailure { _acceptedIds.value = _acceptedIds.value - messageId }
         }
     }
 
     fun declineRequest(messageId: String) {
         _declinedIds.value = _declinedIds.value + messageId
-
         viewModelScope.launch {
             friendsActionsRepo.declineFriendRequest(messageId)
-                .onFailure { e ->
-                    Log.e("MESSAGES_VM", "Ошибка отклонения заявки $messageId: ${e.message}")
-                    _declinedIds.value = _declinedIds.value - messageId
-                }
+                .onFailure { _declinedIds.value = _declinedIds.value - messageId }
         }
     }
 
@@ -193,28 +192,16 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
 
             if (targetSignal != null) {
                 _wishedIds.value = _wishedIds.value + targetSignal.id
-
                 notificationsRepo.deleteSignal(targetSignal.id)
-                    .onFailure { e ->
-                        Log.e("MESSAGES_VM", "Не удалось удалить сигнал ${targetSignal.id}: ${e.message}")
-                        _wishedIds.value = _wishedIds.value - targetSignal.id
-                    }
+                    .onFailure { _wishedIds.value = _wishedIds.value - targetSignal.id }
             }
 
             signalsRepo.sendSignal(
-                senderId = senderId,
-                senderName = senderName,
-                receiverId = receiverId,
-                type = "fishing_wish",
-                anchorId = anchorId,
-                messageText = "Хорошей рыбалки! 🎣"
-            ).onFailure { e ->
-                Log.e("MESSAGES_VM", "Ошибка отправки пожелания: ${e.message}")
-            }
+                senderId = senderId, senderName = senderName, receiverId = receiverId,
+                type = "fishing_wish", anchorId = anchorId, messageText = "Хорошей рыбалки! 🎣"
+            )
         }
     }
 
-    fun refreshData() {
-        loadData()
-    }
+    fun refreshData() { loadData() }
 }

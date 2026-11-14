@@ -4,7 +4,6 @@ import android.content.Context
 import io.appwrite.Query
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
 import ru.semen.fishingspot.messages.friends.data.AppMessage
 import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.UserSessionManager
@@ -13,13 +12,8 @@ class NotificationsRepository(private val context: Context) {
 
     private val DB_ID = "6ad5021a0029a2c88786"
     private val MESSAGES_COL_ID = "6aeb4c1600142e707a69"
-
     private val NOTIFICATIONS_COL_ID = "6aef1b7300251aa8ce5b"
 
-    /**
-     * Загружает входящие уведомления для текущего пользователя.
-     * Возвращает список AppMessage, отсортированный по времени (новые сверху).
-     */
     suspend fun getIncomingMessages(): Result<List<AppMessage>> = withContext(Dispatchers.IO) {
         val currentUserId = UserSessionManager.getCurrentUserId(context)
             ?: return@withContext Result.failure(Exception("Пользователь не авторизован"))
@@ -51,16 +45,13 @@ class NotificationsRepository(private val context: Context) {
                     timestamp = (data["timestamp"] as? Number)?.toLong() ?: 0L
                 )
             }
-
             Result.success(messages)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    /**
-     * Удаляет сообщение/уведомление по ID.
-     */
+    // ✅ УНИВЕРСАЛЬНОЕ УДАЛЕНИЕ СООБЩЕНИЙ И ЯКОРЕЙ
     suspend fun deleteMessage(messageId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             AppwriteManager.databases.deleteDocument(
@@ -73,12 +64,13 @@ class NotificationsRepository(private val context: Context) {
             Result.failure(e)
         }
     }
-    // В NotificationsRepository.kt добавь этот метод
+
+    // ✅ УДАЛЕНИЕ СИГНАЛОВ (ДЛЯ ПОЖЕЛАНИЙ)
     suspend fun deleteSignal(documentId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             AppwriteManager.databases.deleteDocument(
                 databaseId = DB_ID,
-                collectionId = NOTIFICATIONS_COL_ID, // Убедись, что константа доступна или передай её
+                collectionId = NOTIFICATIONS_COL_ID,
                 documentId = documentId
             )
             Result.success(Unit)
