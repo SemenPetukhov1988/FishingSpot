@@ -24,7 +24,6 @@ class SignalTypeBottomSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // ✅ ПОЛУЧАЕМ РЕАЛЬНОЕ ИМЯ ПОЛЬЗОВАТЕЛЯ ПРЯМО ЗДЕСЬ
         val senderName = UserSessionManager.getCurrentNickname(requireContext()) ?: "Рыбак"
         val senderId = UserSessionManager.getCurrentUserId(requireContext()) ?: ""
 
@@ -33,6 +32,7 @@ class SignalTypeBottomSheet : BottomSheetDialogFragment() {
             openRecipientSheet("on_fishing", senderName, senderId)
         }
 
+        // ✅ ДЛЯ НОВОЙ ФИЧИ ТОЖЕ ИДЕМ К ВЫБОРУ ПОЛУЧАТЕЛЯ
         binding.btnGoingFishing.setOnClickListener {
             dismiss()
             openRecipientSheet("going_fishing", senderName, senderId)
@@ -44,11 +44,10 @@ class SignalTypeBottomSheet : BottomSheetDialogFragment() {
         }
     }
 
-    // ✅ ЗАЩИТА ОТ ДУБЛЯ ШЕЙТА ПРИ БЫСТРЫХ ТАПАХ
     private fun openRecipientSheet(signalType: String, senderName: String, senderId: String) {
         if (parentFragmentManager.findFragmentByTag("recipient_sheet") != null) return
 
-        RecipientSelectionBottomSheet(
+        RecipientSelectionBottomSheet.newInstance(
             signalType = signalType,
             senderName = senderName,
             senderId = senderId

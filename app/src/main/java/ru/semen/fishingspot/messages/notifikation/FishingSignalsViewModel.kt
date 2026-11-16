@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.messages.data.FishingSignal
-import ru.semen.fishingspot.messages.notifikation.FishingSignalRepository
 
 sealed class SignalsUiState {
     object Loading : SignalsUiState()
@@ -37,16 +36,12 @@ class FishingSignalsViewModel(
         viewModelScope.launch {
             Log.d("SIGNAL_LOAD", "📤 Вызов репозитория для userId='$userId'")
             _uiState.value = SignalsUiState.Loading
-
             try {
                 val result = repository.getSignals(userId)
-                Log.d("SIGNAL_LOAD", "📥 Репозиторий вернул Result")
-
                 result.fold(
                     onSuccess = { signals ->
                         Log.d("SIGNAL_LOAD", "✅ Успех: ${signals.size} сигналов")
-                        val sorted = signals.sortedByDescending { it.createdAt }
-                        _uiState.value = SignalsUiState.Success(sorted)
+                        _uiState.value = SignalsUiState.Success(signals.sortedByDescending { it.createdAt })
                     },
                     onFailure = { error ->
                         Log.e("SIGNAL_LOAD", "❌ Ошибка репозитория: ${error.message}")
@@ -60,6 +55,7 @@ class FishingSignalsViewModel(
         }
     }
 
+    // ✅ ОБНОВЛЕННЫЙ МЕТОД С ПАРАМЕТРОМ plannedDate
     fun sendSignal(
         senderId: String,
         senderName: String,
@@ -69,11 +65,11 @@ class FishingSignalsViewModel(
         lon: Double = 0.0,
         zoom: Double = 0.0,
         messageText: String? = null,
-        anchorId: String = ""
+        anchorId: String = "",
+        plannedDate: Long = 0 // ✅ ДОБАВЛЕН ПАРАМЕТР
     ) {
         viewModelScope.launch {
             _sendState.value = SendSignalState.Sending
-
             repository.sendSignal(
                 senderId = senderId,
                 senderName = senderName,
@@ -83,12 +79,12 @@ class FishingSignalsViewModel(
                 lon = lon,
                 zoom = zoom,
                 messageText = messageText,
-                anchorId = anchorId
+                anchorId = anchorId,
+                plannedDate = plannedDate // ✅ ПЕРЕДАЧА В РЕПОЗИТОРИЙ
             ).fold(
                 onSuccess = {
                     _sendState.value = SendSignalState.Success
-                    // ✅ ФИКС: Перезагружаем ленту ОТПРАВИТЕЛЯ (senderId), где лежат якоря
-                    loadSignals(senderId)
+                    loadSignals(senderId) // Перезагружаем ленту отправителя для обновления якорей
                 },
                 onFailure = { error ->
                     _sendState.value = SendSignalState.Error(error.message ?: "Ошибка отправки")
@@ -96,11 +92,7 @@ class FishingSignalsViewModel(
             )
         }
     }
-    // В FishingSignalsViewModel.kt добавь этот метод
-    fun reloadForCurrentUser(userId: String) {
-        loadSignals(userId)
-    }
-    fun resetSendState() {
-        _sendState.value = SendSignalState.Idle
-    }
+
+    fun reloadForCurrentUser(userId: String) { loadSignals(userId) }
+    fun resetSendState() { _sendState.value = SendSignalState.Idle }
 }

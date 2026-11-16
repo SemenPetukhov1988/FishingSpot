@@ -27,16 +27,16 @@ class FishingSignalRepository {
         lon: Double = 0.0,
         zoom: Double = 0.0,
         messageText: String? = null,
-        anchorId: String = "" // Этот параметр используется только для ответов (fishing_wish)
+        anchorId: String = "",
+        plannedDate: Long = 0 // ✅ ДОБАВЛЕН ПАРАМЕТР ДАТЫ ПОЕЗДКИ
     ): Result<Int> = withContext(Dispatchers.IO) {
         try {
             var finalAnchorId = anchorId
 
-            // ✅ СОЗДАЕМ ЯКОРЬ ТОЛЬКО ДЛЯ on_fishing И ПОЛУЧАЕМ ЕГО ID
+            // ✅ СОЗДАЕМ ЯКОРЬ ТОЛЬКО ДЛЯ on_fishing И going_fishing (если нужно)
             if (type == "on_fishing") {
                 try {
                     Log.d("ANCHOR_DEBUG", "🔨 Создаём якорь для $senderId")
-
                     val anchorData = mapOf(
                         "senderId" to senderId,
                         "senderName" to senderName,
@@ -46,25 +46,20 @@ class FishingSignalRepository {
                         "timestamp" to System.currentTimeMillis(),
                         "isRead" to true
                     )
-
                     val anchorDoc = AppwriteManager.databases.createDocument(
                         databaseId = DB_ID,
                         collectionId = MESSAGES_COL_ID,
-                        documentId = ID.Companion.unique(),
+                        documentId = ID.unique(),
                         data = anchorData
                     )
-
-                    // ✅ ЯВНО ПРИСВАИВАЕМ ID ИЗ ОТВЕТА СЕРВЕРА
                     finalAnchorId = anchorDoc.id
                     Log.d("ANCHOR_DEBUG", "✅ Якорь создан. ID=$finalAnchorId")
-
                 } catch (e: Exception) {
                     Log.e("ANCHOR_DEBUG", "❌ Ошибка якоря: ${e.message}")
-                    // Если якорь не создался, finalAnchorId останется пустым или переданным
                 }
             }
 
-            // ✅ ФОРМИРУЕМ ДАННЫЕ СИГНАЛА СТРОГО ПОСЛЕ СОЗДАНИЯ ЯКОРЯ
+            // ✅ ФОРМИРУЕМ ДАННЫЕ СИГНАЛА С УЧЕТОМ ПЛАНИРУЕМОЙ ДАТЫ
             val baseData = mutableMapOf<String, Any>(
                 "senderId" to senderId,
                 "senderName" to senderName,
@@ -75,7 +70,8 @@ class FishingSignalRepository {
                 "zoom" to zoom,
                 "isRead" to false,
                 "createdAt" to Instant.now().toString(),
-                "anchorId" to finalAnchorId // ✅ ГАРАНТИРОВАННО ПРАВИЛЬНЫЙ ID
+                "anchorId" to finalAnchorId,
+                "plannedDate" to plannedDate // ✅ ЗАПИСЬ ДАТЫ В БАЗУ
             )
 
             if (!messageText.isNullOrEmpty()) {
@@ -90,26 +86,23 @@ class FishingSignalRepository {
                     collectionId = USERS_COL_ID,
                     documentId = senderId
                 )
-                val friendIds =
-                    (userDoc.data["friends"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-
+                val friendIds = (userDoc.data["friends"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
                 for (friendId in friendIds) {
                     try {
                         AppwriteManager.databases.createDocument(
                             databaseId = DB_ID,
                             collectionId = NOTIFICATIONS_COL_ID,
-                            documentId = ID.Companion.unique(),
+                            documentId = ID.unique(),
                             data = baseData + ("receiverId" to friendId)
                         )
                         successCount++
-                    } catch (_: Exception) { /* Пропускаем ошибки */
-                    }
+                    } catch (_: Exception) { /* Пропускаем ошибки отдельных отправок */ }
                 }
             } else {
                 AppwriteManager.databases.createDocument(
                     databaseId = DB_ID,
                     collectionId = NOTIFICATIONS_COL_ID,
-                    documentId = ID.Companion.unique(),
+                    documentId = ID.unique(),
                     data = baseData
                 )
                 successCount = 1
@@ -121,56 +114,49 @@ class FishingSignalRepository {
         }
     }
 
-    suspend fun getSignals(receiverId: String): Result<List<FishingSignal>> =
-        withContext(Dispatchers.IO) {
-            Log.d("REPO_SIGNALS", "📤 Запрос к Appwrite: receiverId='$receiverId'")
-
-            try {
-                val result = AppwriteManager.databases.listDocuments(
-                    databaseId = DB_ID,
-                    collectionId = NOTIFICATIONS_COL_ID,
-                    queries = listOf(
-                        Query.Companion.equal("receiverId", receiverId),
-                        Query.Companion.orderDesc("createdAt"),
-                        Query.Companion.limit(100)
-                    )
+    suspend fun getSignals(receiverId: String): Result<List<FishingSignal>> = withContext(Dispatchers.IO) {
+        Log.d("REPO_SIGNALS", "📤 Запрос к Appwrite: receiverId='$receiverId'")
+        try {
+            val result = AppwriteManager.databases.listDocuments(
+                databaseId = DB_ID,
+                collectionId = NOTIFICATIONS_COL_ID,
+                queries = listOf(
+                    Query.equal("receiverId", receiverId),
+                    Query.orderDesc("createdAt"),
+                    Query.limit(100)
                 )
+            )
+            Log.d("REPO_SIGNALS", "📥 Ответ от Appwrite: ${result.documents.size} документов")
 
-                Log.d("REPO_SIGNALS", "📥 Ответ от Appwrite: ${result.documents.size} документов")
+            val signalTypes = setOf("on_fishing", "going_fishing", "fishing_wish", "fishing_reply")
+            val signals = result.documents.mapNotNull { doc ->
+                val data = doc.data
+                val type = data["type"] as? String ?: return@mapNotNull null
+                if (type !in signalTypes) return@mapNotNull null
 
-                val signalTypes =
-                    setOf("on_fishing", "going_fishing", "fishing_wish", "fishing_reply")
-
-                val signals = result.documents.mapNotNull { doc ->
-                    val data = doc.data
-                    val type = data["type"] as? String ?: return@mapNotNull null
-
-                    if (type !in signalTypes) return@mapNotNull null
-
-                    FishingSignal(
-                        id = doc.id,
-                        senderId = data["senderId"] as? String ?: "",
-                        senderName = data["senderName"] as? String ?: "Рыбак",
-                        receiverId = data["receiverId"] as? String ?: "",
-                        type = type,
-                        lat = (data["lat"] as? Number)?.toDouble() ?: 0.0,
-                        lon = (data["lon"] as? Number)?.toDouble() ?: 0.0,
-                        zoom = (data["zoom"] as? Number)?.toDouble() ?: 0.0,
-                        messageText = data["messageText"] as? String,
-                        anchorId = data["anchorId"] as? String ?: "",
-                        isRead = data["isRead"] as? Boolean ?: false,
-                        createdAt = parseTime(data["createdAt"])
-                    )
-                }
-
-                Log.d("REPO_SIGNALS", "✅ Маппинг завершён: ${signals.size} FishingSignal объектов")
-                Result.success(signals)
-
-            } catch (e: Exception) {
-                Log.e("REPO_SIGNALS", "❌ Исключение в репозитории: ${e.message}", e)
-                Result.failure(e)
+                FishingSignal(
+                    id = doc.id,
+                    senderId = data["senderId"] as? String ?: "",
+                    senderName = data["senderName"] as? String ?: "Рыбак",
+                    receiverId = data["receiverId"] as? String ?: "",
+                    type = type,
+                    lat = (data["lat"] as? Number)?.toDouble() ?: 0.0,
+                    lon = (data["lon"] as? Number)?.toDouble() ?: 0.0,
+                    zoom = (data["zoom"] as? Number)?.toDouble() ?: 0.0,
+                    messageText = data["messageText"] as? String,
+                    anchorId = data["anchorId"] as? String ?: "",
+                    isRead = data["isRead"] as? Boolean ?: false,
+                    createdAt = parseTime(data["createdAt"]),
+                    plannedDate = (data["plannedDate"] as? Number)?.toLong() ?: 0L // ✅ БЕЗОПАСНОЕ ЧТЕНИЕ
+                )
             }
+            Log.d("REPO_SIGNALS", "✅ Маппинг завершён: ${signals.size} FishingSignal объектов")
+            Result.success(signals)
+        } catch (e: Exception) {
+            Log.e("REPO_SIGNALS", "❌ Исключение в репозитории: ${e.message}", e)
+            Result.failure(e)
         }
+    }
 
     private fun parseTime(ts: Any?): Long {
         return when (ts) {
@@ -178,5 +164,28 @@ class FishingSignalRepository {
             is String -> try { Instant.parse(ts).toEpochMilli() } catch (_: Exception) { System.currentTimeMillis() }
             else -> System.currentTimeMillis()
         }
+    }
+
+    // Метод для отдельной отправки плана (если понадобится изолированная логика)
+    suspend fun sendGoingFishingPlan(
+        senderId: String, senderName: String, receiverId: String,
+        lat: Double, lon: Double, messageText: String,
+        anchorId: String, plannedDateMillis: Long
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val signalData = mapOf(
+                "senderId" to senderId, "senderName" to senderName,
+                "receiverId" to receiverId, "type" to "going_fishing",
+                "lat" to lat, "lon" to lon, "zoom" to 16.0,
+                "messageText" to messageText, "anchorId" to anchorId,
+                "isRead" to false, "createdAt" to System.currentTimeMillis().toString(),
+                "plannedDate" to plannedDateMillis
+            )
+            AppwriteManager.databases.createDocument(
+                databaseId = DB_ID, collectionId = NOTIFICATIONS_COL_ID,
+                documentId = ID.unique(), data = signalData
+            )
+            Result.success(Unit)
+        } catch (e: Exception) { Result.failure(e) }
     }
 }

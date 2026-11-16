@@ -1,8 +1,8 @@
 package ru.semen.fishingspot.messages.data
 
 /**
- * Модель данных ТОЛЬКО для сигналов рыбалки (on_fishing, going_fishing, fishing_wish, fishing_reply)
- * Не путать с AppMessage (друзья, точки, отзывы)
+ * Модель данных ТОЛЬКО для сигналов рыбалки.
+ * Не путать с AppMessage (друзья, точки, отзывы).
  */
 data class FishingSignal(
     val id: String,                    // documentId из Appwrite
@@ -24,5 +24,9 @@ data class FishingSignal(
 
     // Метаданные
     val isRead: Boolean = false,
-    val createdAt: Long                // timestamp в миллисекундах
+    val createdAt: Long,               // Время создания сигнала
+
+    // ✅ НОВОЕ ПОЛЕ: Дата планируемой поездки (в миллисекундах)
+    // Для старых сигналов и обычных статусов будет 0
+    val plannedDate: Long = 0
 )

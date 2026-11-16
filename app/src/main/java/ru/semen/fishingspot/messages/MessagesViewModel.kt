@@ -91,26 +91,34 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
                     return@launch
                 }
 
+                // ✅ 1. СНАЧАЛА ЗАГРУЖАЕМ ДАННЫЕ С СЕРВЕРА
                 val msgResult = notificationsRepo.getIncomingMessages()
-                if (msgResult.isSuccess) {
-                    _messagesFlow.value = msgResult.getOrNull() ?: emptyList()
+                val sigResult = signalsRepo.getSignals(userId)
 
-                    // ✅ УМНАЯ ОЧИСТКА ФЛАГОВ: оставляем только те ID, которые есть на сервере
-                    val freshMsgIds = _messagesFlow.value.map { it.id }.toSet()
+                // ✅ 2. ОБНОВЛЯЕМ ПОТОКИ И УМНО ОЧИЩАЕМ ФЛАГИ ТОЛЬКО ПОСЛЕ ЗАГРУЗКИ
+                if (msgResult.isSuccess) {
+                    val freshMessages = msgResult.getOrNull() ?: emptyList()
+                    _messagesFlow.value = freshMessages
+
+                    // Оставляем флаги только для тех ID, которые реально существуют на сервере
+                    val freshMsgIds = freshMessages.map { it.id }.toSet()
                     _acceptedIds.value = _acceptedIds.value intersect freshMsgIds
                     _declinedIds.value = _declinedIds.value intersect freshMsgIds
-                    _swipedIds.value = _swipedIds.value intersect freshMsgIds
+                    _swipedIds.value = _swipedIds.value intersect freshMsgIds // ← КЛЮЧЕВОЙ ФИКС
+                } else {
+                    Log.e("MESSAGES_VM", "Ошибка загрузки сообщений: ${msgResult.exceptionOrNull()?.message}")
                 }
 
-                val sigResult = signalsRepo.getSignals(userId)
                 if (sigResult.isSuccess) {
-                    _signalsFlow.value = sigResult.getOrNull()?.sortedByDescending { it.createdAt } ?: emptyList()
+                    val freshSignals = sigResult.getOrNull()?.sortedByDescending { it.createdAt } ?: emptyList()
+                    _signalsFlow.value = freshSignals
 
-                    val freshSigIds = _signalsFlow.value.map { it.id }.toSet()
+                    val freshSigIds = freshSignals.map { it.id }.toSet()
                     _wishedIds.value = _wishedIds.value intersect freshSigIds
                     _signalsError.value = null
                 } else {
                     _signalsError.value = sigResult.exceptionOrNull()?.message ?: "Ошибка загрузки сигналов"
+                    Log.e("MESSAGES_VM", "Ошибка загрузки сигналов: ${_signalsError.value}")
                 }
             } finally {
                 _isRefreshing.value = false

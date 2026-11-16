@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Когда планируете поездку?"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="#1A1A1A"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- ✅ КАЛЕНДАРЬ ВМЕСТО ТЕКСТОВОГО ПОЛЯ -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:strokeColor="#E0E0E0"
+        app:strokeWidth="1dp">
+
+        <CalendarView
+            android:id="@+id/calendarView"
+            android:layout_width="match_parent"
+            android:layout_height="320dp"
+            android:dateTextAppearance="@style/TextAppearance.AppCompat.Medium"
+            android:weekDayTextAppearance="@style/TextAppearance.AppCompat.Small"
+            android:selectedWeekBackgroundColor="#E3F2FD"
+            android:focusedMonthDateColor="#1976D2"
+            android:unfocusedMonthDateColor="#BDBDBD"
+            android:weekSeparatorLineColor="#EEEEEE"/>
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Выбранная дата отображается под календарем для наглядности -->
+    <TextView
+        android:id="@+id/tvSelectedDateDisplay"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:layout_marginTop="12dp"
+        android:textSize="16sp"
+        android:textColor="#1976D2"
+        android:textStyle="bold"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnConfirmDate"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="24dp"
+        android:text="Подтвердить дату"
+        android:textSize="16sp"
+        app:cornerRadius="16dp"
+        app:backgroundTint="#1976D2"/>
+
+</LinearLayout>

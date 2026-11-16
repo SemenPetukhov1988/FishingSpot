@@ -96,9 +96,6 @@ class SendFishingSignalFragment : Fragment() {
         checkLocationPermission()
 
         // ✅ СБРОС СОСТОЯНИЯ ПЕРЕД ПОДПИСКОЙ
-        // Гасим протухший Success/Error от прошлой отправки,
-        // иначе новый экран мгновенно отреагирует на старое событие
-        // и уедет обратно ещё до первого взаимодействия
         signalsViewModel.resetSendState()
 
         // ✅ РЕАКТИВНАЯ ОБРАБОТКА РЕЗУЛЬТАТА ОТПРАВКИ
@@ -135,6 +132,9 @@ class SendFishingSignalFragment : Fragment() {
             val lon = mapView.mapCenter.longitude
             val zoom = mapView.zoomLevelDouble
 
+            // ✅ ИЗВЛЕКАЕМ ДАТУ ИЗ АРГУМЕНТОВ (0L если не передана)
+            val plannedDate = arguments?.getLong("planned_date_millis") ?: 0L
+
             signalsViewModel.sendSignal(
                 senderId = senderId,
                 senderName = senderName,
@@ -142,7 +142,9 @@ class SendFishingSignalFragment : Fragment() {
                 type = signalType,
                 lat = lat,
                 lon = lon,
-                zoom = zoom
+                zoom = zoom,
+                messageText = null,       // ✅ ТЕКСТА ЗДЕСЬ НЕТ
+                plannedDate = plannedDate // ✅ ДАТА ПЕРЕДАЕТСЯ В БАЗУ
             )
 
             // Навигация произойдет автоматически при успехе в observeSendResult()
