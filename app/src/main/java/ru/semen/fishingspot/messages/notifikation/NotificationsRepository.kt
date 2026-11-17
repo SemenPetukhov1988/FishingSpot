@@ -42,7 +42,8 @@ class NotificationsRepository(private val context: Context) {
                     spotLat = (data["spotLat"] as? Number)?.toDouble() ?: 0.0,
                     spotLon = (data["spotLon"] as? Number)?.toDouble() ?: 0.0,
                     contentText = data["contentText"] as? String ?: "",
-                    timestamp = (data["timestamp"] as? Number)?.toLong() ?: 0L
+                    timestamp = (data["timestamp"] as? Number)?.toLong() ?: 0L,
+                    plannedDate = (data["plannedDate"] as? Number)?.toLong() ?: 0L
                 )
             }
             Result.success(messages)

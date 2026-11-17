@@ -28,38 +28,58 @@ class FishingSignalRepository {
         zoom: Double = 0.0,
         messageText: String? = null,
         anchorId: String = "",
-        plannedDate: Long = 0 // ✅ ДОБАВЛЕН ПАРАМЕТР ДАТЫ ПОЕЗДКИ
-    ): Result<Int> = withContext(Dispatchers.IO) {
+        plannedDate: Long = 0,
+        requestComment: String? = null
+    ): Result<Pair<Int, String?>> = withContext(Dispatchers.IO) {
+        Log.d("SEND_SIGNAL_DEBUG", "📥 Получены параметры: type='$type', sender='$senderName', receiver='$receiverId'")
         try {
             var finalAnchorId = anchorId
 
-            // ✅ СОЗДАЕМ ЯКОРЬ ТОЛЬКО ДЛЯ on_fishing И going_fishing (если нужно)
-            if (type == "on_fishing") {
+            if (type == "on_fishing" || type == "going_fishing" || type == "request_spot") {
                 try {
-                    Log.d("ANCHOR_DEBUG", "🔨 Создаём якорь для $senderId")
+                    val anchorType = when (type) {
+                        "on_fishing" -> "ANCHOR_ON_FISHING"
+                        "going_fishing" -> "ANCHOR_GOING_FISHING"
+                        else -> "ANCHOR_SPOT_REQUEST"
+                    }
+
+                    val anchorText = when (type) {
+                        "on_fishing" -> "Вы отправили сообщение ${if (receiverId == "all") "друзьям" else "другу"}, что Вы на рыбалке"
+                        "going_fishing" -> "Запрос отправлен ${if (receiverId == "all") "друзьям" else "другу"}: стоит ли ехать на рыбалку?"
+                        else -> "Просьба порекомендовать место для рыбалки отправлена ${if (receiverId == "all") "друзьям" else "другу"}"
+                    }
+
+                    Log.d("ANCHOR_DEBUG", "🔨 Создаём якорь [$anchorType] для $senderId")
+
                     val anchorData = mapOf(
                         "senderId" to senderId,
                         "senderName" to senderName,
                         "recipientId" to senderId,
-                        "type" to "ANCHOR_ON_FISHING",
-                        "contentText" to "Вы отправили сообщение ${if (receiverId == "all") "друзьям" else "другу"} что Вы на рыбалке",
+                        "type" to anchorType,
+                        "contentText" to anchorText,
+                        "spotLat" to lat,
+                        "spotLon" to lon,
+                        "plannedDate" to plannedDate,
                         "timestamp" to System.currentTimeMillis(),
-                        "isRead" to true
+                        "isRead" to true,
+                        "requestComment" to (if (type == "request_spot") requestComment.orEmpty() else "")
                     )
+
                     val anchorDoc = AppwriteManager.databases.createDocument(
                         databaseId = DB_ID,
                         collectionId = MESSAGES_COL_ID,
                         documentId = ID.unique(),
                         data = anchorData
                     )
+
                     finalAnchorId = anchorDoc.id
                     Log.d("ANCHOR_DEBUG", "✅ Якорь создан. ID=$finalAnchorId")
+
                 } catch (e: Exception) {
                     Log.e("ANCHOR_DEBUG", "❌ Ошибка якоря: ${e.message}")
                 }
             }
 
-            // ✅ ФОРМИРУЕМ ДАННЫЕ СИГНАЛА С УЧЕТОМ ПЛАНИРУЕМОЙ ДАТЫ
             val baseData = mutableMapOf<String, Any>(
                 "senderId" to senderId,
                 "senderName" to senderName,
@@ -71,7 +91,7 @@ class FishingSignalRepository {
                 "isRead" to false,
                 "createdAt" to Instant.now().toString(),
                 "anchorId" to finalAnchorId,
-                "plannedDate" to plannedDate // ✅ ЗАПИСЬ ДАТЫ В БАЗУ
+                "plannedDate" to plannedDate
             )
 
             if (!messageText.isNullOrEmpty()) {
@@ -96,7 +116,7 @@ class FishingSignalRepository {
                             data = baseData + ("receiverId" to friendId)
                         )
                         successCount++
-                    } catch (_: Exception) { /* Пропускаем ошибки отдельных отправок */ }
+                    } catch (_: Exception) { /* Пропускаем ошибки */ }
                 }
             } else {
                 AppwriteManager.databases.createDocument(
@@ -108,14 +128,15 @@ class FishingSignalRepository {
                 successCount = 1
             }
 
-            Result.success(successCount)
+            Result.success(Pair(successCount, finalAnchorId))
         } catch (e: Exception) {
+            Log.e("SEND_SIGNAL_DEBUG", "❌ Критическая ошибка: ${e.message}", e)
             Result.failure(e)
         }
     }
 
     suspend fun getSignals(receiverId: String): Result<List<FishingSignal>> = withContext(Dispatchers.IO) {
-        Log.d("REPO_SIGNALS", "📤 Запрос к Appwrite: receiverId='$receiverId'")
+        Log.d("SIGNALS_DEBUG", "📤 Запрос к Appwrite: receiverId='$receiverId'")
         try {
             val result = AppwriteManager.databases.listDocuments(
                 databaseId = DB_ID,
@@ -126,12 +147,21 @@ class FishingSignalRepository {
                     Query.limit(100)
                 )
             )
-            Log.d("REPO_SIGNALS", "📥 Ответ от Appwrite: ${result.documents.size} документов")
 
-            val signalTypes = setOf("on_fishing", "going_fishing", "fishing_wish", "fishing_reply")
+            // ✅ ВРЕМЕННЫЙ ЛОГ ДЛЯ ДИАГНОСТИКИ ПРИХОДЯЩИХ ДОКУМЕНТОВ
+            Log.d("SIGNALS_DEBUG", "📥 Получено ${result.documents.size} документов от сервера")
+            result.documents.forEach { doc ->
+                Log.d("SIGNALS_DEBUG", "   - type='${doc.data["type"]}', sender='${doc.data["senderName"]}'")
+            }
+
+            // ✅ ИСПРАВЛЕНИЕ: ДОБАВЛЕН request_spot В РАЗРЕШЕННЫЕ ТИПЫ
+            val signalTypes = setOf("on_fishing", "going_fishing", "fishing_wish", "fishing_reply", "request_spot")
+
             val signals = result.documents.mapNotNull { doc ->
                 val data = doc.data
                 val type = data["type"] as? String ?: return@mapNotNull null
+
+                // Если тип не входит в разрешенный список, документ пропускается
                 if (type !in signalTypes) return@mapNotNull null
 
                 FishingSignal(
@@ -147,13 +177,49 @@ class FishingSignalRepository {
                     anchorId = data["anchorId"] as? String ?: "",
                     isRead = data["isRead"] as? Boolean ?: false,
                     createdAt = parseTime(data["createdAt"]),
-                    plannedDate = (data["plannedDate"] as? Number)?.toLong() ?: 0L // ✅ БЕЗОПАСНОЕ ЧТЕНИЕ
+                    plannedDate = (data["plannedDate"] as? Number)?.toLong() ?: 0L
                 )
             }
-            Log.d("REPO_SIGNALS", "✅ Маппинг завершён: ${signals.size} FishingSignal объектов")
+
+            Log.d("SIGNALS_DEBUG", "✅ После фильтрации осталось ${signals.size} сигналов")
             Result.success(signals)
         } catch (e: Exception) {
-            Log.e("REPO_SIGNALS", "❌ Исключение в репозитории: ${e.message}", e)
+            Log.e("SIGNALS_DEBUG", "❌ Исключение в репозитории: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun sendReply(
+        anchorId: String,
+        senderId: String,
+        senderName: String,
+        receiverId: String,
+        replyText: String
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            if (anchorId.isEmpty()) {
+                return@withContext Result.failure(Exception("Ошибка привязки к запросу"))
+            }
+
+            val data = mapOf(
+                "senderId" to senderId,
+                "senderName" to senderName,
+                "receiverId" to receiverId,
+                "type" to "fishing_reply",
+                "anchorId" to anchorId,
+                "messageText" to replyText,
+                "isRead" to false,
+                "createdAt" to java.time.Instant.now().toString()
+            )
+
+            AppwriteManager.databases.createDocument(
+                databaseId = DB_ID,
+                collectionId = NOTIFICATIONS_COL_ID,
+                documentId = ID.unique(),
+                data = data
+            )
+            Result.success(Unit)
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }
@@ -166,26 +232,16 @@ class FishingSignalRepository {
         }
     }
 
-    // Метод для отдельной отправки плана (если понадобится изолированная логика)
-    suspend fun sendGoingFishingPlan(
-        senderId: String, senderName: String, receiverId: String,
-        lat: Double, lon: Double, messageText: String,
-        anchorId: String, plannedDateMillis: Long
-    ): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun deleteSignal(signalId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val signalData = mapOf(
-                "senderId" to senderId, "senderName" to senderName,
-                "receiverId" to receiverId, "type" to "going_fishing",
-                "lat" to lat, "lon" to lon, "zoom" to 16.0,
-                "messageText" to messageText, "anchorId" to anchorId,
-                "isRead" to false, "createdAt" to System.currentTimeMillis().toString(),
-                "plannedDate" to plannedDateMillis
-            )
-            AppwriteManager.databases.createDocument(
-                databaseId = DB_ID, collectionId = NOTIFICATIONS_COL_ID,
-                documentId = ID.unique(), data = signalData
+            AppwriteManager.databases.deleteDocument(
+                databaseId = DB_ID,
+                collectionId = NOTIFICATIONS_COL_ID,
+                documentId = signalId
             )
             Result.success(Unit)
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

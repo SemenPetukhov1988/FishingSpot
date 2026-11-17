@@ -11,17 +11,28 @@ data class FriendMessageItem(val message: AppMessage) : FeedItem {
 }
 
 /**
- * Группа: Якорь (сообщение отправителя) + его ответы (пожелания)
+ * Группа: Якорь "Я на рыбалке" (AppMessage) + ответы
  */
 data class AnchorGroupItem(
-    val anchorMessage: AppMessage,        // Сообщение "Вы отправили..."
-    val replies: List<FishingSignal> = emptyList(), // Пожелания fishing_wish
+    val anchorMessage: AppMessage,
+    val replies: List<FishingSignal> = emptyList(),
     override val timestamp: Long = anchorMessage.timestamp
 ) : FeedItem
 
 /**
- * Обычный сигнал on_fishing для получателя (без ответов внутри)
+ * ✅ СПЕЦИАЛЬНЫЙ ЭЛЕМЕНТ ДЛЯ ЯКОРЯ "СТОИТ ЛИ ЕХАТЬ?"
+ * Исправлено: убрано дублирование timestamp
  */
+data class GoingFishingAnchorItem(
+    val id: String,
+    val contentText: String,
+    val spotLat: Double,
+    val spotLon: Double,
+    val plannedDate: Long,
+    override val timestamp: Long, // ✅ ИСПОЛЬЗУЕМ OVERRIDE ПРЯМО В КОНСТРУКТОРЕ
+    val replies: List<FishingSignal> = emptyList()
+) : FeedItem
+
 data class SignalItem(val signal: FishingSignal) : FeedItem {
     override val timestamp = signal.createdAt
 }

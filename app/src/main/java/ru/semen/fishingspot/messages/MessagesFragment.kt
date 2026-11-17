@@ -19,7 +19,13 @@ import ru.semen.fishingspot.feature_messages.viewmodel.MessagesViewModel
 import ru.semen.fishingspot.feature_messages.viewmodel.MessagesUiState
 import ru.semen.fishingspot.messages.adapter.MessagesAdapter
 import ru.semen.fishingspot.messages.data.AnchorGroupItem
+import ru.semen.fishingspot.messages.data.FeedItem
 import ru.semen.fishingspot.messages.data.FriendMessageItem
+import ru.semen.fishingspot.messages.data.GoingFishingAnchorItem
+import ru.semen.fishingspot.messages.data.SignalItem
+import ru.semen.fishingspot.messages.notifikation.RecommendSpotDateBottomSheet
+import ru.semen.fishingspot.messages.notifikation.ReplyToPlanDialog
+import ru.semen.fishingspot.messages.notifikation.gofishing.ViewSpotMapDialog
 import ru.semen.fishingspot.messages.notifikation.onfishing.NotificationMapPreviewDialog
 import ru.semen.fishingspot.utils.UserSessionManager
 
@@ -29,7 +35,9 @@ class MessagesFragment : Fragment() {
     private val binding get() = _binding!!
     private val messagesViewModel: MessagesViewModel by viewModels()
     private lateinit var adapter: MessagesAdapter
-    private var isMapDialogShowing = false
+
+    // ✅ ID элементов ленты с прошлой загрузки — для поиска новых
+    private var knownItemIds: Set<String> = emptySet()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentMessagesBinding.inflate(inflater, container, false)
@@ -42,6 +50,16 @@ class MessagesFragment : Fragment() {
         setupSwipeToDelete()
         observeState()
 
+        // ✅ Слушаем ту же шину, куда шторка отправляет результат (childFragmentManager)
+        childFragmentManager.setFragmentResultListener(
+            RecommendSpotDateBottomSheet.RESULT_KEY,
+            viewLifecycleOwner
+        ) { _: String, bundle: Bundle ->
+            if (bundle.getBoolean("refresh_feed", false)) {
+                messagesViewModel.refreshData()
+            }
+        }
+
         binding.fabAddMessage.setOnClickListener {
             SignalTypeBottomSheet().show(childFragmentManager, "signal_type_sheet")
         }
@@ -50,6 +68,16 @@ class MessagesFragment : Fragment() {
             messagesViewModel.refreshData()
         }
     }
+
+    // ✅ Единый способ получить id элемента ленты без изменения FeedItem
+    // ✅ Единый способ получить id элемента ленты без изменения FeedItem
+    private fun feedId(item: FeedItem): String = when (item) {
+        is FriendMessageItem -> item.message.id
+        is AnchorGroupItem -> item.anchorMessage.id
+        is GoingFishingAnchorItem -> item.id          // ← id лежит прямо в элементе
+        is SignalItem -> item.signal.id
+    }
+
 
     private fun setupAdapter() {
         adapter = MessagesAdapter(
@@ -61,8 +89,19 @@ class MessagesFragment : Fragment() {
                 Toast.makeText(requireContext(), "Профиль: $name", Toast.LENGTH_SHORT).show()
             },
             onShowMapClick = { item ->
-                if (isMapDialogShowing) return@MessagesAdapter
-                // Логика карты для сигналов при необходимости
+                // ✅ Проверка через Fragment Manager (надежно работает при любом закрытии)
+                if (childFragmentManager.findFragmentByTag("notification_map_preview") != null) {
+                    return@MessagesAdapter
+                }
+
+                val signalItem = item as? SignalItem ?: return@MessagesAdapter
+                val signal = signalItem.signal
+
+                NotificationMapPreviewDialog.newInstance(
+                    lat = signal.lat,
+                    lon = signal.lon,
+                    name = signal.senderName.ifEmpty { "Рыбак" }
+                ).show(childFragmentManager, "notification_map_preview")
             },
             onWishGoodFishingClick = { anchorId, receiverId ->
                 val userId = UserSessionManager.getCurrentUserId(requireContext()) ?: return@MessagesAdapter
@@ -75,13 +114,27 @@ class MessagesFragment : Fragment() {
             },
             onDeleteMessageClick = { messageId ->
                 messagesViewModel.declineRequest(messageId)
+            },
+            onShowDetailsClick = { lat, lon, dateMillis ->
+                ViewSpotMapDialog.newInstance(lat, lon, dateMillis)
+                    .show(childFragmentManager, "view_spot_map")
+            },
+            onReplyToGoingFishingClick = { lat, lon, anchorId, senderId ->
+                ReplyToPlanDialog.newInstance(anchorId, senderId, lat, lon)
+                    .show(childFragmentManager, "reply_to_plan")
+            },
+            onRecommendSpotClick = { anchorId, senderId ->
+                Toast.makeText(
+                    requireContext(),
+                    "Открывается выбор точки... (якорь: ${anchorId.take(6)}...)",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         )
         binding.rvMessages.layoutManager = LinearLayoutManager(requireContext())
         binding.rvMessages.adapter = adapter
     }
 
-    // ✅ СВАЙП ЧЕРЕЗ ПУБЛИЧНЫЙ МЕТОД АДАПТЕРА
     private fun setupSwipeToDelete() {
         val swipeHandler = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
             override fun onMove(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder) = false
@@ -89,16 +142,13 @@ class MessagesFragment : Fragment() {
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val position = viewHolder.bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
-                    // ✅ ИСПОЛЬЗУЕМ getItemAt ВМЕСТО ЗАЩИЩЕННОГО getItem
-                    val item = adapter.getItemAt(position)
+                    val item = adapter.getItemAt(position) ?: return
 
-                    val messageId = when (item) {
-                        is FriendMessageItem -> item.message.id
-                        is AnchorGroupItem -> item.anchorMessage.id
-                        else -> null
-                    }
+                    val currentList = adapter.currentList.toMutableList()
+                    currentList.removeAt(position)
+                    adapter.submitList(currentList)
 
-                    messageId?.let { messagesViewModel.swipeToDelete(it) }
+                    messagesViewModel.swipeToDelete(item)
                 }
             }
         }
@@ -117,11 +167,28 @@ class MessagesFragment : Fragment() {
                     messagesViewModel.uiState.collect { state ->
                         when (state) {
                             is MessagesUiState.Success -> {
-                                adapter.submitList(state.feedItems)
+                                val newList = state.feedItems
+
+                                // ✅ Ищем элементы, которых не было в прошлый раз
+                                val newIds = newList.map { feedId(it) }.toSet() - knownItemIds
+                                val isNewContent = knownItemIds.isNotEmpty() && newIds.isNotEmpty()
+                                knownItemIds = newIds
+
+                                adapter.submitList(newList) {
+                                    if (isNewContent) {
+                                        // Самый свежий новый элемент — плавно к нему
+                                        val position = newList.indexOfFirst { feedId(it) == newIds.first() }
+                                        if (position >= 0) {
+                                            binding.rvMessages.smoothScrollToPosition(position)
+                                        }
+                                    }
+                                }
+
                                 binding.layoutEmptyState.visibility =
-                                    if (state.feedItems.isEmpty()) View.VISIBLE else View.GONE
+                                    if (newList.isEmpty()) View.VISIBLE else View.GONE
                                 binding.rvMessages.visibility =
-                                    if (state.feedItems.isEmpty()) View.GONE else View.VISIBLE
+                                    if (newList.isEmpty()) View.GONE else View.VISIBLE
+
                                 state.signalsError?.let {
                                     Toast.makeText(requireContext(), "Сигналы: $it", Toast.LENGTH_SHORT).show()
                                 }

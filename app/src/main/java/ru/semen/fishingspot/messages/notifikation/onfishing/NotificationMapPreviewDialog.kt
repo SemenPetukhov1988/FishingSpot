@@ -48,7 +48,6 @@ class NotificationMapPreviewDialog : BottomSheetDialogFragment() {
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        // ✅ ИСПОЛЬЗУЕМ НОВУЮ РАЗМЕТКУ
         _binding = DialogNotificationMapPreviewBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -64,6 +63,7 @@ class NotificationMapPreviewDialog : BottomSheetDialogFragment() {
     }
 
     private fun initMapAndUI() {
+        // ✅ ИСПРАВЛЕНИЕ: Создаем карту только если её нет
         if (mapView == null) {
             mapView = MapView(requireContext()).apply {
                 setTileSource(TileSourceFactory.MAPNIK)
@@ -71,25 +71,23 @@ class NotificationMapPreviewDialog : BottomSheetDialogFragment() {
                 setBackgroundColor(Color.parseColor("#EAEFF5"))
             }
             binding.mapContainer.addView(mapView, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        }
 
-            // Кнопка закрытия
-            binding.btnCancelMapPreview.setOnClickListener { dismiss() }
+        // ✅ ИСПРАВЛЕНИЕ: Настраиваем UI ПРИ КАЖДОМ открытии (кнопки, текст, маркер)
+        binding.btnCancelMapPreview.setOnClickListener { dismiss() }
 
-            // ✅ ПОКАЗЫВАЕМ КНОПКУ НАВИГАЦИИ И ВЕШАЕМ ИНТЕНТ
-            binding.btnNavigateToSpot.apply {
-                visibility = View.VISIBLE
-                setOnClickListener {
-                    val uri = Uri.parse("geo:${signalLat},${signalLon}?q=${signalLat},${signalLon}(${senderName})")
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, uri))
-                    } catch (e: Exception) {
-                        Toast.makeText(requireContext(), "Не удалось открыть карты", Toast.LENGTH_SHORT).show()
-                    }
+        binding.btnNavigateToSpot.apply {
+            visibility = View.VISIBLE
+            setOnClickListener {
+                val uri = Uri.parse("geo:${signalLat},${signalLon}?q=${signalLat},${signalLon}(${senderName})")
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, uri))
+                } catch (e: Exception) {
+                    Toast.makeText(requireContext(), "Не удалось открыть карты", Toast.LENGTH_SHORT).show()
                 }
             }
         }
 
-        // Обновляем UI
         binding.tvMapDialogTitle.text = "📍 $senderName сейчас здесь"
 
         mapView?.controller?.setCenter(GeoPoint(signalLat, signalLon))
@@ -113,13 +111,11 @@ class NotificationMapPreviewDialog : BottomSheetDialogFragment() {
             bottomSheet?.let { sheet ->
                 val behavior = BottomSheetBehavior.from(sheet)
 
-                // Высота 2/3 экрана
                 val displayMetrics = resources.displayMetrics
                 val twoThirdsHeight = (displayMetrics.heightPixels * 2 / 3).toInt()
                 sheet.layoutParams.height = twoThirdsHeight
                 sheet.requestLayout()
 
-                // Блокируем свайп
                 behavior.state = BottomSheetBehavior.STATE_EXPANDED
                 behavior.skipCollapsed = true
                 behavior.isDraggable = false

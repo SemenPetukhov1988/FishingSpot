@@ -27,17 +27,19 @@ class SignalTypeBottomSheet : BottomSheetDialogFragment() {
         val senderName = UserSessionManager.getCurrentNickname(requireContext()) ?: "Рыбак"
         val senderId = UserSessionManager.getCurrentUserId(requireContext()) ?: ""
 
+        // ✅ ИСПРАВЛЕНО: Вернул правильный тип для "Я на рыбалке"
         binding.btnOnFishing.setOnClickListener {
             dismiss()
             openRecipientSheet("on_fishing", senderName, senderId)
         }
 
-        // ✅ ДЛЯ НОВОЙ ФИЧИ ТОЖЕ ИДЕМ К ВЫБОРУ ПОЛУЧАТЕЛЯ
+        // ✅ ИСПРАВЛЕНО: Вернул правильный тип для "Стоит ли ехать?"
         binding.btnGoingFishing.setOnClickListener {
             dismiss()
             openRecipientSheet("going_fishing", senderName, senderId)
         }
 
+        // ✅ НОВАЯ ФИЧА: Тип request_spot (как в репозитории и Enum)
         binding.btnRequestSpot.setOnClickListener {
             dismiss()
             openRecipientSheet("request_spot", senderName, senderId)

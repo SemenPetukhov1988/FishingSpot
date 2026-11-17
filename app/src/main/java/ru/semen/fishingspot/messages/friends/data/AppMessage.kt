@@ -25,7 +25,9 @@ data class AppMessage(
     val customMessage: String = "",
 
     val isRead: Boolean = false,
-    val timestamp: Long = 0L
+    val timestamp: Long = 0L,
+
+    val plannedDate: Long = 0
 )
 
 enum class MessageType(val value: String) {

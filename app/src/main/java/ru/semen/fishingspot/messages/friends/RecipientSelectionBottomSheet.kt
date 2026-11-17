@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.BottomSheetRecipientSelectionBinding
 import ru.semen.fishingspot.messages.notifikation.DateSelectionBottomSheet
+import ru.semen.fishingspot.messages.notifikation.RecommendSpotDateBottomSheet // ✅ Добавлен импорт
 import ru.semen.fishingspot.utils.AppwriteManager
 import ru.semen.fishingspot.utils.UserSessionManager
 
@@ -65,34 +66,47 @@ class RecipientSelectionBottomSheet : BottomSheetDialogFragment() {
         loadFriends()
     }
 
-    // ✅ ИСПРАВЛЕННАЯ ЛОГИКА ПЕРЕХОДА
+    // ✅ ИСПРАВЛЕННАЯ ЛОГИКА ПЕРЕХОДА С ПОДДЕРЖКОЙ REQUEST_SPOT
     private fun handleFriendSelected(receiverId: String, signalType: String, senderName: String, senderId: String) {
         dismiss()
 
-        if (signalType == "going_fishing") {
-            // НОВАЯ ЦЕПОЧКА: Идем к выбору даты
-            DateSelectionBottomSheet.newInstance().apply {
-                arguments = Bundle().apply {
-                    putString("signal_type", signalType)
-                    putString("sender_name", senderName)
-                    putString("sender_id", senderId)
-                    putString("receiver_id", receiverId)
-                }
-            }.show(parentFragmentManager, "date_selection")
-
-        } else {
-            // СТАРАЯ ЛОГИКА: Сразу идем на карту для on_fishing и других типов
-            val bundle = Bundle().apply {
-                putString("signal_type", signalType)
-                putString("receiver_id", receiverId)
-                putString("sender_name", senderName)
-                putString("sender_id", senderId)
+        when (signalType) {
+            "going_fishing" -> {
+                // ЦЕПОЧКА ДЛЯ "СТОИТ ЛИ ЕХАТЬ?": Календарь -> Карта
+                DateSelectionBottomSheet.newInstance().apply {
+                    arguments = Bundle().apply {
+                        putString("signal_type", signalType)
+                        putString("sender_name", senderName)
+                        putString("sender_id", senderId)
+                        putString("receiver_id", receiverId)
+                    }
+                }.show(parentFragmentManager, "date_selection")
             }
 
-            try {
-                findNavController().navigate(R.id.sendFishingSignalFragment, bundle)
-            } catch (e: Exception) {
-                Log.e("RECIPIENT_SHEET", "Ошибка навигации на карту: ${e.message}", e)
+            "request_spot" -> {
+                // ✅ НОВАЯ ЦЕПОЧКА: Календарь + Комментарий -> Сразу отправка (без карты)
+                RecommendSpotDateBottomSheet.newInstance(
+                    signalType = signalType,
+                    senderName = senderName,
+                    senderId = senderId,
+                    receiverId = receiverId
+                ).show(parentFragmentManager, "recommend_spot_date")
+            }
+
+            else -> {
+                // СТАРАЯ ЛОГИКА: Сразу идем на карту для on_fishing и других типов
+                val bundle = Bundle().apply {
+                    putString("signal_type", signalType)
+                    putString("receiver_id", receiverId)
+                    putString("sender_name", senderName)
+                    putString("sender_id", senderId)
+                }
+
+                try {
+                    findNavController().navigate(R.id.sendFishingSignalFragment, bundle)
+                } catch (e: Exception) {
+                    Log.e("RECIPIENT_SHEET", "Ошибка навигации на карту: ${e.message}", e)
+                }
             }
         }
     }

@@ -6,7 +6,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-
 import ru.semen.fishingspot.feature_messages.notifications.repository.NotificationsRepository
 import ru.semen.fishingspot.messages.data.*
 import ru.semen.fishingspot.messages.friends.data.AppMessage
@@ -31,11 +30,10 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
     private val _signalsError = MutableStateFlow<String?>(null)
     private val _isRefreshing = MutableStateFlow(false)
 
-    // ✅ ОПТИМИСТИЧНЫЕ ФЛАГИ
     private val _acceptedIds = MutableStateFlow<Set<String>>(emptySet())
     private val _declinedIds = MutableStateFlow<Set<String>>(emptySet())
     private val _wishedIds = MutableStateFlow<Set<String>>(emptySet())
-    private val _swipedIds = MutableStateFlow<Set<String>>(emptySet()) // ✅ НОВЫЙ ФЛАГ ДЛЯ СВАЙПОВ
+    private val _swipedIds = MutableStateFlow<Set<String>>(emptySet())
 
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
@@ -43,7 +41,7 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
         val accepted: Set<String> = emptySet(),
         val declined: Set<String> = emptySet(),
         val wished: Set<String> = emptySet(),
-        val swiped: Set<String> = emptySet() // ✅ ДОБАВЛЕНО В DATA CLASS
+        val swiped: Set<String> = emptySet()
     )
 
     private val flagsFlow = combine(_acceptedIds, _declinedIds, _wishedIds, _swipedIds) { a, d, w, s ->
@@ -51,34 +49,21 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
     }
 
     val uiState: StateFlow<MessagesUiState> = combine(
-        _messagesFlow,
-        _signalsFlow,
-        _signalsError,
-        flagsFlow
-    ) { messages: List<AppMessage>,
-        signals: List<FishingSignal>,
-        sigError: String?,
-        flags: ActionFlags ->
-
+        _messagesFlow, _signalsFlow, _signalsError, flagsFlow
+    ) { messages, signals, sigError, flags ->
         val filteredMessages = messages.filter {
             it.id !in flags.accepted && it.id !in flags.declined && it.id !in flags.swiped
         }
         val visibleSignals = signals.filterNot {
             it.type == "on_fishing" && it.id in flags.wished
         }
-
         val feedItems = buildFeedList(filteredMessages, visibleSignals)
 
-        if (feedItems.isEmpty() && sigError != null) {
-            MessagesUiState.Error(sigError)
-        } else {
-            MessagesUiState.Success(feedItems, sigError)
-        }
+        if (feedItems.isEmpty() && sigError != null) MessagesUiState.Error(sigError)
+        else MessagesUiState.Success(feedItems, sigError)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MessagesUiState.Loading)
 
-    init {
-        loadData()
-    }
+    init { loadData() }
 
     fun loadData() {
         viewModelScope.launch {
@@ -91,34 +76,26 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
                     return@launch
                 }
 
-                // ✅ 1. СНАЧАЛА ЗАГРУЖАЕМ ДАННЫЕ С СЕРВЕРА
                 val msgResult = notificationsRepo.getIncomingMessages()
                 val sigResult = signalsRepo.getSignals(userId)
 
-                // ✅ 2. ОБНОВЛЯЕМ ПОТОКИ И УМНО ОЧИЩАЕМ ФЛАГИ ТОЛЬКО ПОСЛЕ ЗАГРУЗКИ
                 if (msgResult.isSuccess) {
                     val freshMessages = msgResult.getOrNull() ?: emptyList()
                     _messagesFlow.value = freshMessages
-
-                    // Оставляем флаги только для тех ID, которые реально существуют на сервере
                     val freshMsgIds = freshMessages.map { it.id }.toSet()
                     _acceptedIds.value = _acceptedIds.value intersect freshMsgIds
                     _declinedIds.value = _declinedIds.value intersect freshMsgIds
-                    _swipedIds.value = _swipedIds.value intersect freshMsgIds // ← КЛЮЧЕВОЙ ФИКС
-                } else {
-                    Log.e("MESSAGES_VM", "Ошибка загрузки сообщений: ${msgResult.exceptionOrNull()?.message}")
+                    _swipedIds.value = _swipedIds.value intersect freshMsgIds
                 }
 
                 if (sigResult.isSuccess) {
                     val freshSignals = sigResult.getOrNull()?.sortedByDescending { it.createdAt } ?: emptyList()
                     _signalsFlow.value = freshSignals
-
                     val freshSigIds = freshSignals.map { it.id }.toSet()
                     _wishedIds.value = _wishedIds.value intersect freshSigIds
                     _signalsError.value = null
                 } else {
                     _signalsError.value = sigResult.exceptionOrNull()?.message ?: "Ошибка загрузки сигналов"
-                    Log.e("MESSAGES_VM", "Ошибка загрузки сигналов: ${_signalsError.value}")
                 }
             } finally {
                 _isRefreshing.value = false
@@ -130,49 +107,86 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
         val anchorsMap = mutableMapOf<String, MutableList<FishingSignal>>()
         val anchorIds = mutableSetOf<String>()
 
+        // ✅ ДОБАВЛЕН ANCHOR_SPOT_REQUEST В УСЛОВИЕ СБОРА ЯКОРЕЙ
         messages.forEach { msg ->
-            if (msg.type == "ANCHOR_ON_FISHING") {
+            if (msg.type == "ANCHOR_ON_FISHING" || msg.type == "ANCHOR_GOING_FISHING" || msg.type == "ANCHOR_SPOT_REQUEST") {
                 anchorsMap[msg.id] = mutableListOf()
                 anchorIds.add(msg.id)
             }
         }
 
         signals.forEach { signal ->
-            if (signal.type == "fishing_wish" && signal.anchorId.isNotEmpty()) {
+            if ((signal.type == "fishing_wish" || signal.type == "fishing_reply") && signal.anchorId.isNotEmpty()) {
                 anchorsMap[signal.anchorId]?.add(signal)
             }
         }
 
         val feedItems = mutableListOf<FeedItem>()
-        messages.filter { it.type != "ANCHOR_ON_FISHING" }.forEach { msg ->
+
+        // ✅ ИСКЛЮЧАЕМ ВСЕ ТРИ ТИПА ЯКОРЕЙ ИЗ ОБЫЧНЫХ СООБЩЕНИЙ
+        messages.filter {
+            it.type != "ANCHOR_ON_FISHING" &&
+                    it.type != "ANCHOR_GOING_FISHING" &&
+                    it.type != "ANCHOR_SPOT_REQUEST"
+        }.forEach { msg ->
             feedItems.add(FriendMessageItem(msg))
         }
 
+        // ✅ РАЗДЕЛЯЕМ СОЗДАНИЕ ЯКОРЕЙ ПО ТИПУ
         anchorIds.forEach { anchorId ->
-            val anchorMsg = messages.find { it.id == anchorId }
-            if (anchorMsg != null) {
-                val replies = anchorsMap[anchorId]?.sortedBy { it.createdAt } ?: emptyList()
-                feedItems.add(AnchorGroupItem(anchorMsg, replies))
+            val anchorMsg = messages.find { it.id == anchorId } ?: return@forEach
+            val replies = anchorsMap[anchorId]?.sortedBy { it.createdAt } ?: emptyList()
+
+            when (anchorMsg.type) {
+                "ANCHOR_GOING_FISHING" -> {
+                    feedItems.add(GoingFishingAnchorItem(
+                        id = anchorMsg.id,
+                        contentText = anchorMsg.contentText,
+                        spotLat = anchorMsg.spotLat,
+                        spotLon = anchorMsg.spotLon,
+                        plannedDate = anchorMsg.plannedDate,
+                        timestamp = anchorMsg.timestamp,
+                        replies = replies
+                    ))
+                }
+                // ✅ НОВЫЙ ТИП ЯКОРЯ ОТОБРАЖАЕТСЯ КАК ОБЫЧНАЯ ГРУППА С ОТВЕТАМИ
+                "ANCHOR_SPOT_REQUEST" -> {
+                    feedItems.add(AnchorGroupItem(anchorMsg, replies))
+                }
+                else -> {
+                    feedItems.add(AnchorGroupItem(anchorMsg, replies))
+                }
             }
         }
 
-        signals.filter { it.type == "on_fishing" }.forEach { sig ->
+        // ✅ ДОБАВЛЕН spot_request В ФИЛЬТР СИГНАЛОВ ДЛЯ ПОЛУЧАТЕЛЯ
+        signals.filter {
+            it.type == "on_fishing" ||
+                    it.type == "going_fishing" ||
+                    it.type == "request_spot" // ← ОБЯЗАТЕЛЬНО ДОБАВИТЬ ЭТОТ ТИП
+        }.forEach { sig ->
             feedItems.add(SignalItem(sig))
         }
 
         return feedItems.sortedByDescending { it.timestamp }
     }
 
-    // ✅ МЕТОД ДЛЯ СВАЙПА
-    fun swipeToDelete(messageId: String) {
-        _swipedIds.value = _swipedIds.value + messageId
+    fun swipeToDelete(item: FeedItem) {
+        val id = when (item) {
+            is FriendMessageItem -> item.message.id
+            is AnchorGroupItem -> item.anchorMessage.id
+            is GoingFishingAnchorItem -> item.id
+            is SignalItem -> item.signal.id
+            else -> null
+        } ?: return
 
         viewModelScope.launch {
-            notificationsRepo.deleteMessage(messageId)
-                .onFailure { e ->
-                    Log.e("MESSAGES_VM", "Ошибка удаления по свайпу: ${e.message}")
-                    _swipedIds.value = _swipedIds.value - messageId
-                }
+            val result = when (item) {
+                is SignalItem -> signalsRepo.deleteSignal(id)
+                else -> notificationsRepo.deleteMessage(id)
+            }
+
+            result.onFailure { loadData() }
         }
     }
 
@@ -197,18 +211,19 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
             val targetSignal = _signalsFlow.value.firstOrNull {
                 it.type == "on_fishing" && it.anchorId == anchorId
             }
-
             if (targetSignal != null) {
                 _wishedIds.value = _wishedIds.value + targetSignal.id
                 notificationsRepo.deleteSignal(targetSignal.id)
                     .onFailure { _wishedIds.value = _wishedIds.value - targetSignal.id }
             }
-
             signalsRepo.sendSignal(
                 senderId = senderId, senderName = senderName, receiverId = receiverId,
                 type = "fishing_wish", anchorId = anchorId, messageText = "Хорошей рыбалки! 🎣"
             )
         }
+    }
+    fun forceRefreshFeed() {
+        loadData() // Просто вызываем существующий метод загрузки
     }
 
     fun refreshData() { loadData() }
