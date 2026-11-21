@@ -107,7 +107,6 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
         val anchorsMap = mutableMapOf<String, MutableList<FishingSignal>>()
         val anchorIds = mutableSetOf<String>()
 
-        // ✅ ДОБАВЛЕН ANCHOR_SPOT_REQUEST В УСЛОВИЕ СБОРА ЯКОРЕЙ
         messages.forEach { msg ->
             if (msg.type == "ANCHOR_ON_FISHING" || msg.type == "ANCHOR_GOING_FISHING" || msg.type == "ANCHOR_SPOT_REQUEST") {
                 anchorsMap[msg.id] = mutableListOf()
@@ -116,14 +115,16 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
         }
 
         signals.forEach { signal ->
-            if ((signal.type == "fishing_wish" || signal.type == "fishing_reply") && signal.anchorId.isNotEmpty()) {
+            // ✅ ДОБАВЛЕН spot_recommendation В УСЛОВИЕ ГРУППИРОВКИ ОТВЕТОВ
+            if ((signal.type == "fishing_wish" ||
+                        signal.type == "fishing_reply" ||
+                        signal.type == "spot_recommendation") && signal.anchorId.isNotEmpty()) {
                 anchorsMap[signal.anchorId]?.add(signal)
             }
         }
 
         val feedItems = mutableListOf<FeedItem>()
 
-        // ✅ ИСКЛЮЧАЕМ ВСЕ ТРИ ТИПА ЯКОРЕЙ ИЗ ОБЫЧНЫХ СООБЩЕНИЙ
         messages.filter {
             it.type != "ANCHOR_ON_FISHING" &&
                     it.type != "ANCHOR_GOING_FISHING" &&
@@ -132,7 +133,6 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
             feedItems.add(FriendMessageItem(msg))
         }
 
-        // ✅ РАЗДЕЛЯЕМ СОЗДАНИЕ ЯКОРЕЙ ПО ТИПУ
         anchorIds.forEach { anchorId ->
             val anchorMsg = messages.find { it.id == anchorId } ?: return@forEach
             val replies = anchorsMap[anchorId]?.sortedBy { it.createdAt } ?: emptyList()
@@ -149,7 +149,6 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
                         replies = replies
                     ))
                 }
-                // ✅ НОВЫЙ ТИП ЯКОРЯ ОТОБРАЖАЕТСЯ КАК ОБЫЧНАЯ ГРУППА С ОТВЕТАМИ
                 "ANCHOR_SPOT_REQUEST" -> {
                     feedItems.add(AnchorGroupItem(anchorMsg, replies))
                 }
@@ -159,11 +158,10 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        // ✅ ДОБАВЛЕН spot_request В ФИЛЬТР СИГНАЛОВ ДЛЯ ПОЛУЧАТЕЛЯ
         signals.filter {
             it.type == "on_fishing" ||
                     it.type == "going_fishing" ||
-                    it.type == "request_spot" // ← ОБЯЗАТЕЛЬНО ДОБАВИТЬ ЭТОТ ТИП
+                    it.type == "request_spot"
         }.forEach { sig ->
             feedItems.add(SignalItem(sig))
         }

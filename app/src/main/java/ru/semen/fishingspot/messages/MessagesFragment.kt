@@ -26,6 +26,7 @@ import ru.semen.fishingspot.messages.data.SignalItem
 import ru.semen.fishingspot.messages.notifikation.RecommendSpotDateBottomSheet
 import ru.semen.fishingspot.messages.notifikation.RecommendSpotMapDialog
 import ru.semen.fishingspot.messages.notifikation.ReplyToPlanDialog
+import ru.semen.fishingspot.messages.notifikation.SpotRecommendationMapDialog // ✅ НОВЫЙ ИМПОРТ
 import ru.semen.fishingspot.messages.notifikation.gofishing.ViewSpotMapDialog
 import ru.semen.fishingspot.messages.notifikation.onfishing.NotificationMapPreviewDialog
 import ru.semen.fishingspot.utils.UserSessionManager
@@ -37,7 +38,6 @@ class MessagesFragment : Fragment() {
     private val messagesViewModel: MessagesViewModel by viewModels()
     private lateinit var adapter: MessagesAdapter
 
-    // ✅ ID элементов ленты с прошлой загрузки — для поиска новых
     private var knownItemIds: Set<String> = emptySet()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -51,7 +51,6 @@ class MessagesFragment : Fragment() {
         setupSwipeToDelete()
         observeState()
 
-        // ✅ Слушаем ту же шину, куда шторка отправляет результат (childFragmentManager)
         childFragmentManager.setFragmentResultListener(
             RecommendSpotDateBottomSheet.RESULT_KEY,
             viewLifecycleOwner
@@ -70,15 +69,12 @@ class MessagesFragment : Fragment() {
         }
     }
 
-    // ✅ Единый способ получить id элемента ленты без изменения FeedItem
-    // ✅ Единый способ получить id элемента ленты без изменения FeedItem
     private fun feedId(item: FeedItem): String = when (item) {
         is FriendMessageItem -> item.message.id
         is AnchorGroupItem -> item.anchorMessage.id
-        is GoingFishingAnchorItem -> item.id          // ← id лежит прямо в элементе
+        is GoingFishingAnchorItem -> item.id
         is SignalItem -> item.signal.id
     }
-
 
     private fun setupAdapter() {
         adapter = MessagesAdapter(
@@ -90,14 +86,11 @@ class MessagesFragment : Fragment() {
                 Toast.makeText(requireContext(), "Профиль: $name", Toast.LENGTH_SHORT).show()
             },
             onShowMapClick = { item ->
-                // ✅ Проверка через Fragment Manager (надежно работает при любом закрытии)
                 if (childFragmentManager.findFragmentByTag("notification_map_preview") != null) {
                     return@MessagesAdapter
                 }
-
                 val signalItem = item as? SignalItem ?: return@MessagesAdapter
                 val signal = signalItem.signal
-
                 NotificationMapPreviewDialog.newInstance(
                     lat = signal.lat,
                     lon = signal.lon,
@@ -125,9 +118,13 @@ class MessagesFragment : Fragment() {
                     .show(childFragmentManager, "reply_to_plan")
             },
             onRecommendSpotClick = { anchorId, senderId ->
-                // ✅ ЗАМЕНИЛИ ТОСТ НА ВЫЗОВ ШТОРКИ С КАРТОЙ
                 RecommendSpotMapDialog.newInstance(anchorId, senderId)
                     .show(childFragmentManager, "recommend_spot_map")
+            },
+            // ✅ НОВЫЙ КОЛБЕК ДЛЯ ПРОСМОТРА РЕКОМЕНДОВАННОЙ ТОЧКИ
+            onShowRecommendationMapClick = { lat, lon, senderName ->
+                SpotRecommendationMapDialog.newInstance(lat, lon, senderName)
+                    .show(childFragmentManager, "spot_recommendation_map")
             }
         )
         binding.rvMessages.layoutManager = LinearLayoutManager(requireContext())
@@ -142,11 +139,9 @@ class MessagesFragment : Fragment() {
                 val position = viewHolder.bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     val item = adapter.getItemAt(position) ?: return
-
                     val currentList = adapter.currentList.toMutableList()
                     currentList.removeAt(position)
                     adapter.submitList(currentList)
-
                     messagesViewModel.swipeToDelete(item)
                 }
             }
@@ -167,15 +162,12 @@ class MessagesFragment : Fragment() {
                         when (state) {
                             is MessagesUiState.Success -> {
                                 val newList = state.feedItems
-
-                                // ✅ Ищем элементы, которых не было в прошлый раз
                                 val newIds = newList.map { feedId(it) }.toSet() - knownItemIds
                                 val isNewContent = knownItemIds.isNotEmpty() && newIds.isNotEmpty()
                                 knownItemIds = newIds
 
                                 adapter.submitList(newList) {
                                     if (isNewContent) {
-                                        // Самый свежий новый элемент — плавно к нему
                                         val position = newList.indexOfFirst { feedId(it) == newIds.first() }
                                         if (position >= 0) {
                                             binding.rvMessages.smoothScrollToPosition(position)

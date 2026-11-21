@@ -154,8 +154,15 @@ class FishingSignalRepository {
                 Log.d("SIGNALS_DEBUG", "   - type='${doc.data["type"]}', sender='${doc.data["senderName"]}'")
             }
 
-            // ✅ ИСПРАВЛЕНИЕ: ДОБАВЛЕН request_spot В РАЗРЕШЕННЫЕ ТИПЫ
-            val signalTypes = setOf("on_fishing", "going_fishing", "fishing_wish", "fishing_reply", "request_spot")
+            // ✅ ИСПРАВЛЕНИЕ: ДОБАВЛЕНЫ НОВЫЕ ТИПЫ В РАЗРЕШЕННЫЕ
+            val signalTypes = setOf(
+                "on_fishing",
+                "going_fishing",
+                "fishing_wish",
+                "fishing_reply",
+                "request_spot",
+                "spot_recommendation" // ✅ Новый тип для рекомендаций точек
+            )
 
             val signals = result.documents.mapNotNull { doc ->
                 val data = doc.data
@@ -189,28 +196,44 @@ class FishingSignalRepository {
         }
     }
 
+    // ✅ ОБНОВЛЕННЫЙ МЕТОД ОТПРАВКИ ОТВЕТА/РЕКОМЕНДАЦИИ
     suspend fun sendReply(
         anchorId: String,
         senderId: String,
         senderName: String,
         receiverId: String,
-        replyText: String
+        replyText: String,
+        lat: Double = 0.0,       // ✅ Координаты рекомендации
+        lon: Double = 0.0,       // ✅ Координаты рекомендации
+        spotId: String = "",     // ✅ ID выбранной точки из списка
+        type: String = "fishing_reply" // ✅ Тип сигнала (по умолчанию обычный ответ)
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             if (anchorId.isEmpty()) {
                 return@withContext Result.failure(Exception("Ошибка привязки к запросу"))
             }
 
-            val data = mapOf(
+            val data = mutableMapOf<String, Any>(
                 "senderId" to senderId,
                 "senderName" to senderName,
                 "receiverId" to receiverId,
-                "type" to "fishing_reply",
+                "type" to type,
                 "anchorId" to anchorId,
                 "messageText" to replyText,
                 "isRead" to false,
                 "createdAt" to java.time.Instant.now().toString()
             )
+
+            // ✅ Добавляем координаты только если они не нулевые
+            if (lat != 0.0 && lon != 0.0) {
+                data["lat"] = lat
+                data["lon"] = lon
+            }
+
+            // ✅ Добавляем ID точки только если он есть
+            if (spotId.isNotEmpty()) {
+                data["recSpotId"] = spotId
+            }
 
             AppwriteManager.databases.createDocument(
                 databaseId = DB_ID,

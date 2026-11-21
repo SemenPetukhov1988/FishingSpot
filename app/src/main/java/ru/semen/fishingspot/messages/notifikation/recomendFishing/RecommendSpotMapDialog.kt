@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.*
 import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
@@ -17,9 +18,11 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import kotlinx.coroutines.launch
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -30,6 +33,7 @@ import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.DialogRecommendSpotMapBinding
 import ru.semen.fishingspot.map.point.SpotViewModel
 import ru.semen.fishingspot.map.point.data.FishingSpot
+import ru.semen.fishingspot.utils.UserSessionManager
 
 class RecommendSpotMapDialog : BottomSheetDialogFragment() {
 
@@ -38,14 +42,19 @@ class RecommendSpotMapDialog : BottomSheetDialogFragment() {
 
     private var mapView: MapView? = null
     private val spotViewModel: SpotViewModel by activityViewModels()
+    private val signalsRepo = FishingSignalRepository()
     private var locationOverlay: MyLocationNewOverlay? = null
 
     private var isLocationAlreadyShown = false
     private var lastUserLocation: GeoPoint? = null
 
+    // ✅ СОСТОЯНИЕ ВЫБОРА ТОЧКИ
     private var selectedSpotId: String? = null
     private var isNewSpot: Boolean = false
     private var newSpotCoordinates: GeoPoint? = null
+
+    // ✅ НОВАЯ ПЕРЕМЕННАЯ ДЛЯ КООРДИНАТ СУЩЕСТВУЮЩЕЙ ТОЧКИ
+    private var existingSpotCoordinates: GeoPoint? = null
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -93,30 +102,86 @@ class RecommendSpotMapDialog : BottomSheetDialogFragment() {
 
         binding.btnCloseDialog.setOnClickListener { dismiss() }
 
+        // ✅ ИСПРАВЛЕННАЯ ЛОГИКА ОТПРАВКИ
         binding.btnSendSpot.setOnClickListener {
             if (selectedSpotId == null && !isNewSpot) {
                 showQuickFeedback("Выберите точку на карте!")
                 return@setOnClickListener
             }
-            showQuickFeedback("Рекомендация отправлена! 🎣")
-            dismiss()
+
+            val anchorId = arguments?.getString(ARG_ANCHOR_ID) ?: return@setOnClickListener
+            val senderId = arguments?.getString(ARG_SENDER_ID) ?: return@setOnClickListener
+            val myId = UserSessionManager.getCurrentUserId(requireContext()) ?: return@setOnClickListener
+            val myName = UserSessionManager.getCurrentNickname(requireContext()) ?: "Рыбак"
+
+            // ✅ БЕРЕМ ТЕКСТ ИЗ ПОЛЯ ВВОДА
+            val comment = binding.etSpotComment.text.toString().trim()
+
+            // ✅ ПРАВИЛЬНОЕ ОПРЕДЕЛЕНИЕ КООРДИНАТ
+            val recLat: Double
+            val recLon: Double
+
+            if (isNewSpot) {
+                recLat = newSpotCoordinates?.latitude ?: 0.0
+                recLon = newSpotCoordinates?.longitude ?: 0.0
+            } else {
+                recLat = existingSpotCoordinates?.latitude ?: 0.0
+                recLon = existingSpotCoordinates?.longitude ?: 0.0
+            }
+
+            val recSpotId = if (!isNewSpot) selectedSpotId.orEmpty() else ""
+
+            Log.d("SEND_REC_DEBUG", "📤 Отправка: anchor=$anchorId, type=spot_recommendation")
+            Log.d("SEND_REC_DEBUG", "   Координаты: lat=$recLat, lon=$recLon, spotId=$recSpotId")
+            Log.d("SEND_REC_DEBUG", "   Комментарий: '$comment'")
+
+            lifecycleScope.launch {
+                try {
+                    val result = signalsRepo.sendReply(
+                        anchorId = anchorId,
+                        senderId = myId,
+                        senderName = myName,
+                        receiverId = senderId,
+                        replyText = comment,
+                        lat = recLat,
+                        lon = recLon,
+                        spotId = recSpotId,
+                        type = "spot_recommendation"
+                    )
+
+                    if (result.isSuccess) {
+                        Log.d("SEND_REC_DEBUG", "✅ Успешно отправлено!")
+                        showQuickFeedback("Рекомендация отправлена! 🎣")
+                        binding.root.postDelayed({ dismiss() }, 600)
+                    } else {
+                        val error = result.exceptionOrNull()?.message ?: "Неизвестная ошибка"
+                        Log.e("SEND_REC_DEBUG", "❌ Ошибка: $error")
+                        showQuickFeedback("Ошибка: $error")
+                    }
+                } catch (e: Exception) {
+                    Log.e("SEND_REC_DEBUG", "💥 Критический сбой: ${e.message}", e)
+                    showQuickFeedback("Критическая ошибка: ${e.message}")
+                }
+            }
         }
     }
 
-    // ✅ АНИМАЦИЯ УВЕДОМЛЕНИЯ СВЕРХУ КАРТЫ
+    // ✅ БЕЗОПАСНАЯ АНИМАЦИЯ УВЕДОМЛЕНИЯ
     private fun showQuickFeedback(message: String) {
-        binding.tvMapFeedback.text = message
-        binding.tvMapFeedback.visibility = View.VISIBLE
+        val currentBinding = _binding ?: return
 
-        // Анимация появления
+        currentBinding.tvMapFeedback.text = message
+        currentBinding.tvMapFeedback.visibility = View.VISIBLE
+
         val fadeIn = AlphaAnimation(0f, 1f).apply {
             duration = 200
             fillAfter = true
         }
-        binding.tvMapFeedback.startAnimation(fadeIn)
+        currentBinding.tvMapFeedback.startAnimation(fadeIn)
 
-        // Исчезновение через 0.8 секунды (в 2 раза быстрее обычного Snackbar)
-        binding.tvMapFeedback.postDelayed({
+        currentBinding.tvMapFeedback.postDelayed({
+            val safeBinding = _binding ?: return@postDelayed
+
             val fadeOut = AlphaAnimation(1f, 0f).apply {
                 duration = 300
                 fillAfter = true
@@ -125,10 +190,12 @@ class RecommendSpotMapDialog : BottomSheetDialogFragment() {
                 override fun onAnimationStart(animation: android.view.animation.Animation?) {}
                 override fun onAnimationRepeat(animation: android.view.animation.Animation?) {}
                 override fun onAnimationEnd(animation: android.view.animation.Animation?) {
-                    binding.tvMapFeedback.visibility = View.GONE
+                    if (_binding != null) {
+                        safeBinding.tvMapFeedback.visibility = View.GONE
+                    }
                 }
             })
-            binding.tvMapFeedback.startAnimation(fadeOut)
+            safeBinding.tvMapFeedback.startAnimation(fadeOut)
         }, 800)
     }
 
@@ -216,24 +283,33 @@ class RecommendSpotMapDialog : BottomSheetDialogFragment() {
         })
     }
 
+    // ✅ ИСПРАВЛЕННЫЙ МЕТОД ВЫБОРА СУЩЕСТВУЮЩЕЙ ТОЧКИ
+    // ✅ ИСПРАВЛЕННЫЙ МЕТОД ВЫБОРА СУЩЕСТВУЮЩЕЙ ТОЧКИ (без очистки текста)
+    // ✅ ИСПРАВЛЕННЫЙ МЕТОД ВЫБОРА СУЩЕСТВУЮЩЕЙ ТОЧКИ (без очистки текста)
     private fun selectExistingSpot(id: String, point: GeoPoint, authorName: String) {
         selectedSpotId = id
         isNewSpot = false
         newSpotCoordinates = null
 
+        // ✅ СОХРАНЯЕМ КООРДИНАТЫ ВЫБРАННОЙ ТОЧКИ
+        existingSpotCoordinates = point
+
         mapView?.overlays?.removeAll { it is NewSpotOverlay }
         drawMarkers(spotViewModel.currentSpots.value ?: emptyList())
 
         binding.btnSendSpot.isEnabled = true
-        binding.etSpotComment.setText("")
+        // ❌ УБРАНО: binding.etSpotComment.setText("")
+        // Текст остается, пользователь может дописать комментарий к уже выбранной точке
 
-        // ✅ ИСПРАВЛЕННЫЙ ТЕКСТ УВЕДОМЛЕНИЯ
         showQuickFeedback("Выбрана существующая точка")
     }
+
+    // ✅ ИСПРАВЛЕННЫЙ МЕТОД НОВОЙ ТОЧКИ (без очистки текста)
     private fun showNewSpotConfirmation(point: GeoPoint) {
         newSpotCoordinates = point
         isNewSpot = true
         selectedSpotId = null
+        existingSpotCoordinates = null // Сбрасываем координаты старой точки
 
         val map = mapView ?: return
         map.overlays.removeAll { it is NewSpotOverlay }
@@ -242,10 +318,11 @@ class RecommendSpotMapDialog : BottomSheetDialogFragment() {
         drawMarkers(spotViewModel.currentSpots.value ?: emptyList())
 
         binding.btnSendSpot.isEnabled = true
-        binding.etSpotComment.setText("")
+        // ❌ УБРАНО: binding.etSpotComment.setText("")
+        // Комментарий сохраняется, даже если пользователь случайно ткнул не туда
 
         showQuickFeedback("Выбрана новая точка")
-    }
+    }  
 
     inner class SpotSelectionOverlay(
         private val spot: FishingSpot,

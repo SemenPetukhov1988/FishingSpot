@@ -7,6 +7,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.button.MaterialButton
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.databinding.*
 import ru.semen.fishingspot.messages.data.AnchorGroupItem
@@ -27,7 +28,9 @@ class MessagesAdapter(
     private val onDeleteMessageClick: ((messageId: String) -> Unit)? = null,
     private val onShowDetailsClick: ((lat: Double, lon: Double, dateMillis: Long?) -> Unit)? = null,
     private val onReplyToGoingFishingClick: ((lat: Double, lon: Double, anchorId: String, senderId: String) -> Unit)? = null,
-    private val onRecommendSpotClick: ((anchorId: String, senderId: String) -> Unit)? = null
+    private val onRecommendSpotClick: ((anchorId: String, senderId: String) -> Unit)? = null,
+    // ✅ НОВЫЙ КОЛБЕК ДЛЯ ОТКРЫТИЯ КАРТЫ РЕКОМЕНДАЦИИ
+    private val onShowRecommendationMapClick: ((lat: Double, lon: Double, senderName: String) -> Unit)? = null
 ) : ListAdapter<FeedItem, RecyclerView.ViewHolder>(FeedItemDiffCallback()) {
 
     companion object {
@@ -78,7 +81,7 @@ class MessagesAdapter(
             is FriendMsgViewHolder -> holder.bind(item as FriendMessageItem)
             is FriendRequestViewHolder -> holder.bind(item as FriendMessageItem)
             is IncomingSignalViewHolder -> holder.bind(item as SignalItem, onShowMapClick, onWishGoodFishingClick)
-            is AnchorGroupViewHolder -> holder.bind(item as AnchorGroupItem)
+            is AnchorGroupViewHolder -> holder.bind(item as AnchorGroupItem, onShowRecommendationMapClick)
             is GoingFishingAnchorViewHolder -> holder.bind(item as GoingFishingAnchorItem, onShowDetailsClick)
             is GoingFishingSignalViewHolder -> holder.bind(item as SignalItem, onReplyToGoingFishingClick)
             is SpotRequestSignalViewHolder -> holder.bind(item as SignalItem, onRecommendSpotClick)
@@ -107,36 +110,25 @@ class MessagesAdapter(
         }
     }
 
-    // ✅ ИСПРАВЛЕНИЕ КАРТЫ: Принудительная перепривязка кликов при каждом onBind
     inner class IncomingSignalViewHolder(private val binding: ItemOnFishingSignalBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(item: SignalItem, onShowMap: ((FeedItem) -> Unit)?, onWish: ((String, String) -> Unit)?) {
             val sig = item.signal
-
-            // Сбрасываем старые слушатели перед установкой новых
             binding.btnShowOnMap.setOnClickListener(null)
             binding.btnWishGoodFishing.setOnClickListener(null)
             binding.tvSenderName.setOnClickListener(null)
 
             binding.tvSenderName.text = "${sig.senderName} сейчас на рыбалке! 🎣"
             binding.tvTime.text = getTimeAgo(sig.createdAt)
-
             binding.btnShowOnMap.visibility = View.VISIBLE
-            binding.btnShowOnMap.setOnClickListener {
-                onShowMap?.invoke(item)
-            }
-
-            binding.btnWishGoodFishing.setOnClickListener {
-                onWish?.invoke(sig.anchorId, sig.senderId)
-            }
-
-            binding.tvSenderName.setOnClickListener {
-                onSenderClick?.invoke(item)
-            }
+            binding.btnShowOnMap.setOnClickListener { onShowMap?.invoke(item) }
+            binding.btnWishGoodFishing.setOnClickListener { onWish?.invoke(sig.anchorId, sig.senderId) }
+            binding.tvSenderName.setOnClickListener { onSenderClick?.invoke(item) }
         }
     }
 
+    // ✅ ОБНОВЛЕННЫЙ ХОЛДЕР ЯКОРЯ С ПОДДЕРЖКОЙ РАЗНЫХ ТИПОВ ОТВЕТОВ
     inner class AnchorGroupViewHolder(private val binding: ItemAnchorSignalBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(item: AnchorGroupItem) {
+        fun bind(item: AnchorGroupItem, onShowRecMap: ((Double, Double, String) -> Unit)?) {
             val baseText = item.anchorMessage.contentText
             val comment = try {
                 val field = item.anchorMessage.javaClass.getDeclaredField("requestComment")
@@ -151,25 +143,46 @@ class MessagesAdapter(
             }
 
             binding.tvAnchorTime.text = getTimeAgo(item.anchorMessage.timestamp)
-
             binding.containerReplies.removeAllViews()
             binding.containerReplies.visibility = if (item.replies.isEmpty()) View.GONE else View.VISIBLE
 
             item.replies.forEach { reply ->
-                val replyView = LayoutInflater.from(binding.root.context)
-                    .inflate(R.layout.item_reply_signal, binding.containerReplies, false)
+                // ✅ ВЫБИРАЕМ LAYOUT В ЗАВИСИМОСТИ ОТ ТИПА ОТВЕТА
+                val replyView = if (reply.type == "spot_recommendation") {
+                    LayoutInflater.from(binding.root.context)
+                        .inflate(R.layout.item_spot_recommendation_reply, binding.containerReplies, false).apply {
 
-                val tvText = replyView.findViewById<TextView>(R.id.tvReplyText)
-                val tvTime = replyView.findViewById<TextView>(R.id.tvReplyTime)
+                            // ✅ ФОРМИРУЕМ ТЕКСТ С УЧЕТОМ НАЛИЧИЯ КОММЕНТАРИЯ
+                            val recTextView = findViewById<TextView>(R.id.tvRecText)
+                            val userComment = reply.messageText?.ifBlank { null }
 
-                val replyContent = when (reply.type) {
-                    "fishing_reply" -> "${reply.senderName}: \"${reply.messageText ?: ""}\""
-                    "fishing_wish" -> "${reply.senderName} пожелал хорошей рыбалки! 🎣"
-                    else -> "${reply.senderName}: ${reply.messageText ?: "(без текста)"}"
+                            recTextView.text = if (userComment != null) {
+                                "${reply.senderName} рекомендует точку! 📍\n💬 \"$userComment\""
+                            } else {
+                                "${reply.senderName} рекомендует точку! 📍"
+                            }
+
+                            findViewById<MaterialButton>(R.id.btnShowRecMap).setOnClickListener {
+                                onShowRecMap?.invoke(reply.lat, reply.lon, reply.senderName)
+                            }
+                        }
+                } else {
+                    // Стандартный layout для обычных ответов
+                    LayoutInflater.from(binding.root.context)
+                        .inflate(R.layout.item_reply_signal, binding.containerReplies, false).apply {
+                            val tvText = findViewById<TextView>(R.id.tvReplyText)
+                            val tvTime = findViewById<TextView>(R.id.tvReplyTime)
+
+                            val replyContent = when (reply.type) {
+                                "fishing_reply" -> "${reply.senderName}: \"${reply.messageText ?: ""}\""
+                                "fishing_wish" -> "${reply.senderName} пожелал хорошей рыбалки! 🎣"
+                                else -> "${reply.senderName}: ${reply.messageText ?: "(без текста)"}"
+                            }
+                            tvText.text = replyContent
+                            tvTime.text = getTimeAgo(reply.createdAt)
+                        }
                 }
 
-                tvText.text = replyContent
-                tvTime.text = getTimeAgo(reply.createdAt)
                 binding.containerReplies.addView(replyView)
             }
 
@@ -180,11 +193,9 @@ class MessagesAdapter(
     inner class GoingFishingAnchorViewHolder(private val binding: ItemGoingFishingAnchorBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(item: GoingFishingAnchorItem, onClick: ((Double, Double, Long?) -> Unit)?) {
             binding.tvAnchorTitle.text = item.contentText
-
             val dateStr = if (item.plannedDate > 0) {
                 "📅 ${SimpleDateFormat("d MMMM yyyy", Locale.getDefault()).format(Date(item.plannedDate))}"
             } else ""
-
             binding.tvPlannedDate.text = dateStr
             binding.tvPlannedDate.visibility = if (dateStr.isNotEmpty()) View.VISIBLE else View.GONE
 
@@ -194,15 +205,12 @@ class MessagesAdapter(
             item.replies.forEach { reply ->
                 val replyView = LayoutInflater.from(binding.root.context)
                     .inflate(R.layout.item_reply_signal, binding.containerReplies, false)
-
                 val tvText = replyView.findViewById<TextView>(R.id.tvReplyText)
                 val tvTime = replyView.findViewById<TextView>(R.id.tvReplyTime)
-
                 val replyContent = when (reply.type) {
                     "fishing_reply" -> "${reply.senderName}: \"${reply.messageText ?: ""}\""
                     else -> "${reply.senderName}: ${reply.messageText ?: "(без текста)"}"
                 }
-
                 tvText.text = replyContent
                 tvTime.text = getTimeAgo(reply.createdAt)
                 binding.containerReplies.addView(replyView)
@@ -210,70 +218,46 @@ class MessagesAdapter(
 
             binding.tvRepliesCount.text = "${item.replies.size} ответ(ов)"
             binding.tvRepliesCount.visibility = if (item.replies.isEmpty()) View.GONE else View.VISIBLE
-
-            binding.btnShowDetails.setOnClickListener {
-                onClick?.invoke(item.spotLat, item.spotLon, item.plannedDate)
-            }
+            binding.btnShowDetails.setOnClickListener { onClick?.invoke(item.spotLat, item.spotLon, item.plannedDate) }
         }
     }
 
     inner class GoingFishingSignalViewHolder(private val binding: ItemGoingFishingSignalBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(item: SignalItem, onReply: ((lat: Double, lon: Double, anchorId: String, senderId: String) -> Unit)?) {
+        fun bind(item: SignalItem, onReply: ((Double, Double, String, String) -> Unit)?) {
             val sig = item.signal
-
             val dateText = if (sig.plannedDate > 0) {
                 val formattedDate = SimpleDateFormat("d MMMM yyyy", Locale.getDefault()).format(Date(sig.plannedDate))
                 "${sig.senderName} спрашивает: стоит ли туда ехать на рыбалку $formattedDate? 🎣"
             } else {
                 "${sig.senderName} спрашивает: стоит ли туда ехать на рыбалку? 🎣"
             }
-
             binding.tvSenderName.text = dateText
             binding.tvTime.text = getTimeAgo(sig.createdAt)
             binding.btnShowDetails.text = "📍 Посмотреть на карте и ответить"
-
-            binding.btnShowDetails.setOnClickListener {
-                onReply?.invoke(sig.lat, sig.lon, sig.anchorId, sig.senderId)
-            }
-
-            binding.root.setOnClickListener {
-                onSenderClick?.invoke(item)
-            }
+            binding.btnShowDetails.setOnClickListener { onReply?.invoke(sig.lat, sig.lon, sig.anchorId, sig.senderId) }
+            binding.root.setOnClickListener { onSenderClick?.invoke(item) }
         }
     }
 
-    // ✅ ОБНОВЛЕННЫЙ ХОЛДЕР ДЛЯ ЗАПРОСА РЕКОМЕНДАЦИИ МЕСТА
-    // Теперь отображает дату и комментарий отправителя (пояснение про окуня/мормышку)
     inner class SpotRequestSignalViewHolder(private val binding: ItemGoingFishingSignalBinding) : RecyclerView.ViewHolder(binding.root) {
-        fun bind(item: SignalItem, onRecommend: ((anchorId: String, senderId: String) -> Unit)?) {
+        fun bind(item: SignalItem, onRecommend: ((String, String) -> Unit)?) {
             val sig = item.signal
-
-            // Формируем основной текст с датой
             val dateText = if (sig.plannedDate > 0) {
                 val formattedDate = SimpleDateFormat("d MMMM yyyy", Locale.getDefault()).format(Date(sig.plannedDate))
                 "${sig.senderName} просит дать точку для рыбалки на $formattedDate 🎣"
             } else {
                 "${sig.senderName} просит дать точку для рыбалки 🎣"
             }
-
-            // Добавляем пояснение от отправителя (messageText из сигнала)
             val fullText = if (!sig.messageText.isNullOrEmpty()) {
                 "$dateText\n\n💬 \"${sig.messageText}\""
             } else {
                 dateText
             }
-
             binding.tvSenderName.text = fullText
             binding.tvTime.text = getTimeAgo(sig.createdAt)
             binding.btnShowDetails.text = "📍 Предложить свое место"
-
-            binding.btnShowDetails.setOnClickListener {
-                onRecommend?.invoke(sig.anchorId, sig.senderId)
-            }
-
-            binding.root.setOnClickListener {
-                onSenderClick?.invoke(item)
-            }
+            binding.btnShowDetails.setOnClickListener { onRecommend?.invoke(sig.anchorId, sig.senderId) }
+            binding.root.setOnClickListener { onSenderClick?.invoke(item) }
         }
     }
 
