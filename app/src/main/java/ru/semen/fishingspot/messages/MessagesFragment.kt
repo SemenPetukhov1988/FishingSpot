@@ -24,6 +24,7 @@ import ru.semen.fishingspot.messages.data.FriendMessageItem
 import ru.semen.fishingspot.messages.data.GoingFishingAnchorItem
 import ru.semen.fishingspot.messages.data.SignalItem
 import ru.semen.fishingspot.messages.notifikation.RecommendSpotDateBottomSheet
+import ru.semen.fishingspot.messages.notifikation.RecommendSpotMapDialog
 import ru.semen.fishingspot.messages.notifikation.ReplyToPlanDialog
 import ru.semen.fishingspot.messages.notifikation.gofishing.ViewSpotMapDialog
 import ru.semen.fishingspot.messages.notifikation.onfishing.NotificationMapPreviewDialog
@@ -124,11 +125,9 @@ class MessagesFragment : Fragment() {
                     .show(childFragmentManager, "reply_to_plan")
             },
             onRecommendSpotClick = { anchorId, senderId ->
-                Toast.makeText(
-                    requireContext(),
-                    "Открывается выбор точки... (якорь: ${anchorId.take(6)}...)",
-                    Toast.LENGTH_LONG
-                ).show()
+                // ✅ ЗАМЕНИЛИ ТОСТ НА ВЫЗОВ ШТОРКИ С КАРТОЙ
+                RecommendSpotMapDialog.newInstance(anchorId, senderId)
+                    .show(childFragmentManager, "recommend_spot_map")
             }
         )
         binding.rvMessages.layoutManager = LinearLayoutManager(requireContext())

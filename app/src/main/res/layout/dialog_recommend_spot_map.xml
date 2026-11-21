@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:id="@+id/tvDialogTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:text="Выбери точку / сделай новую"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#1A1A1A"/>
+
+        <ImageButton
+            android:id="@+id/btnCloseDialog"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/close_24dp_000000_fill0_wght400_grad0_opsz24"
+            android:contentDescription="Закрыть"
+            app:tint="#757575"/>
+    </RelativeLayout>
+
+    <!-- ✅ КОНТЕЙНЕР КАРТЫ С ВСПЛЫВАЮЩИМ УВЕДОМЛЕНИЕМ -->
+    <FrameLayout
+        android:id="@+id/mapContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:minHeight="350dp"
+        android:background="#EAEFF5"
+        android:layout_marginBottom="12dp">
+
+        <!-- Текстовое поле для быстрых уведомлений сверху -->
+        <TextView
+            android:id="@+id/tvMapFeedback"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="16dp"
+            android:background="#CC000000"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:elevation="4dp"
+            android:visibility="gone"
+            android:text="Сообщение"/>
+
+    </FrameLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Комментарий к точке (необязательно)"
+        app:boxBackgroundMode="outline"
+        app:boxCornerRadiusTopStart="8dp"
+        app:boxCornerRadiusTopEnd="8dp"
+        app:boxCornerRadiusBottomStart="8dp"
+        app:boxCornerRadiusBottomEnd="8dp"
+        android:layout_marginBottom="12dp">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etSpotComment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="3"
+            android:inputType="textMultiLine|textCapSentences"/>
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnSendSpot"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="📍 Отправить рекомендацию"
+        android:textSize="16sp"
+        app:cornerRadius="12dp"
+        app:backgroundTint="#1976D2"
+        android:enabled="false"/>
+
+</LinearLayout>
