@@ -19,6 +19,9 @@ sealed class MessagesUiState {
     data class Error(val message: String) : MessagesUiState()
 }
 
+// ✅ ШАГ 1: ТИПЫ ВКЛАДОК
+enum class TabType { INCOMING, OUTGOING }
+
 class MessagesViewModel(application: Application) : AndroidViewModel(application) {
 
     private val notificationsRepo = NotificationsRepository(application.applicationContext)
@@ -29,6 +32,10 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
     private val _signalsFlow = MutableStateFlow<List<FishingSignal>>(emptyList())
     private val _signalsError = MutableStateFlow<String?>(null)
     private val _isRefreshing = MutableStateFlow(false)
+
+    // ✅ ШАГ 1: ТЕКУЩАЯ АКТИВНАЯ ВКЛАДКА
+    private val _currentTab = MutableStateFlow<TabType>(TabType.INCOMING)
+    val currentTab: StateFlow<TabType> = _currentTab.asStateFlow()
 
     private val _acceptedIds = MutableStateFlow<Set<String>>(emptySet())
     private val _declinedIds = MutableStateFlow<Set<String>>(emptySet())
@@ -48,16 +55,31 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
         ActionFlags(a, d, w, s)
     }
 
+    // ✅ ШАГ 1: ДОБАВЛЯЕМ _currentTab В КОМБАЙН И ФИЛЬТРУЕМ ДАННЫЕ
     val uiState: StateFlow<MessagesUiState> = combine(
-        _messagesFlow, _signalsFlow, _signalsError, flagsFlow
-    ) { messages, signals, sigError, flags ->
+        _messagesFlow, _signalsFlow, _signalsError, flagsFlow, _currentTab
+    ) { messages, signals, sigError, flags, tab ->
+
+        // Базовая логика формирования ленты (без изменений)
         val filteredMessages = messages.filter {
             it.id !in flags.accepted && it.id !in flags.declined && it.id !in flags.swiped
         }
         val visibleSignals = signals.filterNot {
             it.type == "on_fishing" && it.id in flags.wished
         }
-        val feedItems = buildFeedList(filteredMessages, visibleSignals)
+        val allFeedItems = buildFeedList(filteredMessages, visibleSignals)
+
+        // ✅ ШАГ 1: ФИЛЬТРАЦИЯ ПО ВКЛАДКЕ
+        val feedItems = when (tab) {
+            TabType.INCOMING -> allFeedItems.filter {
+                it is FriendMessageItem ||
+                        it is AnchorGroupItem ||
+                        it is GoingFishingAnchorItem
+            }
+            TabType.OUTGOING -> allFeedItems.filter {
+                it is SignalItem
+            }
+        }
 
         if (feedItems.isEmpty() && sigError != null) MessagesUiState.Error(sigError)
         else MessagesUiState.Success(feedItems, sigError)
@@ -101,6 +123,11 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
                 _isRefreshing.value = false
             }
         }
+    }
+
+    // Метод для переключения вкладок из фрагмента
+    fun switchTab(tab: TabType) {
+        _currentTab.value = tab
     }
 
     private fun buildFeedList(messages: List<AppMessage>, signals: List<FishingSignal>): List<FeedItem> {
@@ -220,8 +247,17 @@ class MessagesViewModel(application: Application) : AndroidViewModel(application
             )
         }
     }
+
+    // ✅ НОВЫЙ МЕТОД ДЛЯ УДАЛЕНИЯ ИЗ ИСТОЧНИКА ДАННЫХ
+    fun removeMessageFromSource(messageId: String) {
+        _messagesFlow.value = _messagesFlow.value.filterNot { it.id == messageId }
+    }
+
+    fun removeSignalFromSource(signalId: String) {
+        _signalsFlow.value = _signalsFlow.value.filterNot { it.id == signalId }
+    }
     fun forceRefreshFeed() {
-        loadData() // Просто вызываем существующий метод загрузки
+        loadData()
     }
 
     fun refreshData() { loadData() }

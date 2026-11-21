@@ -13,10 +13,12 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.tabs.TabLayout
 import kotlinx.coroutines.launch
 import ru.semen.fishingspot.databinding.FragmentMessagesBinding
 import ru.semen.fishingspot.feature_messages.viewmodel.MessagesViewModel
 import ru.semen.fishingspot.feature_messages.viewmodel.MessagesUiState
+import ru.semen.fishingspot.feature_messages.viewmodel.TabType
 import ru.semen.fishingspot.messages.adapter.MessagesAdapter
 import ru.semen.fishingspot.messages.data.AnchorGroupItem
 import ru.semen.fishingspot.messages.data.FeedItem
@@ -26,7 +28,7 @@ import ru.semen.fishingspot.messages.data.SignalItem
 import ru.semen.fishingspot.messages.notifikation.RecommendSpotDateBottomSheet
 import ru.semen.fishingspot.messages.notifikation.RecommendSpotMapDialog
 import ru.semen.fishingspot.messages.notifikation.ReplyToPlanDialog
-import ru.semen.fishingspot.messages.notifikation.SpotRecommendationMapDialog // ✅ НОВЫЙ ИМПОРТ
+import ru.semen.fishingspot.messages.notifikation.SpotRecommendationMapDialog
 import ru.semen.fishingspot.messages.notifikation.gofishing.ViewSpotMapDialog
 import ru.semen.fishingspot.messages.notifikation.onfishing.NotificationMapPreviewDialog
 import ru.semen.fishingspot.utils.UserSessionManager
@@ -47,6 +49,9 @@ class MessagesFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // ✅ ШАГ 3: НАСТРОЙКА ТАБОВ
+        setupTabs()
         setupAdapter()
         setupSwipeToDelete()
         observeState()
@@ -67,6 +72,34 @@ class MessagesFragment : Fragment() {
         binding.swipeRefresh.setOnRefreshListener {
             messagesViewModel.refreshData()
         }
+    }
+
+    // ✅ ШАГ 3: ЛОГИКА ПЕРЕКЛЮЧЕНИЯ ВКЛАДОК
+    // ✅ ШАГ 3: НАСТРОЙКА ТАБОВ (ИСПРАВЛЕННЫЕ НАЗВАНИЯ)
+    private fun setupTabs() {
+        // Вкладка 0: Якоря и сообщения от других пользователей
+        binding.tabLayout.addTab(binding.tabLayout.newTab().setText("Исходящие"))
+
+        // Вкладка 1: Твои исходящие сигналы
+        binding.tabLayout.addTab(binding.tabLayout.newTab().setText("Входящие"))
+
+        binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {
+                when (tab?.position) {
+                    // Позиция 0 = Запросы и якоря (INCOMING)
+                    0 -> messagesViewModel.switchTab(TabType.INCOMING)
+                    // Позиция 1 = Мои сигналы (OUTGOING)
+                    1 -> messagesViewModel.switchTab(TabType.OUTGOING)
+                }
+                // Прокручиваем список вверх при смене вкладки для лучшего UX
+                binding.rvMessages.smoothScrollToPosition(0)
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+            override fun onTabReselected(tab: TabLayout.Tab?) {
+                // При повторном нажатии тоже скроллим вверх
+                binding.rvMessages.smoothScrollToPosition(0)
+            }
+        })
     }
 
     private fun feedId(item: FeedItem): String = when (item) {
@@ -121,7 +154,6 @@ class MessagesFragment : Fragment() {
                 RecommendSpotMapDialog.newInstance(anchorId, senderId)
                     .show(childFragmentManager, "recommend_spot_map")
             },
-            // ✅ НОВЫЙ КОЛБЕК ДЛЯ ПРОСМОТРА РЕКОМЕНДОВАННОЙ ТОЧКИ
             onShowRecommendationMapClick = { lat, lon, senderName ->
                 SpotRecommendationMapDialog.newInstance(lat, lon, senderName)
                     .show(childFragmentManager, "spot_recommendation_map")
@@ -139,9 +171,21 @@ class MessagesFragment : Fragment() {
                 val position = viewHolder.bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     val item = adapter.getItemAt(position) ?: return
+
+                    // ✅ ШАГ 1: Удаляем из источника данных в ViewModel
+                    when (item) {
+                        is SignalItem -> messagesViewModel.removeSignalFromSource(item.signal.id)
+                        is AnchorGroupItem -> messagesViewModel.removeMessageFromSource(item.anchorMessage.id)
+                        is GoingFishingAnchorItem -> messagesViewModel.removeMessageFromSource(item.id)
+                        is FriendMessageItem -> messagesViewModel.removeMessageFromSource(item.message.id)
+                    }
+
+                    // ✅ ШАГ 2: Удаляем из адаптера для мгновенной анимации
                     val currentList = adapter.currentList.toMutableList()
                     currentList.removeAt(position)
                     adapter.submitList(currentList)
+
+                    // ✅ ШАГ 3: Отправляем запрос на удаление с сервера (фоновая задача)
                     messagesViewModel.swipeToDelete(item)
                 }
             }

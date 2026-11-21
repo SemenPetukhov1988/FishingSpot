@@ -322,7 +322,7 @@ class RecommendSpotMapDialog : BottomSheetDialogFragment() {
         // Комментарий сохраняется, даже если пользователь случайно ткнул не туда
 
         showQuickFeedback("Выбрана новая точка")
-    }  
+    }
 
     inner class SpotSelectionOverlay(
         private val spot: FishingSpot,
