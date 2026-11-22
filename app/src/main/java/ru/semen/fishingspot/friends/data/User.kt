@@ -7,5 +7,6 @@ package ru.semen.fishingspot.friends.data
 data class User(
     val id: String = "",
     val name: String = "",
+    val avatarUrl: String? = null,
     val isAlreadyFriend: Boolean = false // Чтобы не добавлять повторно
 )

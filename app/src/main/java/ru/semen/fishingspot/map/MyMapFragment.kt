@@ -23,6 +23,8 @@ import androidx.fragment.app.activityViewModels
 import androidx.navigation.NavOptions
 import androidx.navigation.findNavController
 import androidx.navigation.fragment.findNavController
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.bitmap.CircleCrop
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -32,6 +34,10 @@ import ru.semen.fishingspot.R
 import ru.semen.fishingspot.map.point.data.FishingSpot
 import ru.semen.fishingspot.databinding.FragmentMapBinding
 import ru.semen.fishingspot.map.point.SpotViewModel
+
+import ru.semen.fishingspot.profile_avatar.EditProfileDialog
+import ru.semen.fishingspot.utils.ProfileCache
+import ru.semen.fishingspot.utils.UserSessionManager
 
 class MyMapFragment : Fragment() {
 
@@ -136,7 +142,9 @@ class MyMapFragment : Fragment() {
 
         requireActivity().onBackPressedDispatcher.addCallback(
             viewLifecycleOwner, object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() { navigateBackToCurrentTab.run() }
+                override fun handleOnBackPressed() {
+                    navigateBackToCurrentTab.run()
+                }
             }
         )
 
@@ -149,7 +157,42 @@ class MyMapFragment : Fragment() {
             if (_binding == null || message.isNullOrBlank()) return@observe
             Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
         }
+
+        // ✅ ИНИЦИАЛИЗАЦИЯ КНОПКИ ПРОФИЛЯ НА КАРТЕ
+        // ✅ ИНИЦИАЛИЗАЦИЯ КНОПКИ ПРОФИЛЯ НА КАРТЕ (Упрощенная версия)
+        // ✅ ИНИЦИАЛИЗАЦИЯ КНОПКИ ПРОФИЛЯ НА КАРТЕ
+        binding.ivProfileAvatar.apply {
+            setBackgroundResource(R.drawable.bg_avatar_shape)
+
+            val currentUserId = UserSessionManager.getCurrentUserId(requireContext())
+
+            if (currentUserId != null) {
+                val cachedUrl = ProfileCache.getAvatar(currentUserId)
+
+                if (!cachedUrl.isNullOrEmpty()) {
+                    Glide.with(this@MyMapFragment)
+                        .load(cachedUrl)
+                        .transform(CircleCrop())
+                        .placeholder(R.drawable.bg_avatar_shape)
+                        .error(R.drawable.bg_avatar_shape)
+                        .into(this)
+                } else {
+                    setImageResource(R.drawable.group_24dp_000000_fill0_wght400_grad0_opsz24)
+
+                }
+            } else {
+                // На всякий случай, если сессия всё-таки потерялась
+                setImageResource(R.drawable.group_24dp_000000_fill0_wght400_grad0_opsz24)
+
+            }
+
+            setOnClickListener {
+                EditProfileDialog().show(childFragmentManager, "edit_profile_dialog")
+            }
+        }
     }
+
+
 
     private fun clearPendingCamera() {
         returnLat = null
@@ -358,4 +401,6 @@ class MyMapFragment : Fragment() {
         _binding = null
         super.onDestroyView()
     }
+
+
 }
