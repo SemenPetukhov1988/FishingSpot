@@ -9,54 +9,44 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.semen.fishingspot.map.point.data.FishingSpot
+import ru.semen.fishingspot.profile_avatar.repository.ProfileRepository
 import ru.semen.fishingspot.utils.AppwriteManager
+import ru.semen.fishingspot.utils.ProfileCache
 
 class FeedRepository {
 
-    // ⚠️ ЗАМЕНИ НА СВОИ РЕАЛЬНЫЕ ID ИЗ APPWRITE CONSOLE
     private val DATABASE_ID = "6ad5021a0029a2c88786"
     private val COLLECTION_ID = "6ad524e3001c9a28c3e5"
 
     private val _spots = MutableLiveData<List<FishingSpot>>()
     val spots: LiveData<List<FishingSpot>> = _spots
 
-    /**
-     * Загружает ТОЛЬКО публичные точки из Appwrite
-     */
     fun loadPublicSpots() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 Log.d("FEED_REPO", "🔄 Начало загрузки публичных точек...")
-                Log.d("FEED_REPO", "   DB: $DATABASE_ID | Collection: $COLLECTION_ID")
 
+                // 1. Загружаем точки
                 val result = AppwriteManager.databases.listDocuments(
                     databaseId = DATABASE_ID,
                     collectionId = COLLECTION_ID,
                     queries = listOf(
-                        Query.Companion.equal("visibility", "public"), // ✅ Фильтр по видимости
-                        Query.Companion.orderDesc("createdAt"),         // ✅ Новые сверху
-                        Query.Companion.limit(50)                       // ✅ Пагинация
+                        Query.equal("visibility", "public"),
+                        Query.orderDesc("createdAt"),
+                        Query.limit(50)
                     )
                 )
 
                 Log.d("FEED_REPO", "✅ Сервер вернул документов: ${result.documents.size}")
 
-                // В FeedRepository.kt, внутри loadPublicSpots()
-
+                // 2. Парсим точки
                 val list = result.documents.map { doc ->
                     val data = doc.data
-
-                    // Логируем для проверки
-                    Log.d("FEED_REPO", "   📍 Точка: ${data["name"]} | postText=${data["postText"]}")
-
                     FishingSpot(
                         documentId = doc.id,
                         name = (data["name"] as? String) ?: "",
                         description = (data["description"] as? String) ?: "",
-
-                        // ✅ ДОБАВЛЕНО: Чтение текста поста для ленты
                         postText = (data["postText"] as? String) ?: "",
-
                         latitude = (data["latitude"] as? Double) ?: 0.0,
                         longitude = (data["longitude"] as? Double) ?: 0.0,
                         photoUrl = data["photoUrl"] as? String,
@@ -69,9 +59,24 @@ class FeedRepository {
                     )
                 }
 
+                // ✅ 3. БАТЧ-ЗАГРУЗКА ПРОФИЛЕЙ АВТОРОВ
+                val authorIds = list.map { it.authorId }.filter { it.isNotBlank() }.distinct()
+
+                if (authorIds.isNotEmpty()) {
+                    Log.d("FEED_REPO", "📥 Запрашиваем профили для ${authorIds.size} авторов...")
+                    ProfileRepository.getUsersByIds(authorIds).onSuccess { users ->
+                        // Кладем все аватарки в кэш одним махом
+                        ProfileCache.putAll(users.associate { it.id to it.avatarUrl })
+                        Log.d("FEED_REPO", "✅ Кэш профилей обновлен: ${users.size} записей")
+                    }.onFailure { e ->
+                        Log.e("FEED_REPO", "❌ Ошибка загрузки профилей: ${e.message}")
+                    }
+                }
+
+                // 4. Отдаем данные в UI
                 withContext(Dispatchers.Main) {
                     _spots.value = list
-                    Log.d("FEED_REPO", " UI обновлен. Всего точек в ленте: ${list.size}")
+                    Log.d("FEED_REPO", "📤 UI обновлен. Точек: ${list.size}")
                 }
 
             } catch (e: Exception) {

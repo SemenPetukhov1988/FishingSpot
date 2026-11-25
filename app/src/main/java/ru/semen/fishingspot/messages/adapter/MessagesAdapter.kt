@@ -1,5 +1,6 @@
 package ru.semen.fishingspot.messages.adapter
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -15,6 +16,8 @@ import ru.semen.fishingspot.messages.data.FeedItem
 import ru.semen.fishingspot.messages.data.FriendMessageItem
 import ru.semen.fishingspot.messages.data.GoingFishingAnchorItem
 import ru.semen.fishingspot.messages.data.SignalItem
+import ru.semen.fishingspot.utils.ProfileCache
+import ru.semen.fishingspot.utils.loadUserAvatar
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -91,6 +94,15 @@ class MessagesAdapter(
     inner class FriendMsgViewHolder(private val binding: ItemMessageBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(item: FriendMessageItem) {
             val msg = item.message
+
+            // ✅ ДИАГНОСТИКА: Проверяем данные перед загрузкой
+            Log.d("MSG_AVATAR", "🔍 SenderID: '${msg.senderId}'")
+            val cachedUrl = ProfileCache.getAvatar(msg.senderId)
+            Log.d("MSG_AVATAR", "📦 CachedURL: '$cachedUrl'")
+
+            // Загружаем аватарку
+            binding.ivMessageIcon.loadUserAvatar(msg.senderId)
+
             binding.tvSenderName.text = msg.senderName.ifEmpty { "Рыбак" }
             binding.tvMessageAction.text = msg.contentText.ifEmpty { "(без текста)" }
             binding.tvMessageTime.text = getTimeAgo(msg.timestamp)

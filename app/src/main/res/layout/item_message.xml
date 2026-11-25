@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <!-- БЕЗ КАРТОЧКИ И РАМОК. ФОН ЗАДАЁТ РОДИТЕЛЬ (RecyclerView) -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -8,7 +7,7 @@
     android:background="#FFFFFF"
     android:layout_marginBottom="12dp">
 
-    <!-- ШАПКА УВЕДОМЛЕНИЯ (ИКОНКА + ИМЯ + ДЕЙСТВИЕ) -->
+    <!-- ШАПКА УВЕДОМЛЕНИЯ (АВАТАР + ИМЯ + ДЕЙСТВИЕ) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -16,15 +15,14 @@
         android:padding="16dp"
         android:gravity="center_vertical">
 
-        <!-- Иконка уведомления -->
-        <ImageView
+        <!-- ✅ АВАТАРКА ОТПРАВИТЕЛЯ (бывшая заглушка ivMessageIcon) -->
+        <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/ivMessageIcon"
             android:layout_width="44dp"
             android:layout_height="44dp"
-            android:background="@drawable/circle_background"
-            android:padding="10dp"
-            android:src="@drawable/star_rate_24dp_000000_fill0_wght400_grad0_opsz24"
-            app:tint="#FFFFFF" />
+            app:shapeAppearanceOverlay="@style/CircleImageView"
+            android:scaleType="centerCrop"
+            android:src="@drawable/group_24dp_000000_fill0_wght400_grad0_opsz24" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -90,7 +88,7 @@
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- Тонкий разделитель внизу (как в ленте) -->
+    <!-- Тонкий разделитель внизу -->
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"

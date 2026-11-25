@@ -78,7 +78,7 @@ dependencies {
     implementation(libs.converter.gson)
     implementation("androidx.fragment:fragment-ktx:1.8.0")
     implementation(libs.logging.interceptor)
-
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation(libs.glide)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     implementation("com.yandex.android:maps.mobile:4.8.1-full")

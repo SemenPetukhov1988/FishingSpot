@@ -4,6 +4,7 @@ import android.content.Context
 import io.appwrite.Client
 import io.appwrite.services.Account
 import io.appwrite.services.Databases
+import io.appwrite.services.Realtime // ✅ Добавляем импорт
 import io.appwrite.services.Storage
 
 object AppwriteManager {
@@ -11,15 +12,16 @@ object AppwriteManager {
     lateinit var account: Account
     lateinit var databases: Databases
     lateinit var storage: Storage
+    lateinit var realtime: Realtime // ✅ Добавляем свойство
 
     fun init(context: Context) {
         client = Client(context)
-            // ✅ ВАЖНО: добавили :8080 и убрали setSelfSigned
             .setEndpoint("http://153.76.168.237:8080/v1")
             .setProject("6acfd94b00107a8657d8")
 
         account = Account(client)
         databases = Databases(client)
         storage = Storage(client)
+        realtime = Realtime(client) // ✅ Инициализируем сервис
     }
 }
