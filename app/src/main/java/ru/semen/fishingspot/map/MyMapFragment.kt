@@ -25,16 +25,17 @@ import androidx.navigation.findNavController
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.CircleCrop
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import ru.semen.fishingspot.R
-import ru.semen.fishingspot.map.point.data.FishingSpot
 import ru.semen.fishingspot.databinding.FragmentMapBinding
 import ru.semen.fishingspot.map.point.SpotViewModel
-
+import ru.semen.fishingspot.map.point.data.FishingSpot
 import ru.semen.fishingspot.profile_avatar.EditProfileDialog
 import ru.semen.fishingspot.utils.ProfileCache
 import ru.semen.fishingspot.utils.UserSessionManager
@@ -158,41 +159,80 @@ class MyMapFragment : Fragment() {
             Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
         }
 
-        // ✅ ИНИЦИАЛИЗАЦИЯ КНОПКИ ПРОФИЛЯ НА КАРТЕ
-        // ✅ ИНИЦИАЛИЗАЦИЯ КНОПКИ ПРОФИЛЯ НА КАРТЕ (Упрощенная версия)
-        // ✅ ИНИЦИАЛИЗАЦИЯ КНОПКИ ПРОФИЛЯ НА КАРТЕ
-        binding.ivProfileAvatar.apply {
-            setBackgroundResource(R.drawable.bg_avatar_shape)
+        // ✅ ИНИЦИАЛИЗАЦИЯ КНОПКИ ПРОФИЛЯ
+        updateProfileAvatarUI()
 
+        binding.ivProfileAvatar.setOnClickListener {
+            EditProfileDialog().show(childFragmentManager, "edit_profile_dialog")
+        }
+
+        // ✅ РЕАКТИВНАЯ ПОДПИСКА НА ОБНОВЛЕНИЕ КЭША
+        ProfileCache.avatarUpdated.observe(viewLifecycleOwner) { updatedUserId ->
             val currentUserId = UserSessionManager.getCurrentUserId(requireContext())
-
-            if (currentUserId != null) {
-                val cachedUrl = ProfileCache.getAvatar(currentUserId)
-
-                if (!cachedUrl.isNullOrEmpty()) {
-                    Glide.with(this@MyMapFragment)
-                        .load(cachedUrl)
-                        .transform(CircleCrop())
-                        .placeholder(R.drawable.bg_avatar_shape)
-                        .error(R.drawable.bg_avatar_shape)
-                        .into(this)
-                } else {
-                    setImageResource(R.drawable.group_24dp_000000_fill0_wght400_grad0_opsz24)
-
-                }
-            } else {
-                // На всякий случай, если сессия всё-таки потерялась
-                setImageResource(R.drawable.group_24dp_000000_fill0_wght400_grad0_opsz24)
-
-            }
-
-            setOnClickListener {
-                EditProfileDialog().show(childFragmentManager, "edit_profile_dialog")
+            if (updatedUserId == currentUserId) {
+                Log.d("MAP_AVATAR", "🔄 Получен сигнал обновления кэша")
+                updateProfileAvatarUI()
             }
         }
     }
 
+    // ✅ ЕДИНЫЙ МЕТОД ОБНОВЛЕНИЯ АВАТАРКИ
+    private fun updateProfileAvatarUI() {
+        if (_binding == null) return
 
+        val userId = UserSessionManager.getCurrentUserId(requireContext())
+        val cachedUrl = if (!userId.isNullOrEmpty()) {
+            ProfileCache.getAvatar(userId)
+        } else {
+            null
+        }
+
+        binding.ivProfileAvatar.apply {
+            setBackgroundResource(R.drawable.bg_avatar_shape)
+
+            if (!cachedUrl.isNullOrEmpty()) {
+                Glide.with(this@MyMapFragment)
+                    .load(cachedUrl)
+                    .transform(CircleCrop())
+                    .placeholder(R.drawable.bg_avatar_shape)
+                    .error(R.drawable.bg_avatar_shape)
+                    .transition(DrawableTransitionOptions.withCrossFade(300))
+                    .into(this)
+            } else {
+                setImageResource(R.drawable.group_24dp_000000_fill0_wght400_grad0_opsz24)
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        binding.mapView.onResume()
+        spotViewModel.refreshMap()
+
+        // ✅ Синхронизация при возврате фокуса
+        updateProfileAvatarUI()
+
+        if (!isLocationAlreadyShown && _binding != null) {
+            if (lastUserLocation != null) {
+                binding.mapView.controller.setCenter(lastUserLocation)
+                binding.mapView.controller.setZoom(CITY_ZOOM)
+                isLocationAlreadyShown = true
+                hideLoading()
+            } else if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                startLocationTracking()
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        _binding?.mapView?.onPause()
+    }
+
+    override fun onStop() {
+        locationOverlay?.disableMyLocation()
+        super.onStop()
+    }
 
     private fun clearPendingCamera() {
         returnLat = null
@@ -218,33 +258,6 @@ class MyMapFragment : Fragment() {
         } else {
             hideLoading()
         }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        binding.mapView.onResume()
-        spotViewModel.refreshMap()
-
-        if (!isLocationAlreadyShown && _binding != null) {
-            if (lastUserLocation != null) {
-                binding.mapView.controller.setCenter(lastUserLocation)
-                binding.mapView.controller.setZoom(CITY_ZOOM)
-                isLocationAlreadyShown = true
-                hideLoading()
-            } else if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                startLocationTracking()
-            }
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        _binding?.mapView?.onPause()
-    }
-
-    override fun onStop() {
-        locationOverlay?.disableMyLocation()
-        super.onStop()
     }
 
     private fun startLocationTracking() {
@@ -306,12 +319,10 @@ class MyMapFragment : Fragment() {
         }
     }
 
-    // ✅ ОБНОВЛЕННЫЙ МЕТОД ОТРИСОВКИ МАРКЕРОВ С АВТОРОМ
     private fun drawMarkers(spots: List<FishingSpot>) {
         if (_binding == null) return
         val mapView = binding.mapView
 
-        // Удаляем ТОЛЬКО наши кастомные оверлеи, оставляя геолокацию
         mapView.overlays.removeAll { it is AuthorMarkerOverlay }
 
         val icon = ContextCompat.getDrawable(requireContext(), R.drawable.metka4567)
@@ -341,7 +352,6 @@ class MyMapFragment : Fragment() {
         mapView.invalidate()
     }
 
-    // ✅ КАСТОМНЫЙ ОВЕРЛЕЙ ДЛЯ МАРКЕРА С ТЕКСТОМ АВТОРА
     inner class AuthorMarkerOverlay(
         private val spot: FishingSpot,
         private val iconDrawable: Drawable?,
@@ -401,6 +411,4 @@ class MyMapFragment : Fragment() {
         _binding = null
         super.onDestroyView()
     }
-
-
 }

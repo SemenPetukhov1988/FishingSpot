@@ -1,28 +1,29 @@
 package ru.semen.fishingspot.utils
 
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+
 object ProfileCache {
-    // Хранилище: userId -> avatarUrl
     private val cache = mutableMapOf<String, String>()
 
-    // Получить аватарку (null если нет)
+    // ✅ Сигнал обновления: хранит ID пользователя, чья аватарка изменилась
+    private val _avatarUpdated = MutableLiveData<String?>()
+    val avatarUpdated: LiveData<String?> = _avatarUpdated
+
     fun getAvatar(userId: String): String? = cache[userId]
 
-    // Сохранить одну аватарку
     fun putAvatar(userId: String, url: String?) {
-        if (!url.isNullOrEmpty()) {
-            cache[userId] = url
-        } else {
-            cache.remove(userId)
-        }
+        if (!url.isNullOrEmpty()) cache[userId] = url else cache.remove(userId)
+        // ✅ Уведомляем всех подписчиков сразу после изменения
+        _avatarUpdated.value = userId
     }
 
-    // Заполнить кэш пачкой данных (из batch-загрузки)
     fun putAll(profiles: Map<String, String?>) {
-        profiles.forEach { (id, url) ->
-            if (!url.isNullOrEmpty()) cache[id] = url
-        }
+        profiles.forEach { (id, url) -> if (!url.isNullOrEmpty()) cache[id] = url }
     }
 
-    // Очистить кэш (например, при выходе из аккаунта)
-    fun clear() = cache.clear()
+    fun clear() {
+        cache.clear()
+        _avatarUpdated.value = null
+    }
 }

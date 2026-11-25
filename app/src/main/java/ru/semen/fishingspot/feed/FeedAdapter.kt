@@ -11,6 +11,7 @@ import com.bumptech.glide.Glide
 import com.google.android.material.imageview.ShapeableImageView
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.map.point.data.FishingSpot
+import ru.semen.fishingspot.utils.loadUserAvatar // ✅ Импорт Extension-функции
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -35,7 +36,7 @@ class FeedAdapter(
         val tvDate: TextView = view.findViewById(R.id.tvFeedDate)
 
         val tvMetaInfo: TextView = view.findViewById(R.id.tvFeedMetaInfo)
-        val tvUserText: TextView = view.findViewById(R.id.tvFeedUserText) // ✅ Теперь точно найдет в новом XML
+        val tvUserText: TextView = view.findViewById(R.id.tvFeedUserText)
 
         val ivPhoto: ImageView = view.findViewById(R.id.ivFeedPhoto)
         val ivPhotoPlaceholder: ImageView = view.findViewById(R.id.ivFeedPhotoPlaceholder)
@@ -48,7 +49,6 @@ class FeedAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FeedViewHolder {
-        // ✅ ИСПРАВЛЕНИЕ: Используем НОВЫЙ лейаут item_feed_post
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_feed_spot, parent, false)
         return FeedViewHolder(view)
@@ -57,8 +57,12 @@ class FeedAdapter(
     override fun onBindViewHolder(holder: FeedViewHolder, position: Int) {
         val spot = items[position]
 
-        // 1. ШАПКА
+        // 1. ШАПКА + АВАТАРКА
         holder.tvAuthorName.text = spot.authorName.ifEmpty { "Рыбак" }
+
+        // ✅ ЗАГРУЗКА АВАТАРКИ ЧЕРЕЗ EXTENSION
+        holder.ivAuthorAvatar.loadUserAvatar(spot.authorId)
+
         holder.tvSpotName.text = spot.name.ifEmpty { "Без названия" }
 
         val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale("ru"))
@@ -87,7 +91,7 @@ class FeedAdapter(
             holder.ivPhotoPlaceholder.visibility = View.VISIBLE
         }
 
-        // ✅ 4. ТЕКСТ ПОСТА + ОТЛАДКА
+        // 4. ТЕКСТ ПОСТА
         Log.d("FEED_DEBUG", "📝 postText='${spot.postText}' | isEmpty=${spot.postText.isEmpty()}")
 
         if (!spot.postText.isNullOrEmpty()) {

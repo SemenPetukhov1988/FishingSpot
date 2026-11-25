@@ -15,13 +15,13 @@ import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import ru.semen.fishingspot.R
-import ru.semen.fishingspot.map.point.data.FishingSpot
 import ru.semen.fishingspot.databinding.FragmentSpotDetailsBinding
+import ru.semen.fishingspot.map.point.comment.CommentViewModel
 import ru.semen.fishingspot.map.point.comment.CommentsBottomSheetDialogFragment
+import ru.semen.fishingspot.map.point.data.FishingSpot
 import ru.semen.fishingspot.utils.NetworkMonitor
 import ru.semen.fishingspot.utils.UserSessionManager
-import ru.semen.fishingspot.map.point.comment.CommentViewModel
-import ru.semen.fishingspot.map.point.SpotViewModel
+import ru.semen.fishingspot.utils.loadUserAvatar // ✅ Импорт Extension-функции
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -62,7 +62,7 @@ class SpotDetailsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        networkMonitor = NetworkMonitor.Companion.getInstance(requireContext())
+        networkMonitor = NetworkMonitor.getInstance(requireContext())
 
         documentId = arguments?.getString(ARG_DOCUMENT_ID) ?: ""
         sourceTab = arguments?.getInt(ARG_SOURCE_TAB, R.id.nav_my_places) ?: R.id.nav_my_places
@@ -123,7 +123,7 @@ class SpotDetailsFragment : Fragment() {
 
         binding.tvSpotName.text = spot.name
 
-        // ✅ БИНДИНГ ТЕКСТА ПОСТА (Под фото, над панелью действий)
+        // ✅ БИНДИНГ ТЕКСТА ПОСТА
         if (!spot.postText.isNullOrEmpty()) {
             binding.tvPostText.visibility = View.VISIBLE
             binding.tvPostText.text = spot.postText
@@ -131,14 +131,19 @@ class SpotDetailsFragment : Fragment() {
             binding.tvPostText.visibility = View.GONE
         }
 
-        // Техническое описание (снасти/мета-инфо) остается ниже
+        // Техническое описание
         binding.tvDescription.text = spot.description.ifEmpty { "Нет описания" }
 
         binding.tvCatchWeight.text = weightText(spot.catchWeight)
+
+        // ✅ ИМЯ АВТОРА + АВАТАРКА
         binding.tvAuthorName.text = if (isAuthor) "Вы (Автор)" else spot.authorName
+        binding.ivAuthorAvatar.loadUserAvatar(spot.authorId) // ← ЗАГРУЗКА АВАТАРКИ
+
         binding.tvFishingDate.text = "📅 Рыбалка: " +
                 SimpleDateFormat("dd MMMM yyyy", Locale("ru")).format(Date(spot.createdAt))
 
+        // ФОТО ТОЧКИ
         if (!spot.photoUrl.isNullOrEmpty()) {
             binding.ivSpotPhoto.visibility = View.VISIBLE
             binding.ivPhotoPlaceholder.visibility = View.GONE
@@ -187,13 +192,10 @@ class SpotDetailsFragment : Fragment() {
     }
 
     private fun setupClickListeners() {
-        // ✅ УМНЫЙ ВОЗВРАТ: проверяем источник открытия точки
         val navigateBack = Runnable {
             if (sourceTab == R.id.nav_fishermen) {
-                // Если пришли с карты друга — просто закрываем детали и возвращаемся на карту
                 findNavController().popBackStack()
             } else {
-                // Для личных/публичных точек — возвращаемся в табы с нужным режимом
                 val bundle = Bundle().apply { putInt("active_tab", sourceTab) }
                 val navOptions = NavOptions.Builder()
                     .setPopUpTo(R.id.mainTabsFragment, inclusive = false)
@@ -222,7 +224,7 @@ class SpotDetailsFragment : Fragment() {
             val id = currentSpot?.documentId ?: return@setOnClickListener
             confirm("Удалить точку?", "Точка будет удалена с сервера навсегда.", "Удалить") {
                 spotViewModel.deleteSpot(id)
-                navigateBack.run() // ← Используем ту же умную логику
+                navigateBack.run()
             }
         }
 
