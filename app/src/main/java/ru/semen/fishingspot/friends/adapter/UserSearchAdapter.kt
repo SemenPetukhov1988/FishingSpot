@@ -2,11 +2,14 @@ package ru.semen.fishingspot.friends.adapter
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import ru.semen.fishingspot.friends.data.User
+import com.google.android.material.imageview.ShapeableImageView
 import ru.semen.fishingspot.databinding.ItemUserSearchBinding
+import ru.semen.fishingspot.friends.data.User
+import ru.semen.fishingspot.utils.loadUserAvatar
 
 class UserSearchAdapter(
     private val onUserClick: (User) -> Unit
@@ -24,9 +27,10 @@ class UserSearchAdapter(
     inner class SearchViewHolder(private val binding: ItemUserSearchBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(user: User) {
             binding.tvUserName.text = user.name
-            binding.tvAvatarLetter.text = user.name.firstOrNull()?.uppercase() ?: "?"
 
-            // Если уже друг - меняем текст кнопки или скрываем её
+            // ✅ ЗАГРУЗКА АВАТАРКИ ЧЕРЕЗ УМНЫЙ EXTENSION
+            binding.ivUserAvatar.loadUserAvatar(user.id)
+
             if (user.isAlreadyFriend) {
                 binding.btnAddFriend.text = "В друзьях"
                 binding.btnAddFriend.isEnabled = false
@@ -35,7 +39,12 @@ class UserSearchAdapter(
                 binding.btnAddFriend.text = "Добавить"
                 binding.btnAddFriend.isEnabled = true
                 binding.btnAddFriend.alpha = 1.0f
-                binding.btnAddFriend.setOnClickListener { onUserClick(user) }
+
+                binding.btnAddFriend.setOnClickListener {
+                    // ✅ ПОКАЗЫВАЕМ ТОСТ ПЕРЕД ВЫЗОВОМ ЛОГИКИ
+                    Toast.makeText(binding.root.context, "Запрос в друзья отправлен!", Toast.LENGTH_SHORT).show()
+                    onUserClick(user)
+                }
             }
         }
     }

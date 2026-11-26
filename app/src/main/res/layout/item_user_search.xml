@@ -7,16 +7,14 @@
     android:padding="12dp"
     android:gravity="center_vertical">
 
-    <!-- Аватар-заглушка -->
-    <TextView
-        android:id="@+id/tvAvatarLetter"
+    <!-- ✅ АВАТАРКА ПОЛЬЗОВАТЕЛЯ -->
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/ivUserAvatar"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:background="@drawable/circle_background_blue"
-        android:gravity="center"
-        android:textColor="@android:color/white"
-        android:textSize="18sp"
-        android:textStyle="bold" />
+        app:shapeAppearanceOverlay="@style/CircleImageView"
+        android:scaleType="centerCrop"
+        android:src="@drawable/fisherbl" /> <!-- Твоя заглушка -->
 
     <!-- Имя пользователя -->
     <TextView

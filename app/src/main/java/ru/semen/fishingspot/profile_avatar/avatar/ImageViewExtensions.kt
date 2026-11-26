@@ -8,7 +8,7 @@ import ru.semen.fishingspot.R
 fun ImageView.loadUserAvatar(userId: String?) {
     // ✅ Сначала проверяем, есть ли вообще ID
     if (userId.isNullOrEmpty()) {
-        setImageResource(R.drawable.bg_avatar_shape)
+        setImageResource(R.drawable.fisherbl)
         return
     }
 
@@ -16,14 +16,14 @@ fun ImageView.loadUserAvatar(userId: String?) {
     val url = ProfileCache.getAvatar(userId)
 
     if (url.isNullOrEmpty()) {
-        setImageResource(R.drawable.bg_avatar_shape)
+        setImageResource(R.drawable.fisherbl)
         return
     }
 
     Glide.with(this)
         .load(url)
         .transform(CircleCrop())
-        .placeholder(R.drawable.bg_avatar_shape)
-        .error(R.drawable.bg_avatar_shape)
+        .placeholder(R.drawable.fisherbl)
+        .error(R.drawable.fisherbl)
         .into(this)
 }

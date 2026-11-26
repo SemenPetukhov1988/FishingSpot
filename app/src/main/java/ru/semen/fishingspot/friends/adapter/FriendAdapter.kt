@@ -6,8 +6,10 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.imageview.ShapeableImageView
 import ru.semen.fishingspot.R
 import ru.semen.fishingspot.friends.data.Friend
+import ru.semen.fishingspot.utils.loadUserAvatar // ✅ Импорт Extension
 
 class FriendAdapter(
     private val onFriendClick: (Friend) -> Unit,
@@ -22,7 +24,8 @@ class FriendAdapter(
     }
 
     class FriendViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val tvAvatarLetter: TextView = view.findViewById(R.id.tvAvatarLetter)
+        // ✅ Ищем новый ImageView вместо TextView
+        val ivFriendAvatar: ShapeableImageView = view.findViewById(R.id.ivFriendAvatar)
         val tvFriendName: TextView = view.findViewById(R.id.tvFriendName)
         val btnRemoveFriend: ImageButton = view.findViewById(R.id.btnRemoveFriend)
     }
@@ -36,11 +39,11 @@ class FriendAdapter(
     override fun onBindViewHolder(holder: FriendViewHolder, position: Int) {
         val friend = items[position]
 
-        // Привязываем данные
-        holder.tvFriendName.text = friend.name.ifEmpty { "Рыбак" }
-        holder.tvAvatarLetter.text = friend.name.firstOrNull()?.uppercase() ?: "?"
+        // ✅ ЗАГРУЗКА АВАТАРКИ ЧЕРЕЗ УМНЫЙ EXTENSION
+        holder.ivFriendAvatar.loadUserAvatar(friend.id)
 
-        // ✅ ОБРАБОТЧИКИ КЛИКОВ ПРИВЯЗЫВАЮТСЯ ЗДЕСЬ, ГДЕ ЕСТЬ ДОСТУП К СПИСКУ И ЛАМБДАМ
+        holder.tvFriendName.text = friend.name.ifEmpty { "Рыбак" }
+
         holder.itemView.setOnClickListener {
             onFriendClick(friend)
         }

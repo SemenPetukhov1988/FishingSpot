@@ -8,56 +8,84 @@
     android:layout_height="match_parent"
     tools:context=".friends.FishermenFragment">
 
-    <androidx.coordinatorlayout.widget.CoordinatorLayout
+    <!-- ✅ ИСПОЛЬЗУЕМ LINEARLAYOUT ДЛЯ ВЕРТИКАЛЬНОГО РАСПОЛОЖЕНИЯ -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:orientation="vertical"
         android:background="#F0F2F5">
 
-        <!-- Список друзей -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvFriends"
+        <!-- ПОЛЕ ПОИСКА ДРУЗЕЙ -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilSearchFriends"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:padding="8dp"
-            android:paddingBottom="80dp" />
-
-        <!-- Пустое состояние -->
-        <LinearLayout
-            android:id="@+id/layoutEmptyState"
-            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:visibility="gone">
+            android:layout_margin="16dp"
+            app:startIconDrawable="@drawable/search_24dp_000000_fill0_wght400_grad0_opsz24"
+            app:endIconMode="clear_text"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
-            <TextView
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etSearchFriends"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Поиск по имени друга..."
+                android:inputType="text"
+                android:maxLines="1" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- СПИСОК ДРУЗЕЙ (занимает всё оставшееся место) -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvFriends"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:padding="8dp"
+                android:paddingBottom="80dp" />
+
+            <!-- Пустое состояние (по центру экрана) -->
+            <LinearLayout
+                android:id="@+id/layoutEmptyState"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="👥"
-                android:textSize="64sp" />
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:visibility="gone">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="У вас пока нет друзей"
-                android:textColor="#626262"
-                android:textSize="16sp" />
-        </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="👥"
+                    android:textSize="64sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="У вас пока нет друзей"
+                    android:textColor="#626262"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+        </FrameLayout>
 
         <!-- Кнопка добавления (FAB) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/fabAddFriend"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom|end"
+            android:layout_gravity="end|bottom"
             android:layout_margin="24dp"
             android:contentDescription="Добавить друга"
             android:src="@android:drawable/ic_input_add"
             app:backgroundTint="#4C9AFF"
             app:tint="@android:color/white" />
 
-    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+    </LinearLayout>
 </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

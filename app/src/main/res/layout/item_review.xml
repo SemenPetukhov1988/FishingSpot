@@ -1,45 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- ✅ ЗАМЕНИЛИ MaterialCardView НА FrameLayout БЕЗ ФОНА -->
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
-    <!-- Контейнер контента (сдвигается для ответов) -->
+    <!-- ✅ ЛИНИЯ СВЯЗИ (видна только у ответов) -->
+    <View
+        android:id="@+id/viewThreadLine"
+        android:layout_width="2dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="24dp"
+        android:background="#E1E3E6"
+        android:visibility="gone"/>
+
+    <!-- ОСНОВНОЙ КОНТЕЙНЕР -->
     <LinearLayout
         android:id="@+id/contentContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
+        android:orientation="horizontal"
         android:paddingHorizontal="16dp"
-        android:paddingVertical="12dp">
+        android:paddingVertical="8dp">
 
-        <!-- Шапка: автор + дата -->
+        <!-- ✅ АВАТАРКА -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/ivAuthorAvatar"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            app:shapeAppearanceOverlay="@style/CircleImageView"
+            android:scaleType="centerCrop"
+            android:src="@drawable/fisherbl"
+            tools:src="@tools:sample/avatars"/>
+
+        <!-- КОНТЕНТ СПРАВА ОТ АВАТАРКИ -->
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
 
-            <!-- Круг с первой буквой имени -->
-            <TextView
-                android:id="@+id/tvAuthorAvatar"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/circle_background_blue"
-                android:gravity="center"
-                android:textColor="@android:color/white"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                tools:text="С"/>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="10dp"
-                android:orientation="vertical">
+            <!-- ШАПКА: Имя + Дата + Кнопка Ответить -->
+            <!-- ШАПКА: Имя + Дата + Кнопка Ответить -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
 
                 <TextView
                     android:id="@+id/tvAuthorName"
@@ -49,61 +56,46 @@
                     android:textStyle="bold"
                     android:textColor="?attr/colorOnSurface"/>
 
+                <!-- ✅ ДАТА: Ограничена справа кнопкой ответа -->
                 <TextView
                     android:id="@+id/tvReviewDate"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_toEndOf="@id/tvAuthorName"
+                    android:layout_toStartOf="@id/tvReplyButton"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="4dp"
                     android:textSize="12sp"
-                    android:textColor="?attr/colorOnSurfaceVariant"/>
-            </LinearLayout>
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:ellipsize="end"
+                    android:maxLines="1"/>
+
+                <!-- КНОПКА ОТВЕТИТЬ СПРАВА -->
+                <TextView
+                    android:id="@+id/tvReplyButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:text="Ответить"
+                    android:textSize="12sp"
+                    android:textColor="#0288D1"
+                    android:textStyle="bold"
+                    android:padding="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"/>
+            </RelativeLayout>
+
+            <!-- ТЕКСТ КОММЕНТАРИЯ -->
+            <TextView
+                android:id="@+id/tvReviewText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textSize="14sp"
+                android:textColor="?attr/colorOnSurface"
+                android:lineSpacingExtra="2dp"/>
+
         </LinearLayout>
 
-        <!-- ПЛАШКА "ОТВЕЧАЕТ..." -->
-        <TextView
-            android:id="@+id/tvReplyToIndicator"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="4dp"
-            android:textSize="12sp"
-            android:textColor="#0288D1"
-            android:textStyle="bold"
-            android:visibility="gone"
-            tools:text="Семен отвечает Сергею"
-            tools:visibility="visible"/>
-
-        <!-- Текст отзыва -->
-        <TextView
-            android:id="@+id/tvReviewText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp"
-            android:textColor="?attr/colorOnSurface"
-            android:lineSpacingExtra="2dp"/>
-
-        <!-- КНОПКА ОТВЕТИТЬ -->
-        <TextView
-            android:id="@+id/tvReplyButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="️ Ответить"
-            android:textSize="12sp"
-            android:textColor="#0288D1"
-            android:textStyle="bold"
-            android:padding="4dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless"/>
-
     </LinearLayout>
-
-    <!-- Тонкий разделитель между комментариями (как в VK) -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_gravity="bottom"
-        android:layout_marginStart="66dp"
-        android:background="?attr/colorOutlineVariant"/>
-
 </FrameLayout>
